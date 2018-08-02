@@ -9,3 +9,5 @@ Files:
      seq3 dataset.
   4. .mat file is synthesized data.
 
+Update:  
+  1. slam.py is the main algorithm. It implements EKF algorithm for PTZ camera calibration. 
