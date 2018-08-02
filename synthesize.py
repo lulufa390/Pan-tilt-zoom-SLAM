@@ -5,6 +5,7 @@ import scipy.io as sio
 import random
 import cv2 as cv
 from sklearn.preprocessing import normalize
+import math
 
 """
 1. Synthesize points on 3d soccer field model and visualize
@@ -19,14 +20,14 @@ function to generate random points.
 
 def generate_points():
     list_pts = []
-    for i in range(100):
+    for i in range(200):
         xside = random.randint(0, 1)
         list_pts.append([xside * random.gauss(0, 5) + (1 - xside) * random.gauss(108, 5),
-                    random.uniform(0, 70), random.uniform(0, 10)])
+                         random.uniform(0, 70), random.uniform(0, 10)])
 
         list_pts.append([random.uniform(0, 108), random.gauss(63, 2), random.uniform(0, 10)])
 
-    for i in range(0, 20):
+    for i in range(0, 40):
         tmpx = random.gauss(54, 20)
         while tmpx > 108 or tmpx < 0:
             tmpx = random.gauss(54, 20)
@@ -44,15 +45,34 @@ def generate_points():
 
 pts = generate_points()
 
-# load the soccer field model
+"""
+load the soccer field model
+"""
+
 soccer_model = sio.loadmat("./two_point_calib_dataset/util/highlights_soccer_model.mat")
 line_index = soccer_model['line_segment_index']
 points = soccer_model['points']
 
-# load the sequence annotation
+"""
+load the sequence annotation
+"""
+
 seq = sio.loadmat("./two_point_calib_dataset/highlights/seq3_anno.mat")
 annotation = seq["annotation"]
 meta = seq['meta']
+
+"""
+compute the rays of these synthesized points
+"""
+proj_center = meta[0][0]["cc"][0]
+rays = []
+
+for i in range(0, len(pts)):
+    relative = pts[i] - proj_center
+
+    pan = math.atan(-relative[1] / relative[0])
+    tilt = math.asin(relative[2] / np.linalg.norm(relative))
+    rays.append([pan, tilt])
 
 """
 This part is used to visualize the soccer model.
@@ -134,5 +154,6 @@ for i in range(len(pts)):
 
 key_points['features'] = features
 key_points['pts'] = pts
+key_points['rays'] = rays
 
 sio.savemat('synthesize_data.mat', mdict=key_points)
