@@ -130,7 +130,6 @@ for i in range(1, annotation.size):
 
         # cv.circle(img, (int(p[0] / p[2]), int(p[1] / p[2])), color=(0, 0, 0), radius=8, thickness=2)
 
-
     # print(features.shape)
 
     """
@@ -138,31 +137,49 @@ for i in range(1, annotation.size):
     """
     hx = np.ndarray([len(pts), 2])
 
-    print(u, v)
-    print(tmp_x)
+    # print(u, v)
+    # print(tmp_x)
     for j in range(len(pts)):
         hx[j][0] = f * math.tan(rays[j][0] - tmp_x[0]) + u
         hx[j][1] = f * math.tan(rays[j][1] - tmp_x[1]) + v
         cv.circle(img, (int(hx[j][0]), int(hx[j][1])), color=(0, 0, 0), radius=8, thickness=2)
 
-        print("fuck")
-        print(features[j])
-        print(hx[j])
+        # print("fuck")
+        # print(features[j])
+        # print(hx[j])
 
+    y = features.flatten() - hx.flatten()
+
+    # print(y)
     # print(hx)
+
+    """
+    Sk = Hk*Pk|k-1*Hk^T + Rk
+    """
+
+    jacobi_h = np.ndarray([2 * len(pts), 3])
+
+    for j in range(len(pts)):
+        jacobi_h[2 * j][0] = -f / math.pow(math.cos(rays[j][0] - tmp_x[0]), 2)
+        jacobi_h[2 * j][1] = 0
+        jacobi_h[2 * j][2] = math.tan(rays[j][0] - tmp_x[0])
+        jacobi_h[2 * j + 1][0] = 0
+        jacobi_h[2 * j + 1][1] = -f / math.pow(math.cos(rays[j][1] - tmp_x[1]), 2)
+        jacobi_h[2 * j + 1][2] = math.tan(rays[j][1] - tmp_x[1])
+
+    # print(jacobi_h)
+
+    s = np.dot(np.dot(jacobi_h, tmp_p), jacobi_h.T) + 0.1 * np.ones([2 * len(pts), 2 * len(pts)])
+
+    k = np.dot(np.dot(tmp_p, jacobi_h.T), np.linalg.inv(s))
+
+    x[i] = np.transpose(tmp_x + np.dot(k, y))
+
+    p[i] = np.dot((np.eye(3) - np.dot(k, jacobi_h)), tmp_p)
 
     cv.imshow("synthesized image", img)
 
     cv.waitKey(0)
 
-    """
-    get the next pose Pn_init
-    """
-
-    # f += delta_zoom
-    # pan += delta_pan
-    # tilt += delta_tilt
-
-    """
-    Update Pn_init with the observation Z1.
-    """
+print(x)
+# print(p       )
