@@ -10,6 +10,7 @@ import random
 import cv2 as cv
 from sklearn.preprocessing import normalize
 import math
+import synthesize
 
 """                       
 load the soccer field model
@@ -28,10 +29,10 @@ meta = seq['meta']
 """
 load the synthesized data
 """
-synthesize = sio.loadmat("./synthesize_data.mat")
-pts = synthesize["pts"]
-features = synthesize["features"]
-rays = synthesize["rays"]
+data = sio.loadmat("./synthesize_data.mat")
+pts = data["pts"]
+features = data["features"]
+rays = data["rays"]
 
 img = np.zeros((720, 1280, 3), np.uint8)
 
@@ -41,32 +42,22 @@ f, pan, tilt are 3 variables for camera pose
 u, v are the image center
 k is the intrinsic matrix 
 """
-camera = annotation[0][0]['camera'][0]
-
-u = camera[0]
-v = camera[1]
-f = camera[2]
-k = np.array([[f, 0, u], [0, f, v], [0, 0, 1]])
+u, v, f = annotation[0][0]['camera'][0][0:3]
 
 """
-the rotation matrix
+the rotation matrix         
 first get the base rotation
 we will use radian instead of degree for pan and tilt angle
 """
 base_rotation = np.zeros([3, 3])
 cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
 
-pan = annotation[0][0]['ptz'].squeeze()[0] * math.pi / 180
-tilt = annotation[0][0]['ptz'].squeeze()[1] * math.pi / 180
-
-rotation = np.dot(np.array([[1, 0, 0], [0, math.cos(tilt), math.sin(tilt)], [0, -math.sin(tilt), math.cos(tilt)]]),
-                  np.array([[math.cos(pan), 0, -math.sin(pan)], [0, 1, 0], [math.sin(pan), 0, math.cos(pan)]]))
-rotation = np.dot(rotation, base_rotation)
+pan, tilt, _ = annotation[0][0]['ptz'].squeeze() * math.pi / 180
 
 """
 projection center of ptz camera
 """
-c = np.array(camera[6:9])
+c = meta[0][0]["cc"][0]
 
 delta_zoom = 0
 delta_pan = 0
@@ -84,74 +75,21 @@ initialize the covariance matrix
 p = np.ndarray([annotation.size, 3, 3])
 tmp = np.diag([0.01, 0.01, 0.01])
 p[0] = tmp
-print(p.shape)
 
-for i in range(1, annotation.size):
 
-    """
-    prediction
-    """
-    tmp_x = x[i - 1] + [delta_pan, delta_tilt, delta_zoom]
-    tmp_p = p[i - 1] + 0.1 * np.ones([3, 3])
-    # print("+====================+")
-    # print(p)
-    """
-    clear the frame
-    """
-    img.fill(255)
-
-    """
-    get the next observation of feature points for next frame (using ground truth camera pose)
-    """
-    tmp_camera = annotation[0][i]['camera'][0]
-
-    tmp_paras = tmp_camera[0:3]
-    tmp_k = np.array([[tmp_paras[2], 0, tmp_paras[0]], [0, tmp_paras[2], tmp_paras[1]], [0, 0, 1]])
-
-    tmp_pt = annotation[0][i]['ptz'].squeeze()
-    tmp_pt = tmp_pt * math.pi / 180
-    tmp_rotation = np.dot(
-        np.array(
-            [[1, 0, 0], [0, math.cos(tmp_pt[1]), math.sin(tmp_pt[1])], [0, -math.sin(tmp_pt[1]), math.cos(tmp_pt[1])]]),
-        np.array(
-            [[math.cos(tmp_pt[0]), 0, -math.sin(tmp_pt[0])], [0, 1, 0], [math.sin(tmp_pt[0]), 0, math.cos(tmp_pt[0])]]))
-    tmp_rotation = np.dot(tmp_rotation, base_rotation)
-
-    features = np.ndarray([len(pts), 2])
-
-    """
-    draw the feature points in images
-    """
-
-    for j in range(len(pts)):
-        pos = np.array(pts[j])
-        pos = np.dot(tmp_k, np.dot(tmp_rotation, pos - c))
-        features[j] = [int(pos[0] / pos[2]), int(pos[1] / pos[2])]
-
-        # cv.circle(img, (int(p[0] / p[2]), int(p[1] / p[2])), color=(0, 0, 0), radius=8, thickness=2)
-
-    # print(features.shape)
-
-    """
-    yk = zk - h(xk|k-1)
-    """
+def update(previous_x, previous_p, observe):
     hx = np.ndarray([len(pts), 2])
 
-    # print(u, v)
-    # print(tmp_x)
     for j in range(len(pts)):
-        hx[j][0] = f * math.tan(rays[j][0] - tmp_x[0]) + u
-        hx[j][1] = f * math.tan(rays[j][1] - tmp_x[1]) + v
-        cv.circle(img, (int(hx[j][0]), int(hx[j][1])), color=(0, 0, 0), radius=8, thickness=2)
+        hx[j][0] = f * math.tan(rays[j][0] - previous_x[0]) + u
+        hx[j][1] = - f * math.tan(rays[j][1] - previous_x[1]) + v
+        # cv.circle(img, (int(hx[j][0]), int(hx[j][1])), color=(0, 0, 0), radius=8, thickness=2)
 
-        # print("fuck")
-        # print(features[j])
-        # print(hx[j])
+        print("fuck")
+        print(features[j])
+        print(hx[j])
 
-    y = features.flatten() - hx.flatten()
-
-    # print(y)
-    # print(hx)
+    y = observe.flatten() - hx.flatten()
 
     """
     Sk = Hk*Pk|k-1*Hk^T + Rk
@@ -160,26 +98,67 @@ for i in range(1, annotation.size):
     jacobi_h = np.ndarray([2 * len(pts), 3])
 
     for j in range(len(pts)):
-        jacobi_h[2 * j][0] = -f / math.pow(math.cos(rays[j][0] - tmp_x[0]), 2)
+        jacobi_h[2 * j][0] = -f / math.pow(math.cos(rays[j][0] - previous_x[0]), 2)
         jacobi_h[2 * j][1] = 0
-        jacobi_h[2 * j][2] = math.tan(rays[j][0] - tmp_x[0])
+        jacobi_h[2 * j][2] = math.tan(rays[j][0] - previous_x[0])
         jacobi_h[2 * j + 1][0] = 0
-        jacobi_h[2 * j + 1][1] = -f / math.pow(math.cos(rays[j][1] - tmp_x[1]), 2)
-        jacobi_h[2 * j + 1][2] = math.tan(rays[j][1] - tmp_x[1])
+        jacobi_h[2 * j + 1][1] = -f / math.pow(math.cos(rays[j][1] - previous_x[1]), 2)
+        jacobi_h[2 * j + 1][2] = math.tan(rays[j][1] - previous_x[1])
 
-    # print(jacobi_h)
+    s = np.dot(np.dot(jacobi_h, previous_p), jacobi_h.T) + 0.01 * np.ones([2 * len(pts), 2 * len(pts)])
 
-    s = np.dot(np.dot(jacobi_h, tmp_p), jacobi_h.T) + 0.1 * np.ones([2 * len(pts), 2 * len(pts)])
+    k = np.dot(np.dot(previous_p, jacobi_h.T), np.linalg.inv(s))
 
-    k = np.dot(np.dot(tmp_p, jacobi_h.T), np.linalg.inv(s))
+    return [np.transpose(previous_x + np.dot(k, y)), np.dot((np.eye(3) - np.dot(k, jacobi_h)), tmp_p)]
 
-    x[i] = np.transpose(tmp_x + np.dot(k, y))
 
-    p[i] = np.dot((np.eye(3) - np.dot(k, jacobi_h)), tmp_p)
+"""
+the main loop for EKF algorithm
+i is the index for next state, as we the first camera pose is already known, i begins from 1. 
+"""
+for i in range(1, annotation.size):
+
+    """
+    prediction
+    """
+    tmp_x = x[i - 1] + [delta_pan, delta_tilt, delta_zoom]
+    tmp_p = p[i - 1] + 0.01 * np.ones([3, 3])
+
+    """
+    clear the frame
+    """
+    img.fill(255)
+
+    """
+    get the next observation of feature points for next frame (using ground truth camera pose)
+    """
+    tmp_f = annotation[0][i]['camera'][0][2]
+    pan, tilt, _ = annotation[0][i]['ptz'].squeeze() * math.pi / 180
+
+    features = np.ndarray([len(pts), 2])
+
+    for j in range(len(pts)):
+        pos = np.array(pts[j])
+        features[j] = synthesize.from_3d_to_2d(u, v, tmp_f, pan, tilt, c, base_rotation, pos)
+        cv.circle(img, (int(features[j][0]), int(features[j][1])), color=(0, 0, 0), radius=8, thickness=2)
+
+    """
+    yk = zk - h(xk|k-1)
+    """
+
+    x[i], p[i] = update(tmp_x, tmp_p, features)
+
+    # x[i] = np.transpose(tmp_x + np.dot(k, y))
+    #
+    # p[i] = np.dot((np.eye(3) - np.dot(k, jacobi_h)), tmp_p)
+
+    delta_pan, delta_tilt, delta_zoom = x[i] - x[i - 1]
+
+
 
     cv.imshow("synthesized image", img)
 
     cv.waitKey(0)
 
 print(x)
-# print(p       )
+
