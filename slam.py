@@ -75,7 +75,7 @@ def compute_jacobi(theta, phi, foc, ray):
 
     return jacobi_h
 
-print( compute_jacobi(0.9, 0.1, 3500, [0.5,0.5]) - compute_jacobi(0.9, 0.1, 3500, [0.5001,0.5001]))
+# print( compute_jacobi(0.9, 0.1, 3500, [0.9,0.1]) - compute_jacobi(0.9, 0.1, 3500, [0.9001,0.1001]))
 
 
 def update(previous_x, previous_p, observe, u, v, rays):
