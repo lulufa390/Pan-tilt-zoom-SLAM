@@ -19,9 +19,9 @@ class PtzSlam:
         self.img = np.zeros((720, 1280, 3), np.uint8)
 
         """
-        1. load the soccer field model
-        2. load the sequence annotation
-        3. load the synthesized data
+        load the data of soccer field
+        load annotation (ground truth)
+        load synthesized features
         """
         soccer_model = sio.loadmat(model_path)
         self.line_index = soccer_model['line_segment_index']
@@ -37,14 +37,8 @@ class PtzSlam:
         self.rays = data["rays"]
 
         """
-        get the first camera pose 
-        f, pan, tilt are 3 variables for camera pose
-        u, v are the image center
-        """
-
-        """
-        base_rotation: the base rotation matrix of PTZ camera         
-        c: projection center of ptz camera
+        initialize the fixed parameters of our algorithm
+        u, v, base_rotation and c
         """
         self.u, self.v = self.annotation[0][0]['camera'][0][0:2]
         self.base_rotation = np.zeros([3, 3])
@@ -52,9 +46,7 @@ class PtzSlam:
         self.c = self.meta[0][0]["cc"][0]
 
         """
-        1. initialize the camera pose array 
-        2. initialize the covariance matrix array 
-        3. speed model for PTZ camera
+        parameters to be updated
         """
         self.x = np.ndarray([self.annotation.size, 3])
         pan, tilt, f = self.annotation[0][0]['ptz'].squeeze()
@@ -66,7 +58,7 @@ class PtzSlam:
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
         self.q = 0.01 * np.ones([3, 3])
-        self.r = 0.01 * np.ones([3, 3])
+        # self.r = 0.01 * np.ones([3, 3])
 
     @staticmethod
     def compute_jacobi(theta, phi, foc, ray):
@@ -92,8 +84,40 @@ class PtzSlam:
         jacobi_h[1][1] = (-foc * math.tan(ray[1] - (phi + delta)) + foc * math.tan(ray[1] - (phi - delta))) / (
                 2 * delta)
         jacobi_h[1][2] = ((foc + delta) * math.tan(ray[1] - phi) - (foc - delta) * math.tan(ray[1] - phi)) / (2 * delta)
-
         return jacobi_h
+
+    @staticmethod
+    def test_jacobi(theta, phi, f, theta_i, phi_i):
+        print("----------------------------------------")
+        print("theta = %f, phi = %f, f = %f, theta_i = %f, phi_i = %f" % (theta, phi, f, theta_i, phi_i), "\n")
+        print("result of derivative:")
+        print(PtzSlam.compute_jacobi(theta, phi, f, [theta_i, phi_i]), "\n")
+        print("result of approximate:")
+        print(PtzSlam.compute_jacobi_approximate(theta, phi, f, [theta_i, phi_i]))
+        print("----------------------------------------\n")
+
+    def get_observation_from_index(self, index):
+        f = self.annotation[0][index]['camera'][0][2]
+        pan, tilt, _ = self.annotation[0][index]['ptz'].squeeze() * math.pi / 180
+        features = np.ndarray([len(self.rays), 2])
+
+        for j in range(len(self.rays)):
+            pos = np.array(self.pts[j])
+            features[j] = synthesize.from_3d_to_2d(self.u, self.v, f, pan, tilt, self.c, self.base_rotation, pos)
+
+        return features
+
+    def get_observation_from_ptz(self, pan, tilt, f):
+        features = np.ndarray([len(self.rays), 2])
+        for j in range(len(self.rays)):
+            pos = np.array(self.pts[j])
+            features[j] = synthesize.from_3d_to_2d(self.u, self.v, f, pan, tilt, self.c, self.base_rotation, pos)
+
+        return features
+
+    def visualize_features(self, features, pt_color):
+        for j in range(len(features)):
+            cv.circle(self.img, (int(features[j][0]), int(features[j][1])), color=pt_color, radius=8, thickness=2)
 
     def ekf(self, previous_x, previous_p, observe):
         predict_x = previous_x + [self.delta_pan, self.delta_tilt, self.delta_zoom]
@@ -105,7 +129,6 @@ class PtzSlam:
         for j in range(len(self.rays)):
             hx[j][0] = predict_x[2] * math.tan(self.rays[j][0] - predict_x[0]) + self.u
             hx[j][1] = - predict_x[2] * math.tan(self.rays[j][1] - predict_x[1]) + self.v
-            # cv.circle(self.img, (int(hx[j]  [0]), int(hx[j][1])), color=(255, 0, 0), radius=8, thickness=2)
 
         y = []
         jacobi = []
@@ -121,62 +144,52 @@ class PtzSlam:
         jacobi = np.array(jacobi)
         jacobi = jacobi.reshape((-1, 3))
 
+        # print(y)
+        # print(jacobi)
 
+        # test = np.array([[1,1,1], [1,2,3], [1,5,1]])
+        # print(np.linalg.inv(test))
 
         s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 0.01 * np.ones([2 * cnt, 2 * cnt])
 
         k = np.dot(np.dot(predict_p, jacobi.T), np.linalg.inv(s))
 
-        updated_x = np.transpose(predict_x + np.dot(k, y))
+        # print(k.shape)
+        # print(y.shape)
+        #
+        # fuck = np.dot(k, y)
+        # print(fuck.shape)
+        # print(predict_x.shape)
+
+        # print(predict_x + np.dot(k, y) )
+        # updated_x = np.transpose(predict_x + np.dot(k, y))
+        updated_x = predict_x + np.dot(k, y)
         updated_p = np.dot((np.eye(3) - np.dot(k, jacobi)), predict_p)
         return [updated_x, updated_p]
 
-
-
-
-    def get_observation(self, index):
-        f = self.annotation[0][index]['camera'][0][2]
-        pan, tilt, _ = self.annotation[0][index]['ptz'].squeeze() * math.pi / 180
-
-        features = np.ndarray([len(self.rays), 2])
-
-        for j in range(len(self.rays)):
-            pos = np.array(self.pts[j])
-            features[j] = synthesize.from_3d_to_2d(self.u, self.v, f, pan, tilt, self.c, self.base_rotation, pos)
-            cv.circle(self.img, (int(features[j][0]), int(features[j][1])), color=(0, 0, 0), radius=8, thickness=2)
-
-        return features
-
     def main_algorithm(self):
-        for i in range(1, self.annotation.size):
+        self.img.fill(255)
+        for i in range(1, 2):
+            # for i in range(1, self.annotation.size):
+            observe = self.get_observation_from_index(i)
 
-            self.img.fill(255)
-
-            features = self.get_observation(i)
-
-            """
-            yk = zk - h(xk|k-1)       
-            """
-
-            self.x[i], self.p[i] = self.ekf(self.x[i-1], self.p[i-1], features)
-
+            self.x[i], self.p[i] = self.ekf(self.x[i - 1], self.p[i - 1], observe)
             self.delta_pan, self.delta_tilt, self.delta_zoom = self.x[i] - self.x[i - 1]
 
-            cv.imshow("synthesized image", self.img)
+        features = self.get_observation_from_index(1)
+        predict_features = self.get_observation_from_index(0)
+        estimate_features = self.get_observation_from_ptz(self.x[1][0], self.x[1][1], self.x[1][2])
 
-            cv.waitKey(0)
+        self.visualize_features(predict_features, (255, 0, 0))
+        self.visualize_features(features, (0, 0, 0))
+        self.visualize_features(estimate_features, (0, 0, 255))
 
-        print(self.x)
-
-    # for i in range(1, 15):
-    #     for j in range(1, 15):
-    #         print("theta:", i * 0.1, "phi", j * 0.1)
-    #         print(compute_jacobi(0.9, 0.1, 3500, [i * 0.1, j * 0.1]))
-    #
-    #         print(compute_jacobi_approximate(0.9, 0.1, 3500, [i * 0.1, j * 0.1]))
+        cv.imshow("synthesized image", self.img)
+        cv.waitKey(0)
 
 
 slam = PtzSlam("./two_point_calib_dataset/util/highlights_soccer_model.mat",
                "./two_point_calib_dataset/highlights/seq3_anno.mat",
                "./synthesize_data.mat")
 slam.main_algorithm()
+# PtzSlam.test_jacobi(0.9, 0.1, 3500, 0.5, 0.5)
