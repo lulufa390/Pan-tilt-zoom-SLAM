@@ -53,11 +53,11 @@ class PtzSlam:
         self.x[0] = [pan * math.pi / 180, tilt * math.pi / 180, f]
 
         self.p = np.ndarray([self.annotation.size, 3, 3])
-        self.p[0] = np.diag([0.01, 0.01, 0.01])
+        self.p[0] = np.diag([100, 100, 1])
 
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
-        self.q = 0.01 * np.ones([3, 3])
+        self.q = 0.01* np.diag([1000, 1000, 1])
         # self.r = 0.01 * np.ones([3, 3])
 
     @staticmethod
@@ -74,7 +74,7 @@ class PtzSlam:
     @staticmethod
     def compute_jacobi_approximate(theta, phi, foc, ray):
         jacobi_h = np.ndarray([2, 3])
-        delta = 0.01
+        delta = 0.0001
         jacobi_h[0][0] = (foc * math.tan(ray[0] - (theta + delta)) - foc * math.tan(ray[0] - (theta - delta))) / (
                 2 * delta)
         jacobi_h[0][1] = 0
@@ -83,7 +83,7 @@ class PtzSlam:
         jacobi_h[1][0] = 0
         jacobi_h[1][1] = (-foc * math.tan(ray[1] - (phi + delta)) + foc * math.tan(ray[1] - (phi - delta))) / (
                 2 * delta)
-        jacobi_h[1][2] = ((foc + delta) * math.tan(ray[1] - phi) - (foc - delta) * math.tan(ray[1] - phi)) / (2 * delta)
+        jacobi_h[1][2] = (-(foc + delta) * math.tan(ray[1] - phi) + (foc - delta) * math.tan(ray[1] - phi)) / (2 * delta)
         return jacobi_h
 
     @staticmethod
@@ -119,7 +119,7 @@ class PtzSlam:
         for j in range(len(features)):
             cv.circle(self.img, (int(features[j][0]), int(features[j][1])), color=pt_color, radius=8, thickness=2)
 
-    def ekf(self, previous_x, previous_p, observe):
+    def extended_kalman_filter(self, previous_x, previous_p, observe):
         predict_x = previous_x + [self.delta_pan, self.delta_tilt, self.delta_zoom]
 
         predict_p = previous_p + self.q
@@ -132,17 +132,26 @@ class PtzSlam:
 
         y = []
         jacobi = []
-        cnt = 0
+        jacobi_a = []
+
         for j in range(len(self.rays)):
             if 0 < observe[j][0] < 1280 and 0 < observe[j][1] < 720 and 0 < hx[j][0] < 1280 and 0 < hx[j][1] < 720:
                 y.append(observe[j][0] - hx[j][0])
                 y.append(observe[j][1] - hx[j][1])
                 jacobi.append(PtzSlam.compute_jacobi(predict_x[0], predict_x[1], predict_x[2], self.rays[j]))
-                cnt += 1
+                jacobi_a.append(PtzSlam.compute_jacobi_approximate(predict_x[0], predict_x[1], predict_x[2], self.rays[j]))
 
         y = np.array(y)
         jacobi = np.array(jacobi)
         jacobi = jacobi.reshape((-1, 3))
+
+        jacobi_a = np.array(jacobi_a)
+        jacobi_a = jacobi_a.reshape((-1, 3))
+
+        # print(jacobi - jacobi_a)
+
+        print(jacobi)
+        # print(predict_p)
 
         # print(y)
         # print(jacobi)
@@ -150,12 +159,20 @@ class PtzSlam:
         # test = np.array([[1,1,1], [1,2,3], [1,5,1]])
         # print(np.linalg.inv(test))
 
-        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 0.01 * np.ones([2 * cnt, 2 * cnt])
+
+        # print(np.dot(np.dot(jacobi, predict_p), jacobi.T), "\n\n\n")
+        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 0.01 * np.ones([len(y), len(y)])
+
+        # print(s)
+        # print("inv s", np.linalg.inv(s))
+        # print(y)
 
         k = np.dot(np.dot(predict_p, jacobi.T), np.linalg.inv(s))
-
+        print(k)
         # print(k.shape)
         # print(y.shape)
+
+        # print(np.dot(k,y) * 180 / math.pi)
         #
         # fuck = np.dot(k, y)
         # print(fuck.shape)
@@ -165,15 +182,14 @@ class PtzSlam:
         # updated_x = np.transpose(predict_x + np.dot(k, y))
         updated_x = predict_x + np.dot(k, y)
         updated_p = np.dot((np.eye(3) - np.dot(k, jacobi)), predict_p)
-        return [updated_x, updated_p]
+        return updated_x, updated_p
 
     def main_algorithm(self):
         self.img.fill(255)
         for i in range(1, 2):
             # for i in range(1, self.annotation.size):
             observe = self.get_observation_from_index(i)
-
-            self.x[i], self.p[i] = self.ekf(self.x[i - 1], self.p[i - 1], observe)
+            self.x[i], self.p[i] = self.extended_kalman_filter(self.x[i - 1], self.p[i - 1], observe)
             self.delta_pan, self.delta_tilt, self.delta_zoom = self.x[i] - self.x[i - 1]
 
         features = self.get_observation_from_index(1)
@@ -184,12 +200,18 @@ class PtzSlam:
         self.visualize_features(features, (0, 0, 0))
         self.visualize_features(estimate_features, (0, 0, 255))
 
+        print(self.x[1][0:2] * 180 / math.pi, self.x[1][2])
+        print(self.annotation[0][1]['ptz'].squeeze())
         cv.imshow("synthesized image", self.img)
         cv.waitKey(0)
 
+
+# PtzSlam.test_jacobi(0.9, 0.1, 3500, 0.7, 0.5)
+PtzSlam.test_jacobi(0.9, 0.1, 3500, 1.5, 0.8)
+PtzSlam.test_jacobi(0.9, 0.1, 3500, -0.6, 0.5)
 
 slam = PtzSlam("./two_point_calib_dataset/util/highlights_soccer_model.mat",
                "./two_point_calib_dataset/highlights/seq3_anno.mat",
                "./synthesize_data.mat")
 slam.main_algorithm()
-# PtzSlam.test_jacobi(0.9, 0.1, 3500, 0.5, 0.5)
+

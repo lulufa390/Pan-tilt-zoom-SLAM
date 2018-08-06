@@ -22,12 +22,12 @@ function to generate random points.
 def generate_points(num):
     list_pts = []
     for i in range(num):
-        choice = random.randint(0, 4)
-        if choice < 2:
+        choice = random.randint(0, 5)
+        if choice < 3:
             xside = random.randint(0, 1)
             list_pts.append([xside * random.gauss(0, 5) + (1 - xside) * random.gauss(108, 5),
                              random.uniform(0, 70), random.uniform(0, 10)])
-        elif choice < 4:
+        elif choice < 5:
             list_pts.append([random.uniform(0, 108), random.gauss(63, 2), random.uniform(0, 10)])
         else:
             tmpx = random.gauss(54, 20)
@@ -103,7 +103,7 @@ def compute_rays(proj_center, pos, base_r):
     relative = np.dot(base_r, np.transpose(pos - proj_center))
     x, y, z = relative
 
-    pan = math.atan(x / (z))
+    pan = math.atan(x / z)
     tilt = math.atan(-y / math.sqrt(x * x + z * z))
     return [pan, tilt]
 
@@ -114,7 +114,7 @@ And randomly generate the 16-dimension features
 """
 
 
-def save_to_mat(pts, rays):
+def save_to_mat_radian(pts, rays):
     key_points = dict()
     features = []
 
@@ -129,6 +129,25 @@ def save_to_mat(pts, rays):
     key_points['features'] = features
     key_points['pts'] = pts
     key_points['rays'] = rays
+
+    sio.savemat('synthesize_data.mat', mdict=key_points)
+
+
+def save_to_mat_degree(pts, rays):
+    key_points = dict()
+    features = []
+
+    # generate features randomly
+    for i in range(len(pts)):
+        vec = np.random.random(16)
+        vec = vec.reshape(1, 16)
+        vec = normalize(vec, norm='l2')
+        vec = np.squeeze(vec)
+        features.append(vec)
+
+    key_points['features'] = features
+    key_points['pts'] = pts
+    key_points['rays'] = np.asarray(rays) * (180 / math.pi)
 
     sio.savemat('synthesize_data.mat', mdict=key_points)
 

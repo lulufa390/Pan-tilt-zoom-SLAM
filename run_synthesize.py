@@ -2,7 +2,7 @@ from synthesize import *
 
 pts = generate_points(100)
 
-"""
+"""          
 load the soccer field model
 """
 
@@ -29,8 +29,6 @@ rays = []
 for i in range(0, len(pts)):
     ray = compute_rays(proj_center, pts[i], base_rotation)
     rays.append(ray)
-
-
 
 draw_3d_model(line_index, points, pts)
 
@@ -68,4 +66,4 @@ for i in range(annotation.size):
 """
 This part saves synthesized data to mat file
 """
-save_to_mat(pts, rays)
+save_to_mat_degree(pts, rays)
