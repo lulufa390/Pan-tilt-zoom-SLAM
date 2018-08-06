@@ -50,7 +50,7 @@ class PtzSlam:
         """
         self.x = np.ndarray([self.annotation.size, 3])
         pan, tilt, f = self.annotation[0][0]['ptz'].squeeze()
-        self.x[0] = [pan * math.pi / 180, tilt * math.pi / 180, f]
+        self.x[0] = [pan, tilt, f]
 
         self.p = np.ndarray([self.annotation.size, 3, 3])
         self.p[0] = np.diag([100, 100, 1])
@@ -63,12 +63,12 @@ class PtzSlam:
     @staticmethod
     def compute_jacobi(theta, phi, foc, ray):
         jacobi_h = np.ndarray([2, 3])
-        jacobi_h[0][0] = -foc / math.pow(math.cos(ray[0] - theta), 2)
+        jacobi_h[0][0] = -foc / math.pow(math.cos( math.radians(ray[0] - theta) ), 2)
         jacobi_h[0][1] = 0
-        jacobi_h[0][2] = math.tan(ray[0] - theta)
+        jacobi_h[0][2] = math.tan(math.radians(ray[0] - theta))
         jacobi_h[1][0] = 0
-        jacobi_h[1][1] = foc / math.pow(math.cos(ray[1] - phi), 2)
-        jacobi_h[1][2] = -math.tan(ray[1] - phi)
+        jacobi_h[1][1] = foc / math.pow(math.cos(math.radians(ray[1] - phi)), 2)
+        jacobi_h[1][2] = -math.tan(math.radians(ray[1] - phi))
         return jacobi_h
 
     @staticmethod
@@ -111,7 +111,7 @@ class PtzSlam:
         features = np.ndarray([len(self.rays), 2])
         for j in range(len(self.rays)):
             pos = np.array(self.pts[j])
-            features[j] = synthesize.from_3d_to_2d(self.u, self.v, f, pan, tilt, self.c, self.base_rotation, pos)
+            features[j] = synthesize.from_3d_to_2d(self.u, self.v, f, math.radians(pan), math.radians(tilt), self.c, self.base_rotation, pos)
 
         return features
 
@@ -127,8 +127,8 @@ class PtzSlam:
         hx = np.ndarray([len(self.rays), 2])
 
         for j in range(len(self.rays)):
-            hx[j][0] = predict_x[2] * math.tan(self.rays[j][0] - predict_x[0]) + self.u
-            hx[j][1] = - predict_x[2] * math.tan(self.rays[j][1] - predict_x[1]) + self.v
+            hx[j][0] = predict_x[2] * math.tan( math.radians(self.rays[j][0] - predict_x[0]) ) + self.u
+            hx[j][1] = - predict_x[2] * math.tan( math.radians(self.rays[j][1] - predict_x[1]) ) + self.v
 
         y = []
         jacobi = []
@@ -161,11 +161,13 @@ class PtzSlam:
 
 
         # print(np.dot(np.dot(jacobi, predict_p), jacobi.T), "\n\n\n")
-        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 0.01 * np.ones([len(y), len(y)])
+        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) - 1 * np.ones([len(y), len(y)])
 
         # print(s)
         # print("inv s", np.linalg.inv(s))
         # print(y)
+
+
 
         k = np.dot(np.dot(predict_p, jacobi.T), np.linalg.inv(s))
         print(k)
@@ -187,20 +189,30 @@ class PtzSlam:
     def main_algorithm(self):
         self.img.fill(255)
         for i in range(1, 2):
-            # for i in range(1, self.annotation.size):
+        # for i in range(1, self.annotation.size):
+
+            self.img.fill(255)
+
             observe = self.get_observation_from_index(i)
             self.x[i], self.p[i] = self.extended_kalman_filter(self.x[i - 1], self.p[i - 1], observe)
             self.delta_pan, self.delta_tilt, self.delta_zoom = self.x[i] - self.x[i - 1]
+
+            # estimate_features = self.get_observation_from_ptz(self.x[i][0], self.x[i][1], self.x[i][2])
+            # self.visualize_features(observe, (0, 0, 0))
+            # self.visualize_features(estimate_features, (0, 0, 255))
+            # cv.imshow("synthesized image", self.img)
+            # cv.waitKey(0)
 
         features = self.get_observation_from_index(1)
         predict_features = self.get_observation_from_index(0)
         estimate_features = self.get_observation_from_ptz(self.x[1][0], self.x[1][1], self.x[1][2])
 
+
         self.visualize_features(predict_features, (255, 0, 0))
         self.visualize_features(features, (0, 0, 0))
         self.visualize_features(estimate_features, (0, 0, 255))
 
-        print(self.x[1][0:2] * 180 / math.pi, self.x[1][2])
+        print(self.x[1])
         print(self.annotation[0][1]['ptz'].squeeze())
         cv.imshow("synthesized image", self.img)
         cv.waitKey(0)
