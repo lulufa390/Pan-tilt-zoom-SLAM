@@ -11,7 +11,7 @@ import scipy.io as sio
 import random
 import cv2 as cv
 from sklearn.preprocessing import normalize
-import math
+from math import *
 
 """
 function to generate random points.
@@ -21,8 +21,10 @@ function to generate random points.
 
 def generate_points(num):
     list_pts = []
+    random.seed(1)
+
     for i in range(num):
-        choice = random.randint(0, 5)
+        choice = random.randint(0, 6 )
         if choice < 3:
             xside = random.randint(0, 1)
             list_pts.append([xside * random.gauss(0, 5) + (1 - xside) * random.gauss(108, 5),
@@ -61,8 +63,8 @@ def from_3d_to_2d(u, v, f, pan, tilt, c, base_r, pos):
     # pan = annotation['ptz'].squeeze()[0] * math.pi / 180
     # tilt = annotation['ptz'].squeeze()[1] * math.pi / 180
 
-    rotation = np.dot(np.array([[1, 0, 0], [0, math.cos(tilt), math.sin(tilt)], [0, -math.sin(tilt), math.cos(tilt)]]),
-                      np.array([[math.cos(pan), 0, -math.sin(pan)], [0, 1, 0], [math.sin(pan), 0, math.cos(pan)]]))
+    rotation = np.dot(np.array([[1, 0, 0], [0, cos(tilt), sin(tilt)], [0, -sin(tilt), cos(tilt)]]),
+                      np.array([[cos(pan), 0, -sin(pan)], [0, 1, 0], [sin(pan), 0, cos(pan)]]))
     rotation = np.dot(rotation, base_r)
 
     # c = np.array(camera[6:9])
@@ -87,8 +89,20 @@ def from_pan_tilt_to_2d(u, v, f, camera_pan, camera_tilt, pan, tilt):
     # camera_pan = annotation['ptz'].squeeze()[0] * math.pi / 180
     # camera_tilt = annotation['ptz'].squeeze()[1] * math.pi / 180
 
-    x = f * math.tan(pan - camera_pan) + u
-    y = -f * math.tan(tilt - camera_tilt) + v
+    test_pan = atan(  (tan(pan) * cos(camera_pan) - sin(camera_pan))  \
+               / (tan(pan) * sin(camera_pan)*cos(camera_tilt) + tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) * sin(camera_tilt) + cos(camera_tilt)* cos(camera_pan)) )
+
+    test_tilt = atan( -(tan(pan)*sin(camera_tilt) * sin(camera_pan) - tan(tilt) * sqrt(tan(pan) * tan(pan) + 1 ) *cos(camera_tilt) + sin(camera_tilt) * cos(camera_pan) ) \
+                       / sqrt(pow(tan(pan)*cos(camera_pan)-sin(camera_pan),2 ) + pow(tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) , 2))  )
+
+    # test_tilt = atan( -(tan(pan)*sin(camera_tilt) * sin(camera_pan) - tan(tilt) * sqrt(tan(pan) * tan(pan) + 1 ) *cos(camera_tilt) + sin(camera_tilt) * cos(camera_pan) ) \
+    #                    / sqrt( (tan(pan)*cos(camera_pan)-sin(camera_pan) )*(tan(pan)*cos(camera_pan)-sin(camera_pan) ) + (tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) )* (tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) )  ))
+
+    # x = f * math.tan(pan - camera_pan) + u
+    dx = f * tan(test_pan)
+    x = dx + u
+    # y = -f * tan(tilt - camera_tilt) + v
+    y = -sqrt(f*f+dx*dx) * tan(test_tilt) + v
 
     return [x, y]
 
@@ -103,8 +117,8 @@ def compute_rays(proj_center, pos, base_r):
     relative = np.dot(base_r, np.transpose(pos - proj_center))
     x, y, z = relative
 
-    pan = math.atan(x / z)
-    tilt = math.atan(-y / math.sqrt(x * x + z * z))
+    pan = atan(x / z)
+    tilt = atan(-y / sqrt(x * x + z * z))
     return [pan, tilt]
 
 
@@ -147,7 +161,7 @@ def save_to_mat_degree(pts, rays):
 
     key_points['features'] = features
     key_points['pts'] = pts
-    key_points['rays'] = np.asarray(rays) * (180 / math.pi)
+    key_points['rays'] = np.asarray(rays) * (180 / pi)
 
     sio.savemat('synthesize_data.mat', mdict=key_points)
 
@@ -182,8 +196,8 @@ this function draws the lines of soccer field in one image from a specific camer
 def draw_soccer_line(img, u, v, f, pan, tilt, base_r, c, line_index, points):
     k = np.array([[f, 0, u], [0, f, v], [0, 0, 1]])
 
-    rotation = np.dot(np.array([[1, 0, 0], [0, math.cos(tilt), math.sin(tilt)], [0, -math.sin(tilt), math.cos(tilt)]]),
-                      np.array([[math.cos(pan), 0, -math.sin(pan)], [0, 1, 0], [math.sin(pan), 0, math.cos(pan)]]))
+    rotation = np.dot(np.array([[1, 0, 0], [0, cos(tilt), sin(tilt)], [0, -sin(tilt), cos(tilt)]]),
+                      np.array([[cos(pan), 0, -sin(pan)], [0, 1, 0], [sin(pan), 0, cos(pan)]]))
     rotation = np.dot(rotation, base_r)
 
     image_points = np.ndarray([len(points), 2])
