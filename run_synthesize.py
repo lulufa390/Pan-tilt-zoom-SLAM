@@ -23,8 +23,6 @@ base_rotation = np.zeros([3, 3])
 cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
 
 
-
-
 draw_3d_model(line_index, points, pts)
 
 """ 

@@ -24,7 +24,7 @@ def generate_points(num):
     random.seed(1)
 
     for i in range(num):
-        choice = random.randint(0, 6 )
+        choice = random.randint(0, 6)
         if choice < 3:
             xside = random.randint(0, 1)
             list_pts.append([xside * random.gauss(0, 5) + (1 - xside) * random.gauss(108, 5),
@@ -80,29 +80,29 @@ pan and tilt is the angle for that feature point
 """
 
 
+def compute_pose_relative_angles(pan, tilt, camera_pan, camera_tilt):
+    test_pan = atan((tan(pan) * cos(camera_pan) - sin(camera_pan)) \
+                    / (tan(pan) * sin(camera_pan) * cos(camera_tilt) + tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) * sin(
+        camera_tilt) + cos(camera_tilt) * cos(camera_pan)))
+
+    test_tilt = atan(-(tan(pan) * sin(camera_tilt) * sin(camera_pan) - tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) * cos(
+        camera_tilt) + sin(camera_tilt) * cos(camera_pan)) \
+                     / sqrt(pow(tan(pan) * cos(camera_pan) - sin(camera_pan), 2) + pow(
+        tan(pan) * sin(camera_pan) * cos(camera_tilt) + tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) * sin(
+            camera_tilt) + cos(camera_tilt) * cos(camera_pan), 2)))
+
+    return test_pan, test_tilt
+
+
 def from_pan_tilt_to_2d(u, v, f, camera_pan, camera_tilt, pan, tilt):
-    # camera = annotation['camera'][0]
-    # u = camera[0]
-    # v = camera[1]
-    # f = camera[2]
-    #
-    # camera_pan = annotation['ptz'].squeeze()[0] * math.pi / 180
-    # camera_tilt = annotation['ptz'].squeeze()[1] * math.pi / 180
 
-    test_pan = atan(  (tan(pan) * cos(camera_pan) - sin(camera_pan))  \
-               / (tan(pan) * sin(camera_pan)*cos(camera_tilt) + tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) * sin(camera_tilt) + cos(camera_tilt)* cos(camera_pan)) )
-
-    test_tilt = atan( -(tan(pan)*sin(camera_tilt) * sin(camera_pan) - tan(tilt) * sqrt(tan(pan) * tan(pan) + 1 ) *cos(camera_tilt) + sin(camera_tilt) * cos(camera_pan) ) \
-                       / sqrt(pow(tan(pan)*cos(camera_pan)-sin(camera_pan),2 ) + pow(tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) , 2))  )
-
-    # test_tilt = atan( -(tan(pan)*sin(camera_tilt) * sin(camera_pan) - tan(tilt) * sqrt(tan(pan) * tan(pan) + 1 ) *cos(camera_tilt) + sin(camera_tilt) * cos(camera_pan) ) \
-    #                    / sqrt( (tan(pan)*cos(camera_pan)-sin(camera_pan) )*(tan(pan)*cos(camera_pan)-sin(camera_pan) ) + (tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) )* (tan(pan) *sin(camera_pan)*cos(camera_tilt) + tan(tilt) *sqrt(tan(pan)*tan(pan)+1)*sin(camera_tilt) + cos(camera_tilt)*cos(camera_pan) )  ))
+    test_pan, test_tilt = compute_pose_relative_angles(pan, tilt, camera_pan, camera_tilt)
 
     # x = f * math.tan(pan - camera_pan) + u
     dx = f * tan(test_pan)
     x = dx + u
     # y = -f * tan(tilt - camera_tilt) + v
-    y = -sqrt(f*f+dx*dx) * tan(test_tilt) + v
+    y = -sqrt(f * f + dx * dx) * tan(test_tilt) + v
 
     return [x, y]
 
