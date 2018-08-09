@@ -1,6 +1,6 @@
 from synthesize import *
 
-pts = generate_points(3000)
+pts = generate_points(200)
 
 """          
 load the soccer field model
@@ -10,7 +10,7 @@ soccer_model = sio.loadmat("./two_point_calib_dataset/util/highlights_soccer_mod
 line_index = soccer_model['line_segment_index']
 points = soccer_model['points']
 
-"""  
+"""         
 load the sequence annotation     
 """
 
@@ -21,7 +21,6 @@ proj_center = meta[0][0]["cc"][0]
 
 base_rotation = np.zeros([3, 3])
 cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
-
 
 draw_3d_model(line_index, points, pts)
 
@@ -70,4 +69,4 @@ for i in range(annotation.size):
 """
 This part saves synthesized data to mat file
 """
-save_to_mat_degree(pts, rays)
+save_to_mat(pts, rays, True)

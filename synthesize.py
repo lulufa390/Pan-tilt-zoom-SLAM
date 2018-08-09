@@ -21,26 +21,28 @@ function to generate random points.
 
 def generate_points(num):
     list_pts = []
+
+    # fix the random seed
     random.seed(1)
 
     for i in range(num):
         choice = random.randint(0, 6)
         if choice < 3:
-            xside = random.randint(0, 1)
-            list_pts.append([xside * random.gauss(0, 5) + (1 - xside) * random.gauss(108, 5),
+            x_side = random.randint(0, 1)
+            list_pts.append([x_side * random.gauss(0, 5) + (1 - x_side) * random.gauss(108, 5),
                              random.uniform(0, 70), random.uniform(0, 10)])
         elif choice < 5:
             list_pts.append([random.uniform(0, 108), random.gauss(63, 2), random.uniform(0, 10)])
         else:
-            tmpx = random.gauss(54, 20)
-            while tmpx > 108 or tmpx < 0:
-                tmpx = random.gauss(54, 20)
+            tmp_x = random.gauss(54, 20)
+            while tmp_x > 108 or tmp_x < 0:
+                tmp_x = random.gauss(54, 20)
 
-            tmpy = random.gauss(32, 20)
-            while tmpy > 63 or tmpy < 0:
-                tmpy = random.gauss(32, 20)
+            tmp_y = random.gauss(32, 20)
+            while tmp_y > 63 or tmp_y < 0:
+                tmp_y = random.gauss(32, 20)
 
-            list_pts.append([tmpx, tmpy, random.uniform(0, 1)])
+            list_pts.append([tmp_x, tmp_y, random.uniform(0, 1)])
 
     pts_arr = np.array(list_pts, dtype=np.float32)
     return pts_arr
@@ -54,29 +56,19 @@ pos is the 3d position of that feature points
 
 
 def from_3d_to_2d(u, v, f, pan, tilt, c, base_r, pos):
-    # camera = annotation['camera'][0]
-    # u = camera[0]
-    # v = camera[1]
-    # f = camera[2]
     k = np.array([[f, 0, u], [0, f, v], [0, 0, 1]])
-
-    # pan = annotation['ptz'].squeeze()[0] * math.pi / 180
-    # tilt = annotation['ptz'].squeeze()[1] * math.pi / 180
-
     rotation = np.dot(np.array([[1, 0, 0], [0, cos(tilt), sin(tilt)], [0, -sin(tilt), cos(tilt)]]),
                       np.array([[cos(pan), 0, -sin(pan)], [0, 1, 0], [sin(pan), 0, cos(pan)]]))
     rotation = np.dot(rotation, base_r)
 
-    # c = np.array(camera[6:9])
-    pos = np.dot(k, np.dot(rotation, pos - c))
+    position = np.dot(k, np.dot(rotation, pos - c))
 
-    return [pos[0] / pos[2], pos[1] / pos[2]]
+    return [position[0] / position[2], position[1] / position[2]]
 
 
 """
-function from pan/tilt to 2d
-u, v, f, camera_pan, camera_tilt is the parameters of camera pose
-pan and tilt is the angle for that feature point
+function to compute the relative angles of rays  to each camera pose
+the first step to get the image pixels of rays
 """
 
 
@@ -94,16 +86,19 @@ def compute_pose_relative_angles(pan, tilt, camera_pan, camera_tilt):
     return test_pan, test_tilt
 
 
-def from_pan_tilt_to_2d(u, v, f, camera_pan, camera_tilt, pan, tilt):
+"""
+function from pan/tilt to 2d
+u, v, f, camera_pan, camera_tilt is the parameters of camera pose
+pan and tilt is the angle for that feature point
+"""
 
+
+def from_pan_tilt_to_2d(u, v, f, camera_pan, camera_tilt, pan, tilt):
     test_pan, test_tilt = compute_pose_relative_angles(pan, tilt, camera_pan, camera_tilt)
 
-    # x = f * math.tan(pan - camera_pan) + u
     dx = f * tan(test_pan)
     x = dx + u
-    # y = -f * tan(tilt - camera_tilt) + v
     y = -sqrt(f * f + dx * dx) * tan(test_tilt) + v
-
     return [x, y]
 
 
@@ -128,7 +123,7 @@ And randomly generate the 16-dimension features
 """
 
 
-def save_to_mat_radian(pts, rays):
+def save_to_mat(pts, rays, is_degree):
     key_points = dict()
     features = []
 
@@ -142,26 +137,11 @@ def save_to_mat_radian(pts, rays):
 
     key_points['features'] = features
     key_points['pts'] = pts
-    key_points['rays'] = rays
 
-    sio.savemat('synthesize_data.mat', mdict=key_points)
-
-
-def save_to_mat_degree(pts, rays):
-    key_points = dict()
-    features = []
-
-    # generate features randomly
-    for i in range(len(pts)):
-        vec = np.random.random(16)
-        vec = vec.reshape(1, 16)
-        vec = normalize(vec, norm='l2')
-        vec = np.squeeze(vec)
-        features.append(vec)
-
-    key_points['features'] = features
-    key_points['pts'] = pts
-    key_points['rays'] = np.asarray(rays) * (180 / pi)
+    if is_degree:
+        key_points['rays'] = np.asarray(rays) * (180 / pi)
+    else:
+        key_points['rays'] = rays
 
     sio.savemat('synthesize_data.mat', mdict=key_points)
 
@@ -202,7 +182,6 @@ def draw_soccer_line(img, u, v, f, pan, tilt, base_r, c, line_index, points):
 
     image_points = np.ndarray([len(points), 2])
 
-    # get points and draw lines
     for j in range(len(points)):
         p = np.array([points[j][0], points[j][1], 0])
         p = np.dot(k, np.dot(rotation, p - c))
