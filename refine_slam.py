@@ -10,7 +10,7 @@ import random
 import cv2 as cv
 from sklearn.preprocessing import normalize
 from math import *
-from synthesize import *
+from transformation import TransFunction
 
 
 class PtzSlam:
@@ -65,27 +65,27 @@ class PtzSlam:
     def compute_new_jacobi(self, camera_pan, camera_tilt, foc, ray):
         jacobi_h = np.ndarray([2, 3])
         delta_angle = 0.001
-        delta_f = 0.01
+        delta_f = 1.0
 
-        c_pan = radians(camera_pan)
-        c_tilt = radians(camera_tilt)
-        theta = radians(ray[0])
-        phi = radians(ray[1])
+        # c_pan = radians(camera_pan)
+        # c_tilt = radians(camera_tilt)
+        # theta = radians(ray[0])
+        # phi = radians(ray[1])
 
-        x_delta_pan1, y_delta_pan1 = from_pan_tilt_to_2d(self.u, self.v, foc, c_pan - delta_angle, c_tilt,
-                                                         theta, phi)
-        x_delta_pan2, y_delta_pan2 = from_pan_tilt_to_2d(self.u, self.v, foc, c_pan + delta_angle, c_tilt,
-                                                         theta, phi)
+        x_delta_pan1, y_delta_pan1 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc, camera_pan - delta_angle,
+                                                                       camera_tilt, ray[0], ray[1])
+        x_delta_pan2, y_delta_pan2 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc, camera_pan + delta_angle, camera_tilt,
+                                                                       ray[0], ray[1])
 
-        x_delta_tilt1, y_delta_tilt1 = from_pan_tilt_to_2d(self.u, self.v, foc, c_pan, c_tilt - delta_angle,
-                                                           theta, phi)
-        x_delta_tilt2, y_delta_tilt2 = from_pan_tilt_to_2d(self.u, self.v, foc, c_pan, c_tilt + delta_angle,
-                                                           theta, phi)
+        x_delta_tilt1, y_delta_tilt1 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc, camera_pan, camera_tilt - delta_angle,
+                                                                         ray[0], ray[1])
+        x_delta_tilt2, y_delta_tilt2 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc, camera_pan, camera_tilt + delta_angle,
+                                                                         ray[0], ray[1])
 
-        x_delta_f1, y_delta_f1 = from_pan_tilt_to_2d(self.u, self.v, foc - delta_f, c_pan, c_tilt, theta,
-                                                     phi)
-        x_delta_f2, y_delta_f2 = from_pan_tilt_to_2d(self.u, self.v, foc + delta_f, c_pan, c_tilt, theta,
-                                                     phi)
+        x_delta_f1, y_delta_f1 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc - delta_f, camera_pan,
+                                                                   camera_tilt, ray[0], ray[1])
+        x_delta_f2, y_delta_f2 = TransFunction.from_pan_tilt_to_2d(self.u, self.v, foc + delta_f, camera_pan
+                                                                   , camera_tilt, ray[0], ray[1])
 
         jacobi_h[0][0] = (x_delta_pan2 - x_delta_pan1) / (2 * delta_angle)
         jacobi_h[0][1] = (x_delta_tilt2 - x_delta_tilt1) / (2 * delta_angle)
@@ -101,7 +101,7 @@ class PtzSlam:
         points = np.ndarray([len(self.rays), 2])
         for j in range(len(self.rays)):
             pos = np.array(self.pts[j])
-            points[j] = from_3d_to_2d(self.u, self.v, f, radians(pan), radians(tilt), self.c,
+            points[j] = TransFunction.from_3d_to_2d(self.u, self.v, f, pan, tilt, self.c,
                                       self.base_rotation, pos)
         return points
 
@@ -124,14 +124,14 @@ class PtzSlam:
 
         print("\n-----predict_x-----\n", predict_x)
 
-        q_k = 1 * np.diag([100, 100, 1])
+        q_k = 1.0 * np.diag([0.01, 0.01, 1])
         predict_p = previous_p + q_k
 
         # 2. update step
         hx = np.ndarray([len(self.rays), 2])
         for j in range(len(self.rays)):
-            hx[j] = from_pan_tilt_to_2d(self.u, self.v, predict_x[2], radians(predict_x[0]), radians(predict_x[1]),
-                                        radians(self.rays[j][0]), radians(self.rays[j][1]))
+            hx[j] = TransFunction.from_pan_tilt_to_2d(self.u, self.v, predict_x[2], predict_x[0], predict_x[1],
+                                        self.rays[j][0], self.rays[j][1])
 
         print("\n-----hx-----\n", hx)
 
@@ -150,7 +150,7 @@ class PtzSlam:
 
         print("\n-----H*P*H^t-----\n", np.dot(np.dot(jacobi, predict_p), jacobi.T))
 
-        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 1 * np.eye(2 * len(inner_index))
+        s = np.dot(np.dot(jacobi, predict_p), jacobi.T) + 0.1 * np.eye(2 * len(inner_index))
         k = np.dot(np.dot(predict_p, jacobi.T), np.linalg.inv(s))
 
         print("\n-----y-----\n", y.shape)
@@ -182,6 +182,8 @@ class PtzSlam:
 
             cv.imshow("synthesized image", self.img)
             cv.waitKey(0)
+
+            # self.x[i] = self.get_ptz(i)
 
             # self.delta_pan, self.delta_tilt, self.delta_zoom = [0,0,0]
             #
