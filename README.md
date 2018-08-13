@@ -3,10 +3,7 @@
 Camera calibration using python. 
 
 Files:
-  1. main.py draws soccer field lines using the ground truth camera pose.
-  2. composition.py combines two images using their camera pose.
-  3. run_synthesize.py generates feature points on 3d soccer field and output the virtual images using the camera pose on real highlight seq3 dataset. synthesize.py includes functions for run_synthesiz.py.
-  4. .mat file is synthesized data.
-
-Update:  
-  1. refine_slam.py is the main algorithm. It implements EKF algorithm for PTZ camera calibration. 
+  1. learn_camera is a folder for two toy sample code: 1. draw soccer lines; 2. composition of two frames.
+  2. transformation.py define functions for projection among rays, 3-d locations and 2-d locations in images.
+  3. refine_slam.py is EKF algorithm only for localization.
+  4. slam_with_landmarks.py is EKF algorithm for localization and mapping. 
