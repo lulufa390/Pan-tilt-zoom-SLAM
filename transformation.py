@@ -64,6 +64,34 @@ class TransFunction:
         return x, y
 
     @staticmethod
+    def from_2d_to_pan_tilt(u, v, f, c_p, c_t, x, y):
+        pan = radians(c_p)
+        tilt = radians(c_t)
+
+        theta_skim = atan((x - u) / f)
+        phi_skim = atan((y - v) / (-f * sqrt(1 + pow((x - u) / f, 2))))
+
+        x3d_skim = tan(theta_skim)
+        y3d_skim = -tan(phi_skim) * sqrt(pow(tan(theta_skim), 2) + 1)
+
+        rotation = np.dot(np.array([[1, 0, 0],
+                                    [0, cos(tilt), sin(tilt)],
+                                    [0, -sin(tilt), cos(tilt)]]),
+
+                          np.array([[cos(pan), 0, -sin(pan)],
+                                    [0, 1, 0],
+                                    [sin(pan), 0, cos(pan)]]))
+
+        rotation = np.linalg.inv(rotation)
+
+        x3d, y3d, z3d = np.dot(rotation, np.array([x3d_skim, y3d_skim, 1]))
+
+        theta = atan(x3d / z3d)
+        phi = atan(-y3d / sqrt(x3d * x3d + z3d * z3d))
+
+        return degrees(theta), degrees(phi)
+
+    @staticmethod
     def compute_rays(proj_center, pos, base_r):
         relative = np.dot(base_r, np.transpose(pos - proj_center))
         x, y, z = relative
