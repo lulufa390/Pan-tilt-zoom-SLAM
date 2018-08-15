@@ -146,8 +146,11 @@ class PtzSlam:
         self.ray_global = np.concatenate([self.ray_global, in_rays], axis=0)
 
         # initialize global p using global rays
-        self.p_global = 0.001 * np.eye(3+2*len(self.ray_global))
-        self.p_global[2][2] = 0.1
+        self.p_global = 0.01 * np.eye(3+2*len(self.ray_global))
+        self.p_global[2][2] = 1
+
+        q_k = 1 * np.diag([0.01, 0.01, 1])
+
         # print(self.p_global)
 
 
@@ -160,6 +163,10 @@ class PtzSlam:
             self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
             points_before, in_rays_before, index_before = self.get_observation_from_ptz(self.camera_pose[0], self.camera_pose[1],
                                                                           self.camera_pose[2], self.ray_global, 1280, 720)
+
+            print(self.camera_pose)
+
+            self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
 
             y_k = np.ndarray([0])
             for j in range(len(in_rays_before)):
@@ -190,7 +197,7 @@ class PtzSlam:
             jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0],  camera_tilt=self.camera_pose[1],
                                              foc=self.camera_pose[2], rays=self.ray_global[index_before.astype(int)])
 
-            print(self.ray_global[index_before.astype(int)])
+            # print(self.ray_global[index_before.astype(int)])
 
             # print(jacobi.shape)
 
@@ -198,14 +205,35 @@ class PtzSlam:
 
             k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
 
-            print(k_k.shape)
-            print(y_k.shape)
+            # print(k_k.shape)
+            # print(y_k.shape)
             k_mul_y = np.dot(k_k, y_k)
 
-            print(k_mul_y)
+            # print(k_mul_y)
+
+            self.camera_pose += k_mul_y[0:3]
+
+            print(self.ray_global[index_before.astype(int)])
+
+            print(self.camera_pose)
+
+            for i in range(len(index_before)):
+                self.ray_global[int(index_before[i])][0:2] += k_mul_y[2*i +3: 2*i+5]
+
+            print(self.ray_global[index_before.astype(int)])
+
+            points_update, in_rays_update, index_update = self.get_observation_from_ptz(self.camera_pose[0],
+                                                                                       self.camera_pose[1],
+                                                                                       self.camera_pose[2],
+                                                                                       self.ray_global, 1280, 720)
 
         self.visualize_points(points_before, (255, 0, 0))
         self.visualize_points(points_next, (0,0,0))
+        self.visualize_points(points_update, (0, 0, 255))
+
+
+        print("update\n", points_update)
+        print("next\n", points_next)
 
         cv.imshow("test", self.img)
         cv.waitKey(0)
