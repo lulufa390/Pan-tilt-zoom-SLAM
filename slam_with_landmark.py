@@ -72,8 +72,8 @@ class PtzSlam:
         for i in range(len(self.all_rays)):
             x, y = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, self.all_rays[i][0],
                                                      self.all_rays[i][1])
-            # x += random.uniform(-1, 1)
-            # y += random.uniform(-1, 1)
+            x += random.uniform(-2, 2)
+            y += random.uniform(-2, 2)
 
             if 0 < x < self.width and 0 < y < self.height:
                 points = np.row_stack((points, np.concatenate([np.asarray([x, y]), self.all_rays[i][2:18]], axis=0)))
@@ -85,7 +85,7 @@ class PtzSlam:
         ray_num = len(rays)
 
         delta_angle = 0.001
-        delta_f = 1.0
+        delta_f = 0.1
 
         jacobi_h = np.ndarray([2 * ray_num, 3 + 2 * ray_num])
 
@@ -187,10 +187,7 @@ class PtzSlam:
         print("theta-mean-error %.4f" % np.mean(theta_list), "sdev %.4f" % statistics.stdev(theta_list))
         print("phi---mean-error %.4f" % np.mean(phi_list), "sdev %.4f" % statistics.stdev(phi_list), "\n")
 
-
-
     def main_algorithm(self):
-
         random.seed(1)
 
         # first ground truth camera pose
@@ -206,15 +203,15 @@ class PtzSlam:
         self.ray_global = np.concatenate([self.ray_global, init_rays], axis=0)
 
         # initialize global p using global rays
-        self.p_global = 0.01 * np.eye(3 + 2 * len(self.ray_global))
+        self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
         self.p_global[2][2] = 1
 
         # q_k: covariance matrix of noise for state(camera pose)
-        q_k = 1 * np.diag([0.01, 0.01, 1])
+        q_k = 5 * np.diag([0.001, 0.001, 1])
 
-        for i in range(1, 30):
+        for i in range(1, self.annotation.size):
 
-            print("=====The ", i, " iteration=====\n")
+            print("=====The ", i, " iteration=====%d\n" % len(self.ray_global))
 
             self.img.fill(255)
 
@@ -255,7 +252,8 @@ class PtzSlam:
                                              foc=self.camera_pose[2], rays=self.ray_global[matched_inner_point_index.astype(int)])
 
             # get Kalman gain
-            s_k = np.dot(np.dot(jacobi, p), jacobi.T) + np.eye(2 * len(matched_inner_point_index))
+            r_k = 2 * np.eye(2 * len(matched_inner_point_index))
+            s_k = np.dot(np.dot(jacobi, p), jacobi.T) + r_k
 
             k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
 
@@ -309,7 +307,7 @@ class PtzSlam:
             self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
             for j in range(len(matched_inner_point_index)):
                 for k in range(len(matched_inner_point_index)):
-                    self.p_global[3+2 * int(matched_inner_point_index[j]), 3 +2 * int(matched_inner_point_index[k])] = \
+                    self.p_global[3+2 * int(matched_inner_point_index[j]), 3 + 2 * int(matched_inner_point_index[k])] = \
                         update_p[3+2*j, 3+2*k]
                     self.p_global[3 + 2 * int(matched_inner_point_index[j]) + 1,  3 + 2 * int(matched_inner_point_index[k]) + 1] = \
                         update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
