@@ -168,7 +168,7 @@ class DataSynthesize:
 
 
 synthesize = DataSynthesize()
-pts = synthesize.generate_points(100)
+pts = synthesize.generate_points(300)
 synthesize.draw_3d_model(pts)
 rays = synthesize.computer_all_ray(pts)
 synthesize.show_image_sequence(pts)

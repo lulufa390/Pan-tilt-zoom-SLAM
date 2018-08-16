@@ -72,8 +72,8 @@ class PtzSlam:
         for i in range(len(self.all_rays)):
             x, y = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, self.all_rays[i][0],
                                                      self.all_rays[i][1])
-            x += random.uniform(-5, 5)
-            y += random.uniform(-5, 5)
+            # x += random.uniform(-1, 1)
+            # y += random.uniform(-1, 1)
 
             if 0 < x < self.width and 0 < y < self.height:
                 points = np.row_stack((points, np.concatenate([np.asarray([x, y]), self.all_rays[i][2:18]], axis=0)))
@@ -167,11 +167,36 @@ class PtzSlam:
         for j in range(len(points)):
             cv.circle(self.img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=8, thickness=2)
 
+    # output the error of camera pose compared to ground truth
+    def output_camera_error(self, now_index):
+        ground_truth = self.get_ptz(now_index)
+        pan, tilt, f = self.camera_pose - ground_truth
+        print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
+
+    # output the error of global rays compared to ground truth
+    def output_ray_error(self):
+        theta_list = []
+        phi_list = []
+        for j in range(len(self.ray_global)):
+            for k in range(len(self.all_rays)):
+                if np.linalg.norm(self.ray_global[j][2:18] - self.all_rays[k][2:18]) < 0.01:
+                    tmp = self.ray_global[j][0:2] - self.all_rays[k][0:2]
+                    theta_list.append(tmp[0])
+                    phi_list.append(tmp[1])
+                    break
+        print("theta-mean-error %.4f" % np.mean(theta_list), "sdev %.4f" % statistics.stdev(theta_list))
+        print("phi---mean-error %.4f" % np.mean(phi_list), "sdev %.4f" % statistics.stdev(phi_list), "\n")
+
+
+
     def main_algorithm(self):
 
         random.seed(1)
 
+        # first ground truth camera pose
         self.camera_pose = self.get_ptz(0)
+
+        # first frame to initialize global_rays
         first_frame = self.get_image(0)
 
         init_rays = self.get_rays_from_observation(self.camera_pose[0], self.camera_pose[1], self.camera_pose[2],
@@ -184,9 +209,13 @@ class PtzSlam:
         self.p_global = 0.01 * np.eye(3 + 2 * len(self.ray_global))
         self.p_global[2][2] = 1
 
+        # q_k: covariance matrix of noise for state(camera pose)
         q_k = 1 * np.diag([0.01, 0.01, 1])
 
         for i in range(1, 30):
+
+            print("=====The ", i, " iteration=====\n")
+
             self.img.fill(255)
 
             # ground truth features for next frame. In real data we do not need to compute that
@@ -209,92 +238,73 @@ class PtzSlam:
                 for k in range(len(next_frame)):
                     if np.linalg.norm(next_frame[k][2:18] - predict_points[j][2:18]) < 0.01:
                         y_k = np.concatenate((y_k, next_frame[k][0:2] - predict_points[j][0:2]), axis=0)
-
                         matched_inner_point_index = np.concatenate((matched_inner_point_index, [inner_point_index[j]]), axis=0)
+                        break
 
-            print("matched index", matched_inner_point_index)
-
-
-
+            # get predicted_x: combine 3 camera parameters and rays
             predict_x = self.camera_pose
             for j in range(len(matched_inner_point_index)):
                 predict_x = np.concatenate([predict_x, self.ray_global[int(matched_inner_point_index[j])][0:2]], axis=0)
 
             # get p matrix for this iteration from p_global
             p_index = (np.concatenate([[0, 1, 2], matched_inner_point_index + 3, matched_inner_point_index + len(matched_inner_point_index) + 3])).astype(int)
-
             p = self.p_global[p_index][:, p_index]
 
             # compute jacobi
             jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0], camera_tilt=self.camera_pose[1],
                                              foc=self.camera_pose[2], rays=self.ray_global[matched_inner_point_index.astype(int)])
 
+            # get Kalman gain
             s_k = np.dot(np.dot(jacobi, p), jacobi.T) + np.eye(2 * len(matched_inner_point_index))
 
             k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
 
             k_mul_y = np.dot(k_k, y_k)
 
+            # output result for updating camera: before
+            print("before update camera:\n")
+            self.output_camera_error(i)
+
+            # update camera pose
             self.camera_pose += k_mul_y[0:3]
+
+            # output result for updating camera: after
+            print("after update camera:\n")
+            self.output_camera_error(i)
 
             # update speed model
             self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
             # initialize new landmarks
-
-            print("next point", len(next_frame ))
-
             for j in range(len(next_frame)):
                 has_point = False
                 for k in range(len(self.ray_global)):
                     if np.linalg.norm(next_frame[j][2:18] - self.ray_global[k][2:18]) < 0.01:
                         has_point = True
+                        break
 
+                # if no corresponding points in global_rays, we should add it to global ray.
                 if not has_point:
                     new_ray = self.get_rays_from_observation(
                         self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], next_frame[j:j + 1, :])
-
                     self.ray_global = np.concatenate([self.ray_global, new_ray], axis=0)
-
                     self.p_global = np.row_stack((self.p_global, np.zeros([2, self.p_global.shape[1]])))
                     self.p_global = np.column_stack((self.p_global, np.zeros([self.p_global.shape[0], 2])))
                     self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
 
-            # print("new?", self.p_global)
-
+            # output result for updating rays: before
             print("before update rays:\n")
-            theta_list = []
-            phi_list = []
-            for j in range(len(self.ray_global)):
-                for k in range(len(self.all_rays)):
-                    if np.linalg.norm(self.ray_global[j][2:18] - self.all_rays[k][2:18]) < 0.01:
-                        tmp = self.ray_global[j][0:2] - self.all_rays[k][0:2]
-                        theta_list.append(tmp[0])
-                        phi_list.append(tmp[1])
-                        # print(self.ray_global[j][0:2] - self.all_rays[k][0:2])
-                        break
+            self.output_ray_error()
 
-            print("mean", np.mean(theta_list), "sdev", statistics.stdev(theta_list))
-            print("mean", np.mean(phi_list), "sdev", statistics.stdev(phi_list), "\n")
-
+            # update global rays
             for j in range(len(matched_inner_point_index)):
                 self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
 
+            # output result for updating rays: after
             print("after update rays:\n")
-            theta_list = []
-            phi_list = []
-            for j in range(len(self.ray_global)):
-                for k in range(len(self.all_rays)):
-                    if np.linalg.norm(self.ray_global[j][2:18] - self.all_rays[k][2:18]) < 0.01:
-                        tmp = self.ray_global[j][0:2] - self.all_rays[k][0:2]
-                        theta_list.append(tmp[0])
-                        phi_list.append(tmp[1])
-                        # print(self.ray_global[j][0:2] - self.all_rays[k][0:2])
-                        break
+            self.output_ray_error()
 
-            print("mean", np.mean(theta_list), "sdev", statistics.stdev(theta_list))
-            print("mean", np.mean(phi_list), "sdev", statistics.stdev(phi_list), "\n")
-
+            # update global p
             update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
             self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
             for j in range(len(matched_inner_point_index)):
@@ -313,8 +323,6 @@ class PtzSlam:
 
             cv.imshow("test", self.img)
             cv.waitKey(0)
-
-
 
 
 slam = PtzSlam("./two_point_calib_dataset/util/highlights_soccer_model.mat",
