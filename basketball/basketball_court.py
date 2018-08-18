@@ -1,4 +1,4 @@
-# Ice hockey rink geometry model
+# basketball court geometry model
 import numpy as np
 import math
 # for plotting
