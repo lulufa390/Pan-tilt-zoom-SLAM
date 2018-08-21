@@ -134,7 +134,7 @@ class PtzSlam:
 
 
     # return [CornerNumber * 1 * 2]
-    def get_basketball_image(self, index):
+    def get_basketball_image_gray(self, index):
 
         img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
 
@@ -143,7 +143,14 @@ class PtzSlam:
         # corners = cv.goodFeaturesToTrack(img_gray, 30, 0.01, 10)
         return img_gray
 
+    def get_basketball_image_rgb(self, index):
 
+        img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
+
+        # img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+        # corners = cv.goodFeaturesToTrack(img_gray, 30, 0.01, 10)
+        return img
 
     # compute the H_jacobi matrix
     # rays [RayNumber * 2]
@@ -232,9 +239,9 @@ class PtzSlam:
         return rays
 
     # draw some colored points in img
-    def visualize_points(self, points, pt_color):
+    def visualize_points(self, img, points, pt_color):
         for j in range(len(points)):
-            cv.circle(self.img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=8, thickness=2)
+            cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=8, thickness=2)
 
     # output the error of camera pose compared to ground truth
     def output_camera_error(self, now_index):
@@ -258,11 +265,14 @@ class PtzSlam:
 
     def main_algorithm(self):
 
+        first = 680
+        second = 685
+
         # first ground truth camera pose
-        self.camera_pose = self.get_ptz(0)
+        self.camera_pose = self.get_ptz(first)
 
         # first frame to initialize global_rays
-        first_frame = self.get_basketball_image(0)
+        first_frame = self.get_basketball_image_gray(first)
         first_frame_kp = cv.goodFeaturesToTrack(first_frame, 30, 0.01, 10)
 
         # use key points in first frame to get init rays
@@ -283,7 +293,8 @@ class PtzSlam:
         previous_frame_kp = first_frame_kp
         previous_index = np.array([i for i in range(len(self.ray_global))])
 
-        for i in range(1, self.annotation.size):
+        # for i in range(0, self.annotation.size):
+        for i in range(0, 1):
 
             print("=====The ", i, " iteration=====%d\n" % len(self.ray_global))
 
@@ -292,17 +303,19 @@ class PtzSlam:
             # ground truth features for next frame. In real data we do not need to compute that
             # next_frame_kp = self.get_basketball_image_features(i)
             next_frame_kp, status, err = cv.calcOpticalFlowPyrLK(
-                self.get_basketball_image(i-1), self.get_basketball_image(i), previous_frame_kp, None, winSize=(31, 31))
+                self.get_basketball_image_gray(first), self.get_basketball_image_gray(second), previous_frame_kp, None, winSize=(31, 31))
 
 
             matched_kp = np.ndarray([0,  2])
             next_index = np.ndarray([0])
             for j in range(len(next_frame_kp)):
-                if err[j] < 3:
+                if err[j] < 20 and 0 < next_frame_kp[j][0][0] < self.width and 0 < next_frame_kp[j][0][1] < self.height:
                     next_index = np.concatenate([next_index, [previous_index[j]]], axis=0)
                     matched_kp = np.row_stack([matched_kp, next_frame_kp[j][0]])
 
-            print("helooooooooooooo")
+
+
+
 
             # add the camera pose with constant speed model
             self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
@@ -323,13 +336,25 @@ class PtzSlam:
             ptr = 0
             for j in range(len(matched_kp)):
 
-                while inner_point_index[ptr] < next_index[j]:
+                while ptr < len(inner_point_index)-1 and inner_point_index[ptr] < next_index[j]:
                     ptr += 1
                 if inner_point_index[ptr] > next_index[j]:
                     continue
                 y_k = np.concatenate([y_k, matched_kp[j] - predict_points[ptr]], axis=0)
                 matched_inner_point_index = np.concatenate([matched_inner_point_index, [next_index[j]]], axis=0)
 
+            print("matched", len(matched_inner_point_index))
+
+
+            img1 = self.get_basketball_image_rgb(first)
+            img2 = self.get_basketball_image_rgb(second)
+
+            self.visualize_points(img1, previous_frame_kp.squeeze(), (0,0,0) )
+            # self.visualize_points(img2, matched_kp, (0, 0, 0))
+
+            cv.imshow("img1", img1)
+            # cv.imshow("img2", img2)
+            # cv.waitKey(0)
 
             # get predicted_x: combine 3 camera parameters and rays
             predict_x = self.camera_pose
@@ -354,44 +379,21 @@ class PtzSlam:
 
             # output result for updating camera: before
             print("before update camera:\n")
-            self.output_camera_error(i)
+            self.output_camera_error(second)
 
             # update camera pose
             self.camera_pose += k_mul_y[0:3]
 
             # output result for updating camera: after
             print("after update camera:\n")
-            self.output_camera_error(i)
+            self.output_camera_error(second)
 
             # update speed model
             self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
-
-
-            # initialize new landmarks
-            # for j in range(len(next_frame_kp)):
-            #     has_point = False
-            #     for k in range(len(self.ray_global)):
-            #         if np.linalg.norm(next_frame[j][2:18] - self.ray_global[k][2:18]) < 0.01:
-            #             has_point = True
-            #             break
-            #
-            #     # if no corresponding points in global_rays, we should add it to global ray.
-            #     if not has_point:
-            #         new_ray = self.get_rays_from_observation(
-            #             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], next_frame[j:j + 1, :])
-            #         self.ray_global = np.concatenate([self.ray_global, new_ray], axis=0)
-            #         self.p_global = np.row_stack((self.p_global, np.zeros([2, self.p_global.shape[1]])))
-            #         self.p_global = np.column_stack((self.p_global, np.zeros([self.p_global.shape[0], 2])))
-            #         self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
-
-
-
             # update global rays
             for j in range(len(matched_inner_point_index)):
                 self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
-
-
 
             # update global p
             update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
@@ -403,15 +405,16 @@ class PtzSlam:
                     self.p_global[3 + 2 * int(matched_inner_point_index[j]) + 1,  3 + 2 * int(matched_inner_point_index[k]) + 1] = \
                         update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
 
+
             points_update, in_rays_update, index_update = self.get_observation_from_rays(
                 self.camera_pose[0], self.camera_pose[1], self.camera_pose[2],  self.ray_global)
 
-            self.visualize_points(predict_points, (255, 0, 0))
-            self.visualize_points(matched_kp, (0, 0, 0))
+            self.visualize_points(img2, predict_points, (255, 0, 0))
+            # self.visualize_points(matched_kp, (0, 0, 0))
             # for j in range(len(next_frame_kpt_frame_kp[j].pt[0]), int(next_frame_kp[j].pt[1])), color=(0,0,0), radius=8, thickness=2)
-            self.visualize_points(points_update, (0, 0, 255))
+            self.visualize_points(img2, points_update, (0, 0, 255))
 
-            cv.imshow("test", self.img)
+            cv.imshow("test", img2)
             cv.waitKey(0)
 
 
@@ -421,8 +424,7 @@ if __name__ == "__main__":
                    "./basketball/basketball/basketball_anno.mat",
                    "./synthesize_data.mat")
 
-    slam.test_harris()
-    # slam.test_orb()
-    # slam.get_seq3_image(3)
+    # slam.test_harris()
+
 
     slam.main_algorithm()
