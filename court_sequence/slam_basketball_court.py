@@ -265,8 +265,8 @@ class PtzSlam:
 
     def main_algorithm(self):
 
-        first = 680
-        second = 685
+        first = 500
+
 
         # first ground truth camera pose
         self.camera_pose = self.get_ptz(first)
@@ -291,10 +291,15 @@ class PtzSlam:
         q_k = 5 * np.diag([0.001, 0.001, 1])
 
         previous_frame_kp = first_frame_kp
+
+        print(previous_frame_kp.shape)
+
         previous_index = np.array([i for i in range(len(self.ray_global))])
 
-        # for i in range(0, self.annotation.size):
-        for i in range(0, 1):
+        mystep = 1
+
+        for i in range(first + mystep, self.annotation.size, mystep):
+        # for i in range(0, 1):
 
             print("=====The ", i, " iteration=====%d\n" % len(self.ray_global))
 
@@ -303,11 +308,13 @@ class PtzSlam:
             # ground truth features for next frame. In real data we do not need to compute that
             # next_frame_kp = self.get_basketball_image_features(i)
             next_frame_kp, status, err = cv.calcOpticalFlowPyrLK(
-                self.get_basketball_image_gray(first), self.get_basketball_image_gray(second), previous_frame_kp, None, winSize=(31, 31))
+                self.get_basketball_image_gray(i-mystep), self.get_basketball_image_gray(i), previous_frame_kp, None, winSize=(31, 31))
 
 
             matched_kp = np.ndarray([0,  2])
             next_index = np.ndarray([0])
+
+            print("siiiiiiize", len(next_frame_kp), len(previous_index))
             for j in range(len(next_frame_kp)):
                 if err[j] < 20 and 0 < next_frame_kp[j][0][0] < self.width and 0 < next_frame_kp[j][0][1] < self.height:
                     next_index = np.concatenate([next_index, [previous_index[j]]], axis=0)
@@ -346,8 +353,8 @@ class PtzSlam:
             print("matched", len(matched_inner_point_index))
 
 
-            img1 = self.get_basketball_image_rgb(first)
-            img2 = self.get_basketball_image_rgb(second)
+            img1 = self.get_basketball_image_rgb(i-mystep)
+            img2 = self.get_basketball_image_rgb(i)
 
             self.visualize_points(img1, previous_frame_kp.squeeze(), (0,0,0) )
             # self.visualize_points(img2, matched_kp, (0, 0, 0))
@@ -379,14 +386,14 @@ class PtzSlam:
 
             # output result for updating camera: before
             print("before update camera:\n")
-            self.output_camera_error(second)
+            self.output_camera_error(i)
 
             # update camera pose
             self.camera_pose += k_mul_y[0:3]
 
             # output result for updating camera: after
             print("after update camera:\n")
-            self.output_camera_error(second)
+            self.output_camera_error(i)
 
             # update speed model
             self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
@@ -410,12 +417,78 @@ class PtzSlam:
                 self.camera_pose[0], self.camera_pose[1], self.camera_pose[2],  self.ray_global)
 
             self.visualize_points(img2, predict_points, (255, 0, 0))
-            # self.visualize_points(matched_kp, (0, 0, 0))
-            # for j in range(len(next_frame_kpt_frame_kp[j].pt[0]), int(next_frame_kp[j].pt[1])), color=(0,0,0), radius=8, thickness=2)
             self.visualize_points(img2, points_update, (0, 0, 255))
 
             cv.imshow("test", img2)
             cv.waitKey(0)
+
+
+            # add new rays to the image
+            img_new = self.get_basketball_image_gray(i)
+
+            # set the mask
+            mask = np.ones(img_new.shape, np.uint8)
+
+            for j in range(len(points_update)):
+                x, y = points_update[j]
+
+                up_bound = int(max(0, y-50))
+                low_bound = int(min(self.height, y+50))
+                left_bound = int(max(0, x-50))
+                right_bound = int(min(self.width, x+50))
+
+                mask[up_bound:low_bound, left_bound:right_bound] = 0
+
+            new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.01, 10, mask=mask)
+
+
+            print("before", len(index_update), len(points_update))
+
+            print(new_frame_kp)
+
+            if not new_frame_kp is None:
+
+                new_rays = self.get_rays_from_observation(
+                    self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp.squeeze(1))
+
+                now_point_num = len(self.ray_global)
+
+                for j in range(len(new_rays)):
+                    self.ray_global = np.row_stack([self.ray_global, new_rays[j]])
+                    self.p_global = np.row_stack([self.p_global, np.zeros([2, self.p_global.shape[1]])])
+                    self.p_global = np.column_stack([self.p_global, np.zeros([self.p_global.shape[0], 2])])
+                    self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
+
+                    index_update = np.concatenate([index_update, [now_point_num + j]], axis=0)
+                        # np.r([index_update, [now_point_num + j]], axis=0)
+
+            previous_index = index_update
+
+            # self.visualize_points(img2, new_frame_kp.squeeze(), (0, 255,0))
+            self.visualize_points(img2, predict_points, (255, 0, 0))
+            self.visualize_points(img2, points_update, (0, 0, 255))
+
+            points_update = points_update.reshape([points_update.shape[0], 1, 2])
+
+            print("here", len(points_update))
+
+
+            if not new_frame_kp is None:
+                print("???")
+                previous_frame_kp = np.concatenate([points_update, new_frame_kp], axis=0)
+
+            else:
+                previous_frame_kp = points_update
+
+            print("2", len(previous_frame_kp))
+            previous_frame_kp = previous_frame_kp.astype(np.float32)
+
+            # print(previous_frame_kp[0,0,1])
+
+            # cv.imshow("test", img2
+
+            print("fuuuuuuuuuck", len(previous_index), len(previous_frame_kp))
+
 
 
 if __name__ == "__main__":
