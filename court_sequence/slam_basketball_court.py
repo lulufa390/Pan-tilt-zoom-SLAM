@@ -66,72 +66,8 @@ class PtzSlam:
         self.ground_truth_tilt = sig.savgol_filter(self.ground_truth_tilt, 25, 2)
         self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 25, 2)
 
-
     def get_ptz(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
-
-    def test_harris(self):
-        img1 = cv.imread("./basketball/basketball/synthesize_images/2.jpg")
-
-        img1_gray = cv.cvtColor(img1, cv.COLOR_BGR2GRAY)
-
-        img2 = cv.imread("./basketball/basketball/synthesize_images/200.jpg")
-
-        img2_gray = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
-
-        # print(img1.shape)
-
-        # mask = np.zeros(img1.shape, np.uint8)
-        #
-        # mask[180:540, 320:960] = 1
-        # print("fuuuuuuuuuuuck", type(mask))
-        corners = cv.goodFeaturesToTrack(img1_gray, 30, 0.01, 10)
-
-        print(corners.shape)
-
-
-        # corners2 = np.ndarray(corners.shape)
-
-        # for i in range(len(corners)):
-        #     cv.circle(img1, (int(corners[i,0,0]), int(corners[i,0,1])), color=(255, 0, 0), radius=8, thickness=2 )
-
-
-        # print("corners", corners.shape)
-        corners2, st, err = cv.calcOpticalFlowPyrLK(img1_gray, img2_gray, corners, None, winSize=(31,31))
-
-        print(corners.shape, corners2.shape)
-
-        print(st)
-
-        # print(corners - corners2)
-
-        for i in range(len(corners)):
-            if st[i][0] == 1 and err[i] < 5:
-                x1, y1 = round(corners[i,0,0]),  round(corners[i,0,1])
-                x2, y2 = round(corners2[i,0,0]),  round(corners2[i,0,1])
-                cv.circle(img1, (x1, y1), color=(0, 255, 0), radius=8,
-                          thickness=1)
-                cv.circle(img2, (x2, y2), color=(0, 255, 0), radius=8,
-                          thickness=1)
-
-                print(i, x1-x2, y1-y2)
-            # cv.circle(img1, (int(corners[i,0,0]), int(corners[i,0,1])), color=(255, 0, 0), radius=8, thickness= 2 )
-            # print((int(corners[i, 0, 0]), int(corners[i, 0, 1])) - (int(corners2[i, 0, 0]), int(corners2[i, 0, 1])))
-
-        cv.imshow("fuck", img1)
-        cv.imwrite("./test1.jpg", img1)
-        print("err\n", err.shape)
-
-        # print("status", st)
-
-
-
-        # for i in range(len(corners2)):
-        #     if st[i][0] == 1:
-        #         cv.circle(img2, (int(corners2[i,0,0]), int(corners2[i,0,1])), color=(255, 0, 0), radius=8, thickness=2 )
-        cv.imshow("fuck2", img2)
-        cv.imwrite("./test2.jpg", img2)
-
 
     # return [CornerNumber * 1 * 2]
     def get_basketball_image_gray(self, index):
@@ -263,24 +199,66 @@ class PtzSlam:
         print("theta-mean-error %.4f" % np.mean(theta_list), "sdev %.4f" % statistics.stdev(theta_list))
         print("phi---mean-error %.4f" % np.mean(phi_list), "sdev %.4f" % statistics.stdev(phi_list), "\n")
 
+
+    def draw_camera_plot(self):
+        plt.figure(0)
+        x = np.array([i for i in range(slam.annotation.size)])
+        plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
+        plt.plot(x, self.predict_pan, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("pan angle")
+        plt.legend(loc = "best")
+
+        # plt.show()
+
+        plt.figure(1)
+        x = np.array([i for i in range(slam.annotation.size)])
+        plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
+        plt.plot(x, self.predict_tilt, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("tilt angle")
+        plt.legend(loc="best")
+        # plt.show()
+
+        plt.figure(2)
+        x = np.array([i for i in range(slam.annotation.size)])
+        plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
+        plt.plot(x, self.predict_f, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("f")
+        plt.legend(loc="best")
+        plt.show()
+
+    def save_camera_to_mat(self):
+        camera_pose = dict()
+
+        camera_pose['ground_truth_pan'] = self.ground_truth_pan
+        camera_pose['ground_truth_tilt'] = self.ground_truth_tilt
+        camera_pose['ground_truth_f'] = self.ground_truth_f
+
+        camera_pose['predict_pan'] = self.predict_pan
+        camera_pose['predict_tilt'] = self.predict_tilt
+        camera_pose['predict_f'] = self.predict_f
+
+        sio.savemat('camera_pose.mat', mdict=camera_pose)
+
     def main_algorithm(self):
 
-        first = 500
-
+        first = 0
 
         # first ground truth camera pose
         self.camera_pose = self.get_ptz(first)
 
         # first frame to initialize global_rays
         first_frame = self.get_basketball_image_gray(first)
-        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 30, 0.01, 10)
+        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 30, 0.05, 10)
 
         # use key points in first frame to get init rays
         init_rays = self.get_rays_from_observation(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], first_frame_kp.squeeze())
 
         # add rays in frame 1 to global rays
-        self.ray_global = np.concatenate([self.ray_global, init_rays], axis=0)
+        self.ray_global = np.row_stack([self.ray_global, init_rays])
 
 
         # initialize global p using global rays
@@ -298,8 +276,15 @@ class PtzSlam:
 
         mystep = 1
 
+
+        # camera pose sequence
+        self.predict_pan = np.ndarray([self.annotation.size])
+        self.predict_tilt = np.ndarray([self.annotation.size])
+        self.predict_f = np.ndarray([self.annotation.size])
+
+        self.predict_pan[0], self.predict_tilt[0], self.predict_f[0] = self.camera_pose
+
         for i in range(first + mystep, self.annotation.size, mystep):
-        # for i in range(0, 1):
 
             print("=====The ", i, " iteration=====%d\n" % len(self.ray_global))
 
@@ -314,14 +299,12 @@ class PtzSlam:
             matched_kp = np.ndarray([0,  2])
             next_index = np.ndarray([0])
 
-            print("siiiiiiize", len(next_frame_kp), len(previous_index))
+
             for j in range(len(next_frame_kp)):
                 if err[j] < 20 and 0 < next_frame_kp[j][0][0] < self.width and 0 < next_frame_kp[j][0][1] < self.height:
-                    next_index = np.concatenate([next_index, [previous_index[j]]], axis=0)
+                    next_index = np.append(next_index, previous_index[j])
+                    # next_index = np.concatenate([next_index, [previous_index[j]]], axis=0)
                     matched_kp = np.row_stack([matched_kp, next_frame_kp[j][0]])
-
-
-
 
 
             # add the camera pose with constant speed model
@@ -338,7 +321,6 @@ class PtzSlam:
             # compute y_k
             y_k = np.ndarray([0])
 
-
             matched_inner_point_index = np.ndarray([0])
             ptr = 0
             for j in range(len(matched_kp)):
@@ -350,18 +332,12 @@ class PtzSlam:
                 y_k = np.concatenate([y_k, matched_kp[j] - predict_points[ptr]], axis=0)
                 matched_inner_point_index = np.concatenate([matched_inner_point_index, [next_index[j]]], axis=0)
 
-            print("matched", len(matched_inner_point_index))
-
-
             img1 = self.get_basketball_image_rgb(i-mystep)
             img2 = self.get_basketball_image_rgb(i)
 
-            self.visualize_points(img1, previous_frame_kp.squeeze(), (0,0,0) )
-            # self.visualize_points(img2, matched_kp, (0, 0, 0))
+            self.visualize_points(img1, previous_frame_kp.squeeze(), (0, 0, 0))
 
-            cv.imshow("img1", img1)
-            # cv.imshow("img2", img2)
-            # cv.waitKey(0)
+            # cv.imshow("img1", img1)
 
             # get predicted_x: combine 3 camera parameters and rays
             predict_x = self.camera_pose
@@ -391,6 +367,8 @@ class PtzSlam:
             # update camera pose
             self.camera_pose += k_mul_y[0:3]
 
+            self.predict_pan[i], self.predict_tilt[i], self.predict_f[i] = self.camera_pose
+
             # output result for updating camera: after
             print("after update camera:\n")
             self.output_camera_error(i)
@@ -419,8 +397,8 @@ class PtzSlam:
             self.visualize_points(img2, predict_points, (255, 0, 0))
             self.visualize_points(img2, points_update, (0, 0, 255))
 
-            cv.imshow("test", img2)
-            cv.waitKey(0)
+            # cv.imshow("test", img2)
+            # cv.waitKey(0)
 
 
             # add new rays to the image
@@ -439,21 +417,14 @@ class PtzSlam:
 
                 mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.01, 10)
+            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.05, 10)
 
             new_frame_kp = np.ndarray([0, 1, 2])
-
-            print(new_frame_kp.shape)
 
             for j in range(len(all_new_frame_kp)):
                 if mask[int(all_new_frame_kp[j,0,1]), int(all_new_frame_kp[j,0,0])] == 1:
                     new_frame_kp = np.concatenate([new_frame_kp, (all_new_frame_kp[j]).reshape([1,1,2])],axis=0)
 
-
-
-            print("before", len(index_update), len(points_update))
-
-            print(new_frame_kp)
 
             if not new_frame_kp is None:
 
@@ -469,34 +440,21 @@ class PtzSlam:
                     self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
 
                     index_update = np.concatenate([index_update, [now_point_num + j]], axis=0)
-                        # np.r([index_update, [now_point_num + j]], axis=0)
 
             previous_index = index_update
 
-            # self.visualize_points(img2, new_frame_kp.squeeze(), (0, 255,0))
             self.visualize_points(img2, predict_points, (255, 0, 0))
             self.visualize_points(img2, points_update, (0, 0, 255))
 
             points_update = points_update.reshape([points_update.shape[0], 1, 2])
 
-            print("here", len(points_update))
-
-
             if not new_frame_kp is None:
-                print("???")
                 previous_frame_kp = np.concatenate([points_update, new_frame_kp], axis=0)
-
             else:
                 previous_frame_kp = points_update
 
-            print("2", len(previous_frame_kp))
             previous_frame_kp = previous_frame_kp.astype(np.float32)
 
-            # print(previous_frame_kp[0,0,1])
-
-            # cv.imshow("test", img2
-
-            print("fuuuuuuuuuck", len(previous_index), len(previous_frame_kp))
 
 
 
@@ -506,7 +464,19 @@ if __name__ == "__main__":
                    "./basketball/basketball/basketball_anno.mat",
                    "./synthesize_data.mat")
 
-    # slam.test_harris()
+
 
 
     slam.main_algorithm()
+
+    # camera_pos = sio.loadmat("./camera_pose.mat")
+    # slam.predict_pan = camera_pos['predict_pan'].squeeze()
+    # slam.predict_tilt = camera_pos['predict_tilt'].squeeze()
+    # slam.predict_f = camera_pos['predict_f'].squeeze()
+    #
+    # slam.ground_truth_pan = camera_pos['ground_truth_pan'].squeeze()
+    # slam.ground_truth_tilt = camera_pos['ground_truth_tilt'].squeeze()
+    # slam.ground_truth_f = camera_pos['ground_truth_f'].squeeze()
+
+    slam.draw_camera_plot()
+    slam.save_camera_to_mat()
