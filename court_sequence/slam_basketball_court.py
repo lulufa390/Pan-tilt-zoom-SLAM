@@ -439,7 +439,16 @@ class PtzSlam:
 
                 mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-            new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.01, 10, mask=mask)
+            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.01, 10)
+
+            new_frame_kp = np.ndarray([0, 1, 2])
+
+            print(new_frame_kp.shape)
+
+            for j in range(len(all_new_frame_kp)):
+                if mask[int(all_new_frame_kp[j,0,1]), int(all_new_frame_kp[j,0,0])] == 1:
+                    new_frame_kp = np.concatenate([new_frame_kp, (all_new_frame_kp[j]).reshape([1,1,2])],axis=0)
+
 
 
             print("before", len(index_update), len(points_update))
