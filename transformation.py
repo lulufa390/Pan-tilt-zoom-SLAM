@@ -95,7 +95,43 @@ class TransFunction:
     def compute_rays(proj_center, pos, base_r):
         relative = np.dot(base_r, np.transpose(pos - proj_center))
         x, y, z = relative
-        pan = atan(x / z)
-        tilt = atan(-y / sqrt(x * x + z * z))
+        theta = atan(x / z)
+        phi = atan(-y / sqrt(x * x + z * z))
 
-        return degrees(pan), degrees(tilt)
+        return degrees(theta), degrees(phi)
+
+    @staticmethod
+    def from_ray_to_relative_3d(t, p):
+
+        theta = radians(t)
+        phi = radians(p)
+        x = tan(theta)
+        y = - tan(phi) * sqrt(pow(tan(theta), 2) + 1)
+        return np.array([x,y,1])
+
+    @staticmethod
+    def from_relative_3d_to_2d(u, v, f, p, t, pos):
+        pan = radians(p)
+        tilt = radians(t)
+
+        k = np.array([[f, 0, u],
+                      [0, f, v],
+                      [0, 0, 1]])
+
+        rotation = np.dot(np.array([[1, 0, 0],
+                                    [0, cos(tilt), sin(tilt)],
+                                    [0, -sin(tilt), cos(tilt)]]),
+
+                          np.array([[cos(pan), 0, -sin(pan)],
+                                    [0, 1, 0],
+                                    [sin(pan), 0, cos(pan)]]))
+
+        position = np.dot(k, np.dot(rotation, pos))
+
+        return position[0] / position[2], position[1] / position[2]
+
+    @staticmethod
+    def from_3d_to_relative_3d(c, base_r, pos):
+        position = np.dot(base_r, pos - c)
+        return position / position[2]
+
