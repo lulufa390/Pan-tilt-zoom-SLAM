@@ -296,7 +296,7 @@ class PtzSlam:
 
         # first frame to initialize global_rays
         first_frame = self.get_basketball_image_gray(first)
-        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 30, 0.1, 10)
+        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 40, 0.1, 10)
 
         # use key points in first frame to get init rays
         init_rays = self.get_rays_from_observation(
@@ -356,7 +356,7 @@ class PtzSlam:
             # RANSAC algorithm
             ransac_mask = np.ndarray([len(ransac_previous_kp)])
             _, ransac_mask = cv.findHomography(srcPoints=ransac_previous_kp, dstPoints=ransac_next_kp,
-                                               ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
+                                               ransacReprojThreshold=0.5 , method=cv.FM_RANSAC, mask=ransac_mask)
 
             # print(ransac_mask)
 
@@ -490,8 +490,8 @@ class PtzSlam:
 
             # self.draw_box(img2, [28.6512, 15.24, 0])
 
-            cv.imshow("test", img2)
-            cv.waitKey(0)
+            # cv.imshow("test", img2)
+            # cv.waitKey(0)
 
             """
             ===============================
@@ -512,7 +512,7 @@ class PtzSlam:
                 mask[up_bound:low_bound, left_bound:right_bound] = 0
 
             # find new harris corners for next frame
-            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 30, 0.1, 10)
+            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 40, 0.1, 10)
 
             new_frame_kp = np.ndarray([0, 1, 2])
 
