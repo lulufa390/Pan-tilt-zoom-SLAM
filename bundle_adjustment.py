@@ -18,6 +18,8 @@ class BundleAdjust:
         :param annotation_path: path for camera sequence information
         :param data_path: path for synthesized points
         """
+
+        # random.seed(1)
         self.width = 1280
         self.height = 720
 
@@ -48,7 +50,6 @@ class BundleAdjust:
         cv.Rodrigues(self.meta[0][0]["base_rotation"][0], self.base_rotation)
         self.c = self.meta[0][0]["cc"][0]
 
-
         self.key_frame = np.array([i for i in range(0, 3600, 100)])
 
         """
@@ -61,57 +62,79 @@ class BundleAdjust:
             self.ground_truth_pan[i], self.ground_truth_tilt[i], self.ground_truth_f[i] \
                 = self.annotation[0][self.key_frame[i]]['ptz'].squeeze()
 
-        # self.ground_truth_pan = sig.savgol_filter(self.ground_truth_pan, 181, 1)
-        # self.ground_truth_tilt = sig.savgol_filter(self.ground_truth_tilt, 181, 1)
-        # self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 181, 1)
+        """ground_truth_x is a 1d array for ground truth camera pose and rays"""
+        self.ground_truth_x = np.ndarray([3 * len(self.key_frame) + 2 * len(self.ground_truth_ray)])
 
         """camera and rays with noise"""
         self.cameraArray = np.ndarray([3 * len(self.key_frame)])
         for i in range(len(self.key_frame)):
-            self.cameraArray[3 * i] = self.ground_truth_pan[i] + random.gauss(0, 0.5)
-            self.cameraArray[3 * i + 1] = self.ground_truth_tilt[i] + random.gauss(0, 0.5)
-            self.cameraArray[3 * i + 2] = self.ground_truth_f[i] + random.gauss(0, 50)
+            self.cameraArray[3 * i] = self.ground_truth_pan[i] + random.gauss(0, 5)
+            self.cameraArray[3 * i + 1] = self.ground_truth_tilt[i] + random.gauss(0, 2)
+            self.cameraArray[3 * i + 2] = self.ground_truth_f[i] + random.gauss(0, 20)
 
-        self.points3D = np.ndarray([2 * len(self.ground_truth_ray)])
+            self.ground_truth_x[3 * i] = self.ground_truth_pan[i]
+            self.ground_truth_x[3 * i + 1] = self.ground_truth_tilt[i]
+            self.ground_truth_x[3 * i + 2] = self.ground_truth_f[i]
+
+        self.ray3d = np.ndarray([2 * len(self.ground_truth_ray)])
         for i in range(len(self.ground_truth_ray)):
-            self.points3D[2 * i] = self.ground_truth_ray[i][0] + random.gauss(0, 0.5)
-            self.points3D[2 * i + 1] = self.ground_truth_ray[i][1] + random.gauss(0, 0.5)
+            self.ray3d[2 * i] = self.ground_truth_ray[i][0] + random.gauss(0, 5)
+            self.ray3d[2 * i + 1] = self.ground_truth_ray[i][1] + random.gauss(0, 2)
+
+            self.ground_truth_x[3 * len(self.key_frame) + 2 * i] = self.ground_truth_ray[i][0]
+            self.ground_truth_x[3 * len(self.key_frame) + 2 * i + 1] = self.ground_truth_ray[i][1]
+
+
+        self.image_list = []
+        self.point_index_list = []
+        # random.seed(1)
+        for i in range(len(self.key_frame)):
+            tmp_image, tmp_index = self.generate_image(i)
+            self.image_list.append(tmp_image)
+            self.point_index_list.append(tmp_index)
+
 
     def get_ground_truth_camera(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
 
-    def get_image(self, index, inner_idx):
+    def generate_image(self, index):
         """
         :param index: index for image
         :return: all points in that observation
         """
+
         pan, tilt, f = self.get_ground_truth_camera(index)
         points = np.ndarray([0, self.ground_truth_ray.shape[1]])
+        inner_index = np.ndarray([0])
 
-        for i in range(len(inner_idx)):
-            j = int(inner_idx[i])
+        for i in range(len(self.ground_truth_ray)):
+            x, y = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, self.ground_truth_ray[i][0],
+                                                     self.ground_truth_ray[i][1])
 
-            x, y = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, self.ground_truth_ray[j][0],
-                                                     self.ground_truth_ray[j][1])
             # x += random.gauss(0, 2)
             # y += random.gauss(0, 2)
 
-            # if 0 < x < self.width and 0 < y < self.height:
-            points = np.row_stack([points, np.array([x, y])])
+            if 0 < x < self.width and 0 < y < self.height:
+                points = np.row_stack([points, np.array([x, y])])
+                inner_index = np.append(inner_index, i)
+
+
+        return points, inner_index
+
+    def get_image(self, i):
+        return self.image_list[i], self.point_index_list[i]
+
+    def get_observation_from_rays(self, pan, tilt, f, rays, ray_index):
+        points = np.ndarray([0, 2])
+
+        for j in range(len(ray_index)):
+            theta = rays[int(ray_index[j])][0]
+            phi = rays[int(ray_index[j])][1]
+            tmp = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, theta, phi)
+            # if 0 < tmp[0] < self.width and 0 < tmp[1] < self.height:
+            points = np.row_stack([points, np.asarray(tmp)])
 
         return points
-
-    def get_observation_from_rays(self, pan, tilt, f, rays):
-        points = np.ndarray([0, 2])
-        index = np.ndarray([0])
-
-        for j in range(len(rays)):
-            tmp = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, rays[j][0], rays[j][1])
-            if 0 < tmp[0] < self.width and 0 < tmp[1] < self.height:
-                points = np.row_stack([points, np.asarray(tmp)])
-                index = np.concatenate([index, [j]], axis=0)
-
-        return points, index
 
     def fun(self, params, n_cameras, n_points):
         """Compute residuals.
@@ -121,75 +144,102 @@ class BundleAdjust:
         points_3d = params[n_cameras * 3:].reshape((n_points, 2))
 
 
-
         residual = np.ndarray([0])
 
         for i in range(n_cameras):
-            proj_point, inner_index = self.get_observation_from_rays(
-                camera_params[i, 0], camera_params[i, 1], camera_params[i, 2], points_3d)
+            point_2d, inner_index = self.get_image(i)
 
-            point_2d = self.get_image(i, inner_index)
+            # print(len(point_2d), len(inner_index))
+
+            proj_point = self.get_observation_from_rays(
+                camera_params[i, 0], camera_params[i, 1], camera_params[i, 2], points_3d, inner_index)
 
             residual = np.append(residual, proj_point.ravel() - point_2d.ravel())
 
         # print(np.linalg.norm(residual))
 
-
-
         # print(residual.shape)
 
         return residual
-
-    def bundle_adjustment_sparsity(self, numCameras, numPoints):
-        m = cameraIndices.size * 2
-        n = numCameras * 9 + numPoints * 3
-        A = lil_matrix((m, n), dtype=int)
-
-        i = np.arange(cameraIndices.size)
-        for s in range(9):
-            A[2 * i, cameraIndices * 9 + s] = 1
-            A[2 * i + 1, cameraIndices * 9 + s] = 1
-
-        for s in range(3):
-            A[2 * i, numCameras * 9 + pointIndices * 3 + s] = 1
-            A[2 * i + 1, numCameras * 9 + pointIndices * 3 + s] = 1
-
-        return A
-
-    def optimizedParams(self, params, n_cameras, n_points):
-        """
-        Retrieve camera parameters and 3-D coordinates.
-        """
-        camera_params = params[:n_cameras * 3].reshape((n_cameras, 3))
-        points_3d = params[n_cameras * 3:].reshape((n_points, 2))
-
-        return camera_params, points_3d
 
     def bundleAdjust(self):
         """ Returns the bundle adjusted parameters, in this case the optimized
          rotation and translation vectors. """
 
-        x0 = np.hstack((self.cameraArray, self.points3D))
+        x0 = np.hstack((self.cameraArray, self.ray3d))
 
-        f0 = self.fun(x0, len(self.key_frame), len(self.ground_truth_ray))
 
-        plt.figure(0)
-        plt.plot(f0)
+        plt.figure(num="ground pan")
+        plt.plot(self.ground_truth_x[:3 * len(self.key_frame)].reshape((-1,3))[:, 0])
 
-        # A = self.bundle_adjustment_sparsity(
-        #     self.annotation.size, len(self.ground_truth_ray))
+        plt.figure(num="ground tilt")
+        plt.plot(self.ground_truth_x[:3 * len(self.key_frame)].reshape((-1,3))[:, 1])
+
+        plt.figure(num="ground f")
+        plt.plot(self.ground_truth_x[:3 * len(self.key_frame)].reshape((-1,3))[:, 2])
+
+
+        # f0 = self.fun(x0, len(self.key_frame), len(self.ground_truth_ray))
+        #
+        # plt.figure("before residual")
+        # plt.plot(f0)
+
 
         res = least_squares(self.fun, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
                             args=(len(self.key_frame), len(self.ground_truth_ray)))
 
-        f1 = self.fun(res.x, len(self.key_frame), len(self.ground_truth_ray))
-        plt.figure(1)
-        plt.plot(f1)
+
+        # f1 = self.fun(res.x, len(self.key_frame), len(self.ground_truth_ray))
+        # plt.figure("after residual")
+        # plt.plot(f1)
+
+
+        print(np.linalg.norm(x0 - self.ground_truth_x))
+        print(np.linalg.norm(res.x - self.ground_truth_x))
+        # params = self.optimizedParams(res.x, len(self.key_frame), len(self.ground_truth_ray))
+
+        diff_before = x0 - self.ground_truth_x
+        diff_before = diff_before[:3 * len(self.key_frame)].reshape((-1,3))
+
+        diff_after = res.x - self.ground_truth_x
+        diff_after = diff_after[:3 * len(self.key_frame)].reshape((-1, 3))
+
+        after_camera = res.x[:3 * len(self.key_frame)].reshape((-1,3))
+
+        # plt.figure(num="after camera pan")
+        # plt.plot(after_camera[:, 0])
+        #
+        # plt.figure(num="after camera tilt")
+        # plt.plot(after_camera[:, 1])
+        #
+        # plt.figure(num="after camera f")
+        # plt.plot(after_camera[:, 2])
+
+
+        plt.figure(num="before pan")
+        plt.plot(diff_before[:, 0])
+
+        plt.figure(num="before tilt")
+        plt.plot(diff_before[:, 1])
+
+        plt.figure(num="before f")
+        plt.plot(diff_before[:, 2])
+
+        plt.figure(num="after pan")
+        plt.plot(diff_after[:, 0])
+
+        plt.figure(num="after tilt")
+        plt.plot(diff_after[:, 1])
+
+        plt.figure(num="after f")
+        plt.plot(diff_after[:, 2])
+
+
         plt.show()
 
-        params = self.optimizedParams(res.x, len(self.key_frame), len(self.ground_truth_ray))
 
-        return params
+
+        # return params
 
 
 if __name__ == '__main__':
