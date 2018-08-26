@@ -68,14 +68,14 @@ class BundleAdjust:
         """camera and rays with noise"""
         self.cameraArray = np.ndarray([3 * len(self.key_frame)])
         for i in range(len(self.key_frame)):
-            self.cameraArray[3 * i] = self.ground_truth_pan[i] + random.gauss(0, 0.1)
-            self.cameraArray[3 * i + 1] = self.ground_truth_tilt[i] + random.gauss(0, 0.1)
-            self.cameraArray[3 * i + 2] = self.ground_truth_f[i] + random.gauss(0, 10)
+            self.cameraArray[3 * i] = self.ground_truth_pan[i] + random.gauss(0, 0.5)
+            self.cameraArray[3 * i + 1] = self.ground_truth_tilt[i] + random.gauss(0, 0.5)
+            self.cameraArray[3 * i + 2] = self.ground_truth_f[i] + random.gauss(0, 50)
 
         self.points3D = np.ndarray([2 * len(self.ground_truth_ray)])
         for i in range(len(self.ground_truth_ray)):
-            self.points3D[2 * i] = self.ground_truth_ray[i][0] + random.gauss(0, 0.1)
-            self.points3D[2 * i + 1] = self.ground_truth_ray[i][1] + random.gauss(0, 0.1)
+            self.points3D[2 * i] = self.ground_truth_ray[i][0] + random.gauss(0, 0.5)
+            self.points3D[2 * i + 1] = self.ground_truth_ray[i][1] + random.gauss(0, 0.5)
 
     def get_ground_truth_camera(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
@@ -93,8 +93,8 @@ class BundleAdjust:
 
             x, y = TransFunction.from_pan_tilt_to_2d(self.u, self.v, f, pan, tilt, self.ground_truth_ray[j][0],
                                                      self.ground_truth_ray[j][1])
-            x += random.gauss(0, 0.5)
-            y += random.gauss(0, 0.5)
+            # x += random.gauss(0, 2)
+            # y += random.gauss(0, 2)
 
             # if 0 < x < self.width and 0 < y < self.height:
             points = np.row_stack([points, np.array([x, y])])
@@ -121,8 +121,6 @@ class BundleAdjust:
         points_3d = params[n_cameras * 3:].reshape((n_points, 2))
 
 
-        print(camera_params.shape)
-        print(points_3d.shape)
 
         residual = np.ndarray([0])
 
@@ -134,11 +132,11 @@ class BundleAdjust:
 
             residual = np.append(residual, proj_point.ravel() - point_2d.ravel())
 
-        print(np.linalg.norm(residual))
+        # print(np.linalg.norm(residual))
 
 
 
-        print(residual.shape)
+        # print(residual.shape)
 
         return residual
 
@@ -175,13 +173,19 @@ class BundleAdjust:
 
         f0 = self.fun(x0, len(self.key_frame), len(self.ground_truth_ray))
 
+        plt.figure(0)
         plt.plot(f0)
-        plt.show()
+
         # A = self.bundle_adjustment_sparsity(
         #     self.annotation.size, len(self.ground_truth_ray))
 
-        res = least_squares(self.fun, x0, verbose=2, x_scale='jac', ftol=1e-3, method='trf',
+        res = least_squares(self.fun, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
                             args=(len(self.key_frame), len(self.ground_truth_ray)))
+
+        f1 = self.fun(res.x, len(self.key_frame), len(self.ground_truth_ray))
+        plt.figure(1)
+        plt.plot(f1)
+        plt.show()
 
         params = self.optimizedParams(res.x, len(self.key_frame), len(self.ground_truth_ray))
 
