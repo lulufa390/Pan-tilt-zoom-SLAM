@@ -17,10 +17,13 @@ import scipy.signal as sig
 
 class PtzSlam:
     def __init__(self, model_path, annotation_path, data_path):
-
+        """
+        :param model_path: path for basketball model
+        :param annotation_path: path for ground truth camera poses
+        :param data_path: path for synthesized tays
+        """
         self.width = 1280
         self.height = 720
-        # self.img = np.zeros((self.height, self.width, 3), np.uint8)
 
         court_model = sio.loadmat(model_path)
         self.line_index = court_model['line_segment_index']
@@ -32,20 +35,19 @@ class PtzSlam:
 
         data = sio.loadmat(data_path)
 
-        # this is synthesized rays to generate 2d-point. Real data does not have this variable
+        """this is synthesized rays to generate 2d-point. Real data does not have this variable"""
         self.all_rays = np.column_stack((data["rays"], data["features"]))
 
         """
         initialize the fixed parameters of our algorithm
         u, v, base_rotation and c
         """
-
         self.u, self.v = self.annotation[0][0]['camera'][0][0:2]
         self.base_rotation = np.zeros([3, 3])
         cv.Rodrigues(self.meta[0][0]["base_rotation"][0], self.base_rotation)
         self.c = self.meta[0][0]["cc"][0]
 
-        # parameters to be updated
+        """parameters to be updated"""
         self.camera_pose = np.ndarray([3])
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
@@ -63,7 +65,7 @@ class PtzSlam:
         # self.ground_truth_tilt = sig.savgol_filter(self.ground_truth_tilt, 181, 1)
         # self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 181, 1)
 
-        # camera pose sequence
+        """camera pose sequence"""
         self.predict_pan = np.ndarray([self.annotation.size])
         self.predict_tilt = np.ndarray([self.annotation.size])
         self.predict_f = np.ndarray([self.annotation.size])
@@ -71,9 +73,12 @@ class PtzSlam:
     def get_ptz(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
 
-    # return [CornerNumber * 1 * 2]
     @staticmethod
     def get_basketball_image_gray(index):
+        """
+        :param index: image index for basketball sequence
+        :return: gray image of shape [CornerNumber * 1 * 2]
+        """
         # img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
         img = cv.imread("./basketball/basketball/images/000" + str(index+84000) + ".jpg")
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -296,7 +301,7 @@ class PtzSlam:
 
         # first frame to initialize global_rays
         first_frame = self.get_basketball_image_gray(first)
-        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 40, 0.1, 10)
+        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 10, 0.1, 10)
 
         # use key points in first frame to get init rays
         init_rays = self.get_rays_from_observation(
@@ -326,7 +331,11 @@ class PtzSlam:
             ===============================
             0. matching step
             ===============================
+            
             """
+
+
+
             # ground truth features for next frame. In real data we do not need to compute that
             next_frame_kp, status, err = cv.calcOpticalFlowPyrLK(
                 self.get_basketball_image_gray(i-step_length), self.get_basketball_image_gray(i),
@@ -356,7 +365,7 @@ class PtzSlam:
             # RANSAC algorithm
             ransac_mask = np.ndarray([len(ransac_previous_kp)])
             _, ransac_mask = cv.findHomography(srcPoints=ransac_previous_kp, dstPoints=ransac_next_kp,
-                                               ransacReprojThreshold=0.5 , method=cv.FM_RANSAC, mask=ransac_mask)
+                                               ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
 
             # print(ransac_mask)
 
@@ -490,12 +499,12 @@ class PtzSlam:
 
             # self.draw_box(img2, [28.6512, 15.24, 0])
 
-            # cv.imshow("test", img2)
-            # cv.waitKey(0)
+            cv.imshow("test", img2)
+            cv.waitKey(0)
 
             """
             ===============================
-            4.  add new features
+            4.  add new features & update previous frame
             ===============================
             """
             # add new rays to the image
@@ -512,7 +521,7 @@ class PtzSlam:
                 mask[up_bound:low_bound, left_bound:right_bound] = 0
 
             # find new harris corners for next frame
-            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 40, 0.1, 10)
+            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 10, 0.1, 10)
 
             new_frame_kp = np.ndarray([0, 1, 2])
 

@@ -1,4 +1,5 @@
-from mpl_toolkits.mplot3d import Axes3D
+"""synthesize rays on basketball court"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as sio
@@ -7,6 +8,7 @@ import cv2 as cv
 from sklearn.preprocessing import normalize
 from math import *
 from transformation import TransFunction
+import scipy.signal as sig
 
 
 class DataSynthesize:
@@ -57,16 +59,24 @@ class DataSynthesize:
         return pts_arr
 
     def show_image_sequence(self, pts):
+        """optional smooth part"""
+        # pan_arr = np.ndarray([self.annotation.size])
+        # tilt_arr = np.ndarray([self.annotation.size])
+        # f_arr = np.ndarray([self.annotation.size])
+        # for i in range(self.annotation.size):
+        #     pan_arr[i], tilt_arr[i], f_arr[i] = self.annotation[0][i]['ptz'].squeeze()
+
+        # pan_arr = sig.savgol_filter(pan_arr, 181, 1)
+        # tilt_arr = sig.savgol_filter(tilt_arr, 181, 1)
+        # f_arr = sig.savgol_filter(f_arr, 181, 1)
 
         for i in range(self.annotation.size):
             img = np.zeros((720, 1280, 3), np.uint8)
-            img.fill(255)
 
             pan, tilt, f = self.annotation[0][i]['ptz'].squeeze()
-
             self.draw_soccer_line(img, pan, tilt, f)
 
-            # draw the feature points in images
+            """draw the feature points in images"""
             for j in range(len(pts)):
                 p = np.array(pts[j])
 
@@ -83,7 +93,7 @@ class DataSynthesize:
                 cv.circle(img, (int(res[0]), int(res[1])), color=(0, 0, 0), radius=8, thickness=2)
                 cv.circle(img, (int(res2[0]), int(res2[1])), color=(255, 0, 0), radius=8, thickness=2)
 
-            cv.imshow("synthesized image", img)
+            cv.imshow("images", img)
             cv.waitKey(0)
 
     @staticmethod
@@ -166,7 +176,7 @@ class DataSynthesize:
 
 
 synthesize = DataSynthesize()
-pts = synthesize.generate_points(100)
+pts = synthesize.generate_points(10)
 synthesize.draw_3d_model(pts)
 rays = synthesize.computer_all_ray(pts)
 synthesize.show_image_sequence(pts)
