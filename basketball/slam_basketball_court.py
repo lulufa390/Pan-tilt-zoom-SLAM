@@ -66,9 +66,9 @@ class PtzSlam:
         # self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 181, 1)
 
         """camera pose sequence"""
-        self.predict_pan = np.ndarray([self.annotation.size])
-        self.predict_tilt = np.ndarray([self.annotation.size])
-        self.predict_f = np.ndarray([self.annotation.size])
+        self.predict_pan = np.zeros([self.annotation.size])
+        self.predict_tilt = np.zeros([self.annotation.size])
+        self.predict_f = np.zeros([self.annotation.size])
 
     def get_ptz(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
@@ -182,9 +182,9 @@ class PtzSlam:
 
     # draw some colored points in img
     @staticmethod
-    def visualize_points(img, points, pt_color):
+    def visualize_points(img, points, pt_color, rad):
         for j in range(len(points)):
-            cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=8, thickness=2)
+            cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=rad, thickness=2)
 
     # output the error of camera pose compared to ground truth
     def output_camera_error(self, now_index):
@@ -193,15 +193,41 @@ class PtzSlam:
         print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
 
     def draw_camera_plot(self):
-        plt.figure(0)
+        """percentage"""
+        plt.figure("pan percentage error")
+        x = np.array([i for i in range(slam.annotation.size)])
+        # plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
+        plt.plot(x, (self.predict_pan - self.ground_truth_pan) / self.ground_truth_pan * 100 , 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc = "best")
+
+        plt.figure("tilt percentage error")
+        x = np.array([i for i in range(slam.annotation.size)])
+        # plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
+        plt.plot(x, (self.predict_tilt - self.ground_truth_tilt) / self.ground_truth_tilt * 100, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc="best")
+
+        plt.figure("f percentage error")
+        x = np.array([i for i in range(slam.annotation.size)])
+        # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
+        plt.plot(x, (self.predict_f - self.ground_truth_f) / self.ground_truth_f * 100, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc="best")
+
+        """absolute value"""
+        plt.figure("pan")
         x = np.array([i for i in range(slam.annotation.size)])
         plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
-        plt.plot(x, self.predict_pan, 'b', label='predict')
+        plt.plot(x, self.predict_pan , 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("pan angle")
         plt.legend(loc = "best")
 
-        plt.figure(1)
+        plt.figure("tilt")
         x = np.array([i for i in range(slam.annotation.size)])
         plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
         plt.plot(x, self.predict_tilt, 'b', label='predict')
@@ -209,13 +235,14 @@ class PtzSlam:
         plt.ylabel("tilt angle")
         plt.legend(loc="best")
 
-        plt.figure(2)
+        plt.figure("f")
         x = np.array([i for i in range(slam.annotation.size)])
         plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
-        plt.plot(x, self.predict_f, 'b', label='predict')
+        plt.plot(x, self.predict_f , 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("f")
         plt.legend(loc="best")
+
         plt.show()
 
     def save_camera_to_mat(self):
@@ -292,6 +319,45 @@ class PtzSlam:
         cv.line(img, (int(center[0]), int(center[1])), (int(pt7_2d[0]), int(pt7_2d[1])), (255, 128, 0), 2)
         cv.line(img, (int(center[0]), int(center[1])), (int(pt8_2d[0]), int(pt8_2d[1])), (255, 128, 0), 2)
 
+    @staticmethod
+    def detect_harris_corner_grid(self, gray_img, row, column):
+        mask = np.zeros_like(gray_img, dtype=np.uint8)
+
+        grid_height = gray_img.shape[0] // row
+        grid_width = gray_img.shape[1] // column
+
+        all_harris = np.ndarray([0,1,2], dtype=np.float32)
+
+        for i in range(row):
+            for j in range(column):
+                mask.fill(0)
+
+                grid_y1 = i * grid_height
+                grid_x1 = j * grid_width
+
+                if i == row - 1:
+                    grid_y2 = gray_img.shape[0]
+                else:
+                    grid_y2 = i * grid_height + grid_height
+
+                if j == column -1:
+                    grid_x2 = gray_img.shape[1]
+                else:
+                    grid_x2 = j * grid_width + grid_width
+
+                mask[grid_y1:grid_y2, grid_x1:grid_x2] = 1
+
+                grid_harris = cv.goodFeaturesToTrack(gray_img,
+                                                     maxCorners=5, qualityLevel=0.2, minDistance=10, mask=mask)
+
+                if grid_harris is not None:
+                    all_harris = np.concatenate([all_harris, grid_harris], axis=0)
+                # print("all", all_harris.shape)
+
+
+        return all_harris
+
+
     def main_algorithm(self):
 
         first = 0
@@ -301,7 +367,10 @@ class PtzSlam:
 
         # first frame to initialize global_rays
         first_frame = self.get_basketball_image_gray(first)
-        first_frame_kp = cv.goodFeaturesToTrack(first_frame, 10, 0.1, 10)
+        # first_frame_kp = cv.goodFeaturesToTrack(first_frame, maxCorners=20, qualityLevel=0.2, minDistance=10)
+        first_frame_kp = self.detect_harris_corner_grid(first_frame, 4, 4)
+
+        print(first_frame_kp.shape)
 
         # use key points in first frame to get init rays
         init_rays = self.get_rays_from_observation(
@@ -333,8 +402,6 @@ class PtzSlam:
             ===============================
             
             """
-
-
 
             # ground truth features for next frame. In real data we do not need to compute that
             next_frame_kp, status, err = cv.calcOpticalFlowPyrLK(
@@ -383,7 +450,7 @@ class PtzSlam:
             ===============================
             """
             # update camera pose with constant speed model
-            self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
+            # self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
 
             # update p_global
             self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
@@ -412,10 +479,10 @@ class PtzSlam:
                 y_k = np.concatenate([y_k, matched_kp[j] - predict_points[ptr]], axis=0)
                 matched_inner_point_index = np.concatenate([matched_inner_point_index, [next_index[j]]], axis=0)
 
-            img1 = self.get_basketball_image_rgb(i-step_length)
+            # img1 = self.get_basketball_image_rgb(i-step_length)
             img2 = self.get_basketball_image_rgb(i)
 
-            self.visualize_points(img1, previous_frame_kp.squeeze(), (0, 0, 0))
+            # self.visualize_points(img1, previous_frame_kp.squeeze(), (0, 0, 0),8)
 
             # cv.imshow("img1", img1)
 
@@ -456,6 +523,8 @@ class PtzSlam:
             # update speed model
             self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
+            print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
+
             # update global rays
             for j in range(len(matched_inner_point_index)):
                 self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
@@ -491,16 +560,22 @@ class PtzSlam:
             points_update, in_rays_update, index_update = self.get_observation_from_rays(
                 self.camera_pose[0], self.camera_pose[1], self.camera_pose[2],  self.ray_global)
 
+            # observed features in next frame Red
+            self.visualize_points(img2, matched_kp, (0, 0, 255), 10)
 
-            self.visualize_points(img2, matched_kp, (0, 0, 255))
+            # predict using speed model Blue
+            self.visualize_points(img2, predict_points, (255, 0, 0), 5)
+
+            # update Green  Green should from Blue to Red
+            self.visualize_points(img2, points_update, (0, 255, 0), 2)
 
             # for j in range(len(in_rays_update)):
             #     self.draw_box(img2, in_rays_update[j])
 
             # self.draw_box(img2, [28.6512, 15.24, 0])
 
-            cv.imshow("test", img2)
-            cv.waitKey(0)
+            # cv.imshow("test", img2)
+            # cv.waitKey(0)
 
             """
             ===============================
@@ -521,7 +596,9 @@ class PtzSlam:
                 mask[up_bound:low_bound, left_bound:right_bound] = 0
 
             # find new harris corners for next frame
-            all_new_frame_kp = cv.goodFeaturesToTrack(img_new, 10, 0.1, 10)
+            # all_new_frame_kp = cv.goodFeaturesToTrack(img_new, maxCorners=50, qualityLevel=0.2, minDistance=10)
+            all_new_frame_kp = self.detect_harris_corner_grid(img_new, 4, 4)
+
 
             new_frame_kp = np.ndarray([0, 1, 2])
 
