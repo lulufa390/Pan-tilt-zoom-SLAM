@@ -1,6 +1,6 @@
 """
-PTZ camera SLAM tested on synthesized data
-2018.8
+This is a Prototype for PTZ camera SLAM on sports applications.
+2018.9
 """
 
 import matplotlib.pyplot as plt
@@ -9,10 +9,10 @@ import scipy.io as sio
 import random
 import cv2 as cv
 import statistics
+import scipy.signal as sig
 from sklearn.preprocessing import normalize
 from math import *
 from transformation import TransFunction
-import scipy.signal as sig
 from scipy.optimize import least_squares
 
 
@@ -54,7 +54,7 @@ class BundleAdj:
     def get_basketball_image_gray(index):
         """
         :param index: image index for basketball sequence
-        :return: gray image of shape [CornerNumber * 1 * 2]
+        :return: gray image
         """
         img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -65,8 +65,6 @@ class BundleAdj:
         img = BundleAdj.get_basketball_image_gray(img_index)
         sift = cv.xfeatures2d.SIFT_create(nfeatures=point_num)
         kp, des = sift.detectAndCompute(img, None)
-
-        # img = cv.drawKeypoints(img, kp, None)
         return kp, des
 
     def get_observation_from_rays(self, pan, tilt, f, rays, ray_index):
@@ -286,7 +284,7 @@ class PtzSlam:
     def get_basketball_image_gray(index):
         """
         :param index: image index for basketball sequence
-        :return: gray image of shape [CornerNumber * 1 * 2]
+        :return: gray image
         """
         # img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
         img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
@@ -294,15 +292,8 @@ class PtzSlam:
         return img_gray
 
     @staticmethod
-    def get_basketball_image_rgb(index):
-        # img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
-        img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
-        return img
-
-    """draw some colored points in img"""
-
-    @staticmethod
     def visualize_points(img, points, pt_color, rad):
+        """draw some colored points in img"""
         for j in range(len(points)):
             cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=rad, thickness=2)
 
@@ -375,13 +366,15 @@ class PtzSlam:
     def get_ptz(self, index):
         return np.array([self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]])
 
-    """
-    compute the H_jacobi matrix
-    rays: [RayNumber * 2]
-    return: [2 * RayNumber, 3 + 2 * RayNumber]
-    """
-
     def compute_new_jacobi(self, camera_pan, camera_tilt, foc, rays):
+        """
+        compute jacobi matrix
+        :param camera_pan:
+        :param camera_tilt:
+        :param foc:
+        :param rays: [RayNumber * 2]
+        :return: [2 * RayNumber, 3 + 2 * RayNumber]
+        """
         ray_num = len(rays)
 
         delta_angle = 0.001
@@ -440,10 +433,16 @@ class PtzSlam:
 
         return jacobi_h
 
-    """return all 2d points(with features), 
-    corresponding rays(with features) and indexes of these points IN THE IMAGE."""
-
     def get_observation_from_rays(self, pan, tilt, f, rays):
+        """
+        return all 2d points(with features),
+        corresponding rays(with features) and indexes of these points IN THE IMAGE.
+        :param pan:
+        :param tilt:
+        :param f:
+        :param rays: [N, 2]
+        :return: 2-d points: [n, 2] rays: [n, 2], indexes [n]
+        """
         points = np.ndarray([0, 2])
         inner_rays = np.ndarray([0, 2])
         index = np.ndarray([0])
@@ -457,21 +456,23 @@ class PtzSlam:
 
         return points, inner_rays, index
 
-    """
-    get a list of rays(with features) from 2d points and camera pose
-    points: [PointNumber * 2]
-    """
-
     def get_rays_from_observation(self, pan, tilt, f, points):
+        """
+        get a list of rays from 2d points and camera pose
+        :param pan:
+        :param tilt:
+        :param f:
+        :param points: [PointNumber, 2]
+        :return: [RayNumber(=PointNumber), 2]
+        """
         rays = np.ndarray([0, 2])
         for i in range(len(points)):
             angles = TransFunction.from_2d_to_pan_tilt(self.u, self.v, f, pan, tilt, points[i][0], points[i][1])
             rays = np.row_stack([rays, angles])
         return rays
 
-    """output the error of camera pose compared to ground truth"""
-
     def output_camera_error(self, now_index):
+        """output the error of camera pose compared to ground truth"""
         ground_truth = self.get_ptz(now_index)
         pan, tilt, f = self.camera_pose - ground_truth
         print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
@@ -623,21 +624,18 @@ class PtzSlam:
 
         return ret_keypoints
 
-    def main_algorithm(self, first, step_length):
-
-        """first ground truth camera pose"""
-        self.camera_pose = self.get_ptz(first)
-
+    def init_system(self, index):
+        self.camera_pose = self.get_ptz(index)
         """first frame to initialize global_rays"""
-        first_frame = self.get_basketball_image_gray(first)
+        begin_frame = self.get_basketball_image_gray(index)
 
         # first_frame_kp = PtzSlam.detect_harris_corner_grid(first_frame, 4, 4, first)
-        first_frame_kp = PtzSlam.detect_sift_corner(first_frame)
-        first_frame_kp = self.remove_player_feature(first, first_frame_kp)
+        begin_frame_kp = PtzSlam.detect_sift_corner(begin_frame)
+        begin_frame_kp = self.remove_player_feature(index, begin_frame_kp)
 
         """use key points in first frame to get init rays"""
         init_rays = self.get_rays_from_observation(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], first_frame_kp.squeeze())
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], begin_frame_kp.squeeze())
 
         """add rays in frame 1 to global rays"""
         self.ray_global = np.row_stack([self.ray_global, init_rays])
@@ -647,21 +645,177 @@ class PtzSlam:
         self.p_global[2][2] = 1
 
         """q_k: covariance matrix of noise for state(camera pose)"""
-        q_k = 5 * np.diag([0.001, 0.001, 1])
 
-        previous_frame_kp = first_frame_kp
+        previous_frame_kp = begin_frame_kp
         previous_index = np.array([i for i in range(len(self.ray_global))])
 
-        self.predict_pan[0], self.predict_tilt[0], self.predict_f[0] = self.camera_pose
+        self.predict_pan[index], self.predict_tilt[index], self.predict_f[index] = self.camera_pose
 
+        return previous_frame_kp, previous_index
+
+    def optical_flow_matching(self, pre_img, next_img, pre_points, pre_index):
+        next_points, status, err = cv.calcOpticalFlowPyrLK(
+            pre_img, next_img, pre_points, None, winSize=(31, 31))
+
+        good_next_points = np.ndarray([0, 2])
+        good_pre_points = np.ndarray([0, 2])
+        good_index = np.ndarray([0])
+
+        for j in range(len(next_points)):
+            if err[j] < 20 and 0 < next_points[j][0][0] < self.width and 0 < next_points[j][0][1] < self.height:
+                good_index = np.append(good_index, pre_index[j])
+                good_next_points = np.row_stack([good_next_points, next_points[j][0]])
+                good_pre_points = np.row_stack([good_pre_points, pre_points[j][0]])
+
+        return good_pre_points, good_next_points, good_index
+
+    def run_ransac(self, points1, points2, index):
+        ransac_mask = np.ndarray([len(points1)])
+        _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
+                                           ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
+        inner_kp = np.ndarray([0, 2])
+        inner_index = np.ndarray([0])
+
+        for j in range(len(points1)):
+            if ransac_mask[j] == 1:
+                inner_kp = np.row_stack([inner_kp, points2[j]])
+                inner_index = np.append(inner_index, index[j])
+
+        return inner_kp, inner_index, ransac_mask
+
+    def ekf_update(self, i, matched_kp, next_index):
+        # get 2d points, rays and indexes in all landmarks with predicted camera pose
+        predict_points, predict_rays, inner_point_index = self.get_observation_from_rays(
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
+
+        # compute y_k
+        overlap1, overlap2 = PtzSlam.get_overlap_index(next_index, inner_point_index)
+        y_k = matched_kp[overlap1] - predict_points[overlap2]
+        y_k = y_k.flatten()
+
+        matched_inner_point_index = next_index[overlap1]
+
+        # get p matrix for this iteration from p_global
+        p_index = (np.concatenate([[0, 1, 2], matched_inner_point_index + 3,
+                                   matched_inner_point_index + len(matched_inner_point_index) + 3])).astype(int)
+
+        p = self.p_global[p_index][:, p_index]
+
+        # compute jacobi
+        jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0], camera_tilt=self.camera_pose[1],
+                                         foc=self.camera_pose[2],
+                                         rays=self.ray_global[matched_inner_point_index.astype(int)])
+        # get Kalman gain
+        r_k = 2 * np.eye(2 * len(matched_inner_point_index))
+        s_k = np.dot(np.dot(jacobi, p), jacobi.T) + r_k
+
+        k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
+
+        k_mul_y = np.dot(k_k, y_k)
+
+        # output result for updating camera: before
+        print("before update camera:\n")
+        self.output_camera_error(i)
+
+        # update camera pose
+        self.camera_pose += k_mul_y[0:3]
+
+        self.predict_pan[i], self.predict_tilt[i], self.predict_f[i] = self.camera_pose
+
+        # output result for updating camera: after
+        print("after update camera:\n")
+        self.output_camera_error(i)
+
+        # update speed model
+        self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
+
+        print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
+
+        # update global rays
+        for j in range(len(matched_inner_point_index)):
+            self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
+
+        # update global p
+        update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
+        self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
+        for j in range(len(matched_inner_point_index)):
+            for k in range(len(matched_inner_point_index)):
+                self.p_global[
+                    3 + 2 * int(matched_inner_point_index[j]), 3 + 2 * int(matched_inner_point_index[k])] = \
+                    update_p[3 + 2 * j, 3 + 2 * k]
+                self.p_global[
+                    3 + 2 * int(matched_inner_point_index[j]) + 1, 3 + 2 * int(matched_inner_point_index[k]) + 1] = \
+                    update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
+
+    def delete_outliers(self, ransac_mask):
+        """
+        delete ransac outliers from global ray
+        """
+        delete_index = np.ndarray([0])
+        for j in range(len(ransac_mask)):
+            if ransac_mask[j] == 0:
+                delete_index = np.append(delete_index, j)
+
+        self.ray_global = np.delete(self.ray_global, delete_index, axis=0)
+
+        p_delete_index = np.concatenate([delete_index + 3, delete_index + len(delete_index) + 3], axis=0)
+
+        self.p_global = np.delete(self.p_global, p_delete_index, axis=0)
+        self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
+
+    def add_new_points(self, i):
+        points_update, in_rays_update, index_update = self.get_observation_from_rays(
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
+        img_new = self.get_basketball_image_gray(i)
+
+        """set the mask"""
+        mask = np.ones(img_new.shape, np.uint8)
+        for j in range(len(points_update)):
+            x, y = points_update[j]
+            up_bound = int(max(0, y - 50))
+            low_bound = int(min(self.height, y + 50))
+            left_bound = int(max(0, x - 50))
+            right_bound = int(min(self.width, x + 50))
+            mask[up_bound:low_bound, left_bound:right_bound] = 0
+
+        all_new_frame_kp = PtzSlam.detect_sift_corner(img_new)
+        all_new_frame_kp = self.remove_player_feature(i, all_new_frame_kp)
+
+        new_frame_kp = np.ndarray([0, 1, 2])
+
+        """only select those are far from previous corners"""
+        for j in range(len(all_new_frame_kp)):
+            if mask[int(all_new_frame_kp[j, 0, 1]), int(all_new_frame_kp[j, 0, 0])] == 1:
+                new_frame_kp = np.concatenate([new_frame_kp, (all_new_frame_kp[j]).reshape([1, 1, 2])], axis=0)
+
+        points_update = points_update.reshape([points_update.shape[0], 1, 2])
+        if new_frame_kp is not None:
+            new_rays = self.get_rays_from_observation(
+                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp.squeeze(1))
+
+            now_point_num = len(self.ray_global)
+
+            for j in range(len(new_rays)):
+                self.ray_global = np.row_stack([self.ray_global, new_rays[j]])
+                self.p_global = np.row_stack([self.p_global, np.zeros([2, self.p_global.shape[1]])])
+                self.p_global = np.column_stack([self.p_global, np.zeros([self.p_global.shape[0], 2])])
+                self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
+
+                index_update = np.concatenate([index_update, [now_point_num + j]], axis=0)
+
+            points_update = np.concatenate([points_update, new_frame_kp], axis=0)
+
+        return points_update.astype(np.float32), index_update
+
+    def main_algorithm(self, first, step_length):
+        """
+        This is main function for SLAM system.
+        Run this function to begin tracking and mapping
+        :param first: the start frame index
+        :param step_length: step length between consecutive frames
+        """
+        previous_frame_kp, previous_index = self.init_system(first)
         bundle_adj = BundleAdj(self)
-        # print(self.get_ptz(2560))
-        # print(self.get_ptz(2550))
-        # print(self.get_ptz(2400))
-        #
-        # print(bundle_adj.add_key_frame(2560, 10.13, -12.96, 2391.7))
-        # print(bundle_adj.add_key_frame(2550, 11, -13, 2300.7))
-        # print(bundle_adj.add_key_frame(2400, 24, -11, 2159))
 
         for i in range(first + step_length, self.annotation.size, step_length):
 
@@ -669,48 +823,26 @@ class PtzSlam:
 
             """
             ===============================
-            0. matching step
+            0. feature matching step
             ===============================
-            
             """
+            next_img = PtzSlam.get_basketball_image_gray(i)
 
-            """ground truth features for next frame. In real data we do not need to compute that"""
-            next_frame_kp, status, err = cv.calcOpticalFlowPyrLK(
-                self.get_basketball_image_gray(i - step_length), self.get_basketball_image_gray(i),
-                previous_frame_kp, None, winSize=(31, 31))
+            ransac_previous_kp, ransac_next_kp, ransac_index = \
+                self.optical_flow_matching(pre_img, next_img, previous_frame_kp, previous_index)
 
-            ransac_next_kp = np.ndarray([0, 2])
-            ransac_previous_kp = np.ndarray([0, 2])
-            ransac_index = np.ndarray([0])
-
-            for j in range(len(next_frame_kp)):
-                if err[j] < 20 and 0 < next_frame_kp[j][0][0] < self.width and 0 < next_frame_kp[j][0][1] < self.height:
-                    ransac_index = np.append(ransac_index, previous_index[j])
-                    ransac_next_kp = np.row_stack([ransac_next_kp, next_frame_kp[j][0]])
-                    ransac_previous_kp = np.row_stack([ransac_previous_kp, previous_frame_kp[j][0]])
-
-            """run RANSAC"""
-            ransac_mask = np.ndarray([len(ransac_previous_kp)])
-            _, ransac_mask = cv.findHomography(srcPoints=ransac_previous_kp, dstPoints=ransac_next_kp,
-                                               ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
-
-            matched_kp = np.ndarray([0, 2])
-            next_index = np.ndarray([0])
-
-            for j in range(len(ransac_previous_kp)):
-                if ransac_mask[j] == 1:
-                    matched_kp = np.row_stack([matched_kp, ransac_next_kp[j]])
-                    next_index = np.append(next_index, ransac_index[j])
+            matched_kp, next_index, ransac_mask = self.run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
 
             """
             ===============================
             1. predict step
             ===============================
             """
-            # update camera pose with constant speed model
+            """update camera pose with constant speed model"""
             # self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
 
-            # update p_global
+            """update p_global"""
+            q_k = 5 * np.diag([0.001, 0.001, 1])
             self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
 
             """
@@ -719,184 +851,32 @@ class PtzSlam:
             ===============================
             """
 
-            # get 2d points, rays and indexes in all landmarks with predicted camera pose
-            predict_points, predict_rays, inner_point_index = self.get_observation_from_rays(
-                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
-
-            # compute y_k
-            overlap1, overlap2 = PtzSlam.get_overlap_index(next_index, inner_point_index)
-            y_k = matched_kp[overlap1] - predict_points[overlap2]
-            y_k = y_k.flatten()
-
-            matched_inner_point_index = next_index[overlap1]
-
-            img2 = self.get_basketball_image_rgb(i)
-
-            # get p matrix for this iteration from p_global
-            p_index = (np.concatenate([[0, 1, 2], matched_inner_point_index + 3,
-                                       matched_inner_point_index + len(matched_inner_point_index) + 3])).astype(int)
-            p = self.p_global[p_index][:, p_index]
-
-            # compute jacobi
-            jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0], camera_tilt=self.camera_pose[1],
-                                             foc=self.camera_pose[2],
-                                             rays=self.ray_global[matched_inner_point_index.astype(int)])
-
-            # get Kalman gain
-            r_k = 2 * np.eye(2 * len(matched_inner_point_index))
-            s_k = np.dot(np.dot(jacobi, p), jacobi.T) + r_k
-
-            k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
-
-            k_mul_y = np.dot(k_k, y_k)
-
-            # output result for updating camera: before
-            print("before update camera:\n")
-            self.output_camera_error(i)
-
-            # update camera pose
-            self.camera_pose += k_mul_y[0:3]
-
-            self.predict_pan[i], self.predict_tilt[i], self.predict_f[i] = self.camera_pose
-
-            # output result for updating camera: after
-            print("after update camera:\n")
-            self.output_camera_error(i)
-
-            # update speed model
-            self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
-
-            print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
-
-            # update global rays
-            for j in range(len(matched_inner_point_index)):
-                self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
-
-            # update global p
-            update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
-            self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
-            for j in range(len(matched_inner_point_index)):
-                for k in range(len(matched_inner_point_index)):
-                    self.p_global[
-                        3 + 2 * int(matched_inner_point_index[j]), 3 + 2 * int(matched_inner_point_index[k])] = \
-                        update_p[3 + 2 * j, 3 + 2 * k]
-                    self.p_global[
-                        3 + 2 * int(matched_inner_point_index[j]) + 1, 3 + 2 * int(matched_inner_point_index[k]) + 1] = \
-                        update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
+            self.ekf_update(i, matched_kp, next_index)
 
             """
             ===============================
             3. delete outliers
             ===============================
             """
-            # delete rays which are outliers of ransac
-            delete_index = np.ndarray([0])
-            for j in range(len(ransac_mask)):
-                if ransac_mask[j] == 0:
-                    delete_index = np.append(delete_index, j)
-
-            self.ray_global = np.delete(self.ray_global, delete_index, axis=0)
-
-            p_delete_index = np.concatenate([delete_index + 3, delete_index + len(delete_index) + 3], axis=0)
-
-            self.p_global = np.delete(self.p_global, p_delete_index, axis=0)
-            self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
-
-            points_update, in_rays_update, index_update = self.get_observation_from_rays(
-                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
-
-            # observed features in next frame Red
-            self.visualize_points(img2, matched_kp, (0, 0, 255), 10)
-
-            # predict using speed model Blue
-            self.visualize_points(img2, predict_points, (255, 0, 0), 5)
-
-            # update Green  Green should from Blue to Red
-            self.visualize_points(img2, points_update, (0, 255, 0), 2)
-
-            # cv.imshow("test", img2)
-            # cv.waitKey(0)
+            self.delete_outliers(ransac_mask)
 
             """
             ===============================
             4.  add new features & update previous frame
             ===============================
             """
-            # add new rays to the image
-            img_new = self.get_basketball_image_gray(i)
+            previous_frame_kp, previous_index = self.add_new_points(i)
 
-            # set the mask
-            mask = np.ones(img_new.shape, np.uint8)
-            for j in range(len(points_update)):
-                x, y = points_update[j]
-                up_bound = int(max(0, y - 50))
-                low_bound = int(min(self.height, y + 50))
-                left_bound = int(max(0, x - 50))
-                right_bound = int(min(self.width, x + 50))
-                mask[up_bound:low_bound, left_bound:right_bound] = 0
-
-            # all_new_frame_kp = PtzSlam.detect_harris_corner_grid(img_new, 4, 4, i)
-            all_new_frame_kp = PtzSlam.detect_sift_corner(img_new)
-            all_new_frame_kp = self.remove_player_feature(i, all_new_frame_kp)
-
-            new_frame_kp = np.ndarray([0, 1, 2])
-
-            # only select those are far from previous corners
-            for j in range(len(all_new_frame_kp)):
-                if mask[int(all_new_frame_kp[j, 0, 1]), int(all_new_frame_kp[j, 0, 0])] == 1:
-                    new_frame_kp = np.concatenate([new_frame_kp, (all_new_frame_kp[j]).reshape([1, 1, 2])], axis=0)
-
-            points_update = points_update.reshape([points_update.shape[0], 1, 2])
-            if new_frame_kp is not None:
-                new_rays = self.get_rays_from_observation(
-                    self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp.squeeze(1))
-
-                now_point_num = len(self.ray_global)
-
-                for j in range(len(new_rays)):
-                    self.ray_global = np.row_stack([self.ray_global, new_rays[j]])
-                    self.p_global = np.row_stack([self.p_global, np.zeros([2, self.p_global.shape[1]])])
-                    self.p_global = np.column_stack([self.p_global, np.zeros([self.p_global.shape[0], 2])])
-                    self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
-
-                    index_update = np.concatenate([index_update, [now_point_num + j]], axis=0)
-
-                points_update = np.concatenate([points_update, new_frame_kp], axis=0)
-
-            previous_index = index_update
-            previous_frame_kp = points_update.astype(np.float32)
-
-            """if keyframe, start again"""
+            """
+            ===============================
+            5. key frame and restart system
+            ===============================
+            """
             restart = 2600
             if i == restart:
-                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2] = \
-                    bundle_adj.add_key_frame(restart, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
-
-                """first frame to initialize global_rays"""
-                restart_frame = self.get_basketball_image_gray(restart)
-
-                # first_frame_kp = PtzSlam.detect_harris_corner_grid(first_frame, 4, 4, first)
-                restart_frame_kp = PtzSlam.detect_sift_corner(restart_frame)
-                restart_frame_kp = self.remove_player_feature(restart, restart_frame_kp)
-
-                """use key points in first frame to get init rays"""
-                restart_rays = self.get_rays_from_observation(
-                    self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], restart_frame_kp.squeeze())
-
-                """add rays in frame 1 to global rays"""
-                self.ray_global = np.ndarray([0, 2])
-                self.ray_global = np.row_stack([self.ray_global, restart_rays])
-
-                """initialize global p using global rays"""
-                self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
-                self.p_global[2][2] = 1
-
-                """q_k: covariance matrix of noise for state(camera pose)"""
-                q_k = 5 * np.diag([0.001, 0.001, 1])
-
-                previous_frame_kp = restart_frame_kp
-                previous_index = np.array([i for i in range(len(self.ray_global))])
-                self.predict_pan[restart], self.predict_tilt[restart], self.predict_f[restart] = self.camera_pose
+                self.camera_pose = bundle_adj.add_key_frame(
+                    restart, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
+                previous_frame_kp, previous_index = self.init_system(restart)
 
 
 if __name__ == "__main__":
