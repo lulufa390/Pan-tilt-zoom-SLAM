@@ -8,6 +8,7 @@ import scipy.signal as sig
 from sklearn.preprocessing import normalize
 from math import *
 from transformation import TransFunction
+from image_process import *
 from scipy.optimize import least_squares
 
 
@@ -26,13 +27,15 @@ class BundleAdj:
         self.u = ptzslam_obj.u
         self.v = ptzslam_obj.v
 
+        self.annotation = ptzslam_obj.annotation
+        self.image_path = ptzslam_obj.image_path
         """initialize key frame map using first frame"""
         self.feature_num = 100
 
         first_camera = np.array([self.ground_truth_pan[0], self.ground_truth_tilt[0], self.ground_truth_f[0]])
         self.key_frame_camera = np.row_stack([self.key_frame_camera, first_camera])
 
-        kp_init, des_init = self.detect_sift(0, self.feature_num)
+        kp_init, des_init = detect_compute_sift(self.get_basketball_image_gray(0), self.feature_num)
         self.key_frame_sift.append((kp_init, des_init))
 
         ray_index = np.ndarray([self.feature_num])
@@ -45,24 +48,16 @@ class BundleAdj:
 
         self.key_frame_ray_index.append(ray_index)
 
-    @staticmethod
-    def get_basketball_image_gray(index):
+    def get_basketball_image_gray(self, index):
         """
         :param index: image index for basketball sequence
         :return: gray image
         """
-        img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
+        # img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
         # img = cv.imread("./two_point_calib_dataset/highlights/seq3/0" + str(index * 6 + 515) + ".jpg")
-
+        img = cv.imread(self.image_path + self.annotation[0][index]['image_name'][0])
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         return img_gray
-
-    @staticmethod
-    def detect_sift(img_index, point_num):
-        img = BundleAdj.get_basketball_image_gray(img_index)
-        sift = cv.xfeatures2d.SIFT_create(nfeatures=point_num)
-        kp, des = sift.detectAndCompute(img, None)
-        return kp, des
 
     def get_observation_from_rays(self, pan, tilt, f, rays, ray_index):
         """
@@ -117,7 +112,7 @@ class BundleAdj:
         next_camera = np.array([pan, tilt, f])
         self.key_frame_camera = np.row_stack([self.key_frame_camera, next_camera])
 
-        kp_n, des_n = self.detect_sift(frame_index, self.feature_num)
+        kp_n, des_n = detect_compute_sift(self.get_basketball_image_gray(frame_index), self.feature_num)
         self.key_frame_sift.append((kp_n, des_n))
 
         ray_index = np.ndarray([self.feature_num])
@@ -195,9 +190,11 @@ class BundleAdj:
         self.key_frame_camera[0] = [self.ground_truth_pan[0], self.ground_truth_tilt[0], self.ground_truth_f[0]]
 
         # img3 = cv.drawMatches(
-        #     BundleAdj.get_basketball_image_gray(2550), kp_n,
-        #     BundleAdj.get_basketball_image_gray(2560), kp_pre, ransac_inliers, None, flags=2)
+        #     self.get_basketball_image_gray(2550), kp_n,
+        #     self.get_basketball_image_gray(2560), kp_pre, ransac_inliers, None, flags=2)
         # cv.imshow("test", img3)
         # cv.waitKey(0)
 
         return self.key_frame_camera[self.key_frame_camera.shape[0] - 1]
+
+
