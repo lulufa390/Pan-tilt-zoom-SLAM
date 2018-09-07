@@ -40,6 +40,10 @@ class PtzSlam:
         self.bounding_box_mask_list = []
         for i in range(bounding_box['bounding_box'].shape[1]):
             tmp_mask = np.ones([self.height, self.width])
+
+            """to remove the logo in soccer data"""
+            # tmp_mask[57:90, 63:491] = 0
+
             for j in range(bounding_box['bounding_box'][0][i].shape[0]):
                 if bounding_box['bounding_box'][0][i][j][4] > 0.6:
                     for x in range(int(bounding_box['bounding_box'][0][i][j][0]),
@@ -81,10 +85,16 @@ class PtzSlam:
         # self.ground_truth_tilt = sig.savgol_filter(self.ground_truth_tilt, 181, 1)
         # self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 181, 1)
 
-        """camera pose sequence"""
+        """camera pose sequence (basketball)"""
         self.predict_pan = np.zeros([self.annotation.size])
         self.predict_tilt = np.zeros([self.annotation.size])
         self.predict_f = np.zeros([self.annotation.size])
+
+        """camera pose sequence (soccer)"""
+        # self.image_num = 333
+        # self.predict_pan = np.zeros([self.image_num])
+        # self.predict_tilt = np.zeros([self.image_num])
+        # self.predict_f = np.zeros([self.image_num])
 
         """add keyframe for bundle adjustment for our system"""
 
@@ -114,11 +124,7 @@ class PtzSlam:
         :param index: image index for basketball sequence
         :return: gray image
         """
-        # img = cv.imread("./basketball/basketball/synthesize_images/" + str(index) + ".jpg")
-        # img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
-        # img = cv.imread("./two_point_calib_dataset/highlights/seq3/0" + str(index * 6 + 515) + ".jpg")
-
-        # img = cv.imread("./basketball/basketball/images/" + self.annotation[0][index]['image_name'][0])
+        # img = cv.imread(self.image_path + "00000" + str(index + 515) + ".jpg")
         img = cv.imread(self.image_path + self.annotation[0][index]['image_name'][0])
 
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -285,6 +291,33 @@ class PtzSlam:
         plt.xlabel("frame")
         plt.ylabel("f")
         plt.legend(loc="best")
+
+        # plt.figure("pan")
+        # x1 = np.array([6 * i for i in range(self.image_num // 6)])
+        # x2 = np.array([i for i in range(self.image_num)])
+        # plt.plot(x1, self.ground_truth_pan[:self.image_num // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_pan, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("pan angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("tilt")
+        # x1 = np.array([6 * i for i in range(self.image_num // 6)])
+        # x2 = np.array([i for i in range(self.image_num)])
+        # plt.plot(x1, self.ground_truth_tilt[:self.image_num // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_tilt, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("tilt angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("f")
+        # x1 = np.array([6 * i for i in range(self.image_num // 6)])
+        # x2 = np.array([i for i in range(self.image_num)])
+        # plt.plot(x1, self.ground_truth_f[:self.image_num // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_f, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("f")
+        # plt.legend(loc="best")
 
         plt.show()
 
@@ -549,11 +582,11 @@ class PtzSlam:
 
         bundle_adj = BundleAdj(self)
 
-        # restart = [2500, 1500, 500]
+        restart = [2600]
 
+        # accumulate_moving = np.array([0, 0, 0], dtype=np.float64)
 
-        accumulate_moving = np.array([0, 0, 0], dtype=np.float64)
-
+        # for i in range(first + step_length, self.image_num, step_length):
         for i in range(first + step_length, self.annotation.size, step_length):
 
             print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.ray_global))
@@ -622,21 +655,25 @@ class PtzSlam:
             #     previous_frame_kp, previous_index = self.init_system(i)
             #     accumulate_moving = np.array([0, 0, 0], dtype=np.float64)
 
-            # if i == restart[len(restart) - 1 ]:
-            #     break_frame = restart.pop()
-            #     self.camera_pose = bundle_adj.add_key_frame(
-            #         break_frame, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
-            #     previous_frame_kp, previous_index = self.init_system(break_frame)
+            if len(restart) > 0:
+                if i == restart[len(restart) - 1 ]:
+                    break_frame = restart.pop()
+                    self.camera_pose = bundle_adj.add_key_frame(
+                        break_frame, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
+                    previous_frame_kp, previous_index = self.init_system(break_frame)
 
 
 if __name__ == "__main__":
+    """for soccer sequence"""
     # slam = PtzSlam("./two_point_calib_dataset/util/highlights_soccer_model.mat",
     #                "./two_point_calib_dataset/highlights/seq3_anno.mat",
-    #                "./objects_sort_seq3.mat")
+    #                "./objects_soccer.mat",
+    #                "./seq3/")
 
+    """for basketball sequence"""
     slam = PtzSlam("./basketball/basketball_model.mat",
                    "./basketball/basketball/basketball_anno.mat",
-                   "./objects_sort.mat",
+                   "./objects_basketball.mat",
                    "./basketball/basketball/images/")
 
     slam.main_algorithm(first=0, step_length=1)

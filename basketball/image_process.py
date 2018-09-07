@@ -33,7 +33,7 @@ def detect_compute_sift(im, nfeatures):
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
     key_point, descriptor = sift.detectAndCompute(im, None)
 
-    # SIFT may detect more keypoint than set
+    """SIFT may detect more keypoint than set"""
 
     if len(key_point) > nfeatures:
         key_point = key_point[:nfeatures]
@@ -121,10 +121,12 @@ def run_ransac(points1, points2, index):
 
     return inner_kp, inner_index, ransac_mask
 
+
 def visualize_points(img, points, pt_color, rad):
     """draw some colored points in img"""
     for j in range(len(points)):
         cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=rad, thickness=2)
+
 
 if __name__ == "__main__":
     im = cv.imread('./two_point_calib_dataset/highlights/seq1/0419.jpg', 0)

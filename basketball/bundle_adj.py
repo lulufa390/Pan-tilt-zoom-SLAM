@@ -53,9 +53,9 @@ class BundleAdj:
         :param index: image index for basketball sequence
         :return: gray image
         """
-        # img = cv.imread("./basketball/basketball/images/000" + str(index + 84000) + ".jpg")
-        # img = cv.imread("./two_point_calib_dataset/highlights/seq3/0" + str(index * 6 + 515) + ".jpg")
         img = cv.imread(self.image_path + self.annotation[0][index]['image_name'][0])
+        # img = cv.imread(self.image_path + "00000" + str(index + 515) + ".jpg")
+
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         return img_gray
 
