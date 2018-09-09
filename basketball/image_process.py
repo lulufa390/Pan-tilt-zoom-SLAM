@@ -6,7 +6,7 @@ import cv2 as cv
 import numpy as np
 
 
-def detect_sift(gray_img, nfeatures=50):
+def detect_sift(gray_img, nfeatures=600):
     """
     :param gray_img:
     :param nfeatures:
@@ -126,6 +126,24 @@ def visualize_points(img, points, pt_color, rad):
     """draw some colored points in img"""
     for j in range(len(points)):
         cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=rad, thickness=2)
+
+
+def get_overlap_index(index1, index2):
+    index1_overlap = np.ndarray([0], np.int8)
+    index2_overlap = np.ndarray([0], np.int8)
+    ptr1 = 0
+    ptr2 = 0
+    while ptr1 < len(index1) and ptr2 < len(index2):
+        if index1[ptr1] == index2[ptr2]:
+            index1_overlap = np.append(index1_overlap, ptr1)
+            index2_overlap = np.append(index2_overlap, ptr2)
+            ptr1 += 1
+            ptr2 += 1
+        elif index1[ptr1] < index2[ptr2]:
+            ptr1 += 1
+        elif index1[ptr1] > index2[ptr2]:
+            ptr2 += 1
+    return index1_overlap, index2_overlap
 
 
 if __name__ == "__main__":
