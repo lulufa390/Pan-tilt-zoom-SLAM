@@ -197,19 +197,30 @@ def run_ransac(points1, points2, index):
 
     return inner_kp, inner_index, ransac_mask
 
-def build_matching_graph(images, verbose = False):
+def build_matching_graph(images, image_match_mask = [], verbose = False):
     """
     build a graph for a list of images
     The graph is 2D hash map using list index as key
     node: image
     edge: matched key points and a global index (from zero)
     :param images: RGB image or gay Image
+    :image_match_mask: optional N * N a list of list [[]], 1 for matched, 0 or can not match
     :param verbose:
     :return: keypoints, descriptors, landmark index (local --> global)
     """
     N = len(images)
     if verbose:
         print('build a matching graph from %d images.' % N)
+
+    if len(image_match_mask) != 0:
+        assert len(image_match_mask) == N
+        # check image match mask
+        for mask in image_match_mask:
+            assert len(mask) == N
+        if verbose:
+            print('image match is used')
+    else:
+        print("Warning: image match mask is NOT used, may have false positive matches!")
 
     # step 1: extract key points and descriptors
     keypoints, descriptors = [], []
@@ -240,6 +251,10 @@ def build_matching_graph(images, verbose = False):
     for i in range(N):
         kp1, des1 = keypoints[i], descriptors[i]
         for j in range(i+1, N):
+            # skip un-matched frames
+            if (len(image_match_mask) != 0 and image_match_mask[i][j] == 0):
+                continue
+
             kp2, des2 = keypoints[j], descriptors[j]
             pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
             assert len(index1) == len(index2)
@@ -254,8 +269,6 @@ def build_matching_graph(images, verbose = False):
                     print("no enough matches between image: %d and %d" % (i, j))
 
     # step 3: matching consistency check @todo
-
-
 
     # step 4: compute global landmark index
     landmark_index_map = dict.fromkeys(range(N))
@@ -365,7 +378,7 @@ def ut_build_matching_graph():
     #cv.imshow('image 4', im4)
     #cv.waitKey(0)
     images = [im0, im1, im2, im3, im4]
-    build_matching_graph(images, True)
+    build_matching_graph(images, [], True)
 
 
 
