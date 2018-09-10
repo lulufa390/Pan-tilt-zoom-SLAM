@@ -44,21 +44,53 @@ def detect_compute_sift(im, nfeatures, verbose = False):
 
     return key_point, descriptor
 
-def match_sift_features(keypiont1, descrpitor1, keypoint2, descriptor2, verbose = False):
+def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
     # from https://opencv-python-tutroals.readthedocs.io/en
     # /latest/py_tutorials/py_feature2d/py_feature_homography/py_feature_homography.html
+    """
+    :param keypiont1: list of keypoints
+    :param descrpitor1:
+    :param keypoint2:
+    :param descriptor2:
+    :param verbose:
+    :return: matched 2D points, and matched descriptor index
+    """
 
     bf = cv.BFMatcher()
-    matches = bf.knnMatch(descrpitor1, descriptor2, k=2)
+    matches = bf.knnMatch(descriptor1, descriptor2, k=2) # (query_data, train_data)
 
-    # apply ratio test
+    # step 1: apply ratio test
     good = []
     for m, n in matches:
         if m.distance < 0.7 * n.distance:
-            good.append([m])
+            good.append(m)
 
     if verbose == True:
         print('%d matches passed the ratio test' % len(good))
+
+    N = len(good)
+    pts1 = np.zeros((N, 2))
+    pts2 = np.zeros((N, 2))
+    index1 = np.zeros((N), dtype=np.int32)
+    index2 = np.zeros((N), dtype=np.int32)
+    for i in range(N):
+        idx1, idx2 = good[i].queryIdx, good[i].trainIdx  # query is from the first image
+        index1[i], index2[i] = idx1, idx2
+        pts1[i] = keypiont1[idx1].pt
+        pts2[i] = keypoint2[idx2].pt
+
+    # step 2: apply homography constraint
+    # inlier index from homography estimation
+    inlier_index = homography_ransac(pts1, pts2, 1.0)
+
+    if verbose == True:
+        print('%d matches passed the homography ransac' % inlier_index.shape[0])
+
+    pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
+    index1 = index1[inlier_index].tolist()
+    index2 = index2[inlier_index].tolist()
+
+    return pts1, index1, pts2, index2
 
 
 def detect_harris_corner_grid(gray_img, row, column):
@@ -125,8 +157,29 @@ def optical_flow_matching(img, next_img, points, ssd_threshold=20):
 
     return matched_index, next_points
 
+def homography_ransac(points1, points2, reprojection_threshold = 0.5):
+    """
+    :param points1: N x 2 matched points
+    :param points2:
+    :return: N x 1 array, matched index in original points, [0, 3, 4...]
+    """
+    ransac_mask = np.ndarray([len(points1)])
+    _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
+                                       ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC, mask=ransac_mask)
+    inner_kp = np.ndarray([0, 2])
+    inner_index = np.ndarray([0])
+
+    index = [i for i in range(len(ransac_mask)) if ransac_mask[i] == 1]
+    index = np.array(index)
+    return index
 
 def run_ransac(points1, points2, index):
+    """
+    :param points1: N x 2 array, float32 or float64
+    :param points2:
+    :param index:
+    :return:
+    """
     ransac_mask = np.ndarray([len(points1)])
     _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
                                        ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
@@ -172,9 +225,12 @@ def ut_match_sift_features():
     kp1, des1 = detect_compute_sift(im1, 0, True)
     kp2, des2 = detect_compute_sift(im2, 0, True)
 
-    match_sift_features(kp1, des1, kp2, des2, True)
+    print(type(des1[0]))
+    print(des1[0].shape)
 
-    print('image shape:', im1.shape)
+    pt1, index1, pt2, index2 = match_sift_features(kp1, des1, kp2, des2, True)
+
+    #print('image shape:', im1.shape)
 
 
 def ut_redundant():
