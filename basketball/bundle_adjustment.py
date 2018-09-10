@@ -5,79 +5,48 @@ Bundle Adjustment function
 import scipy.io as sio
 import cv2 as cv
 import numpy as np
+from key_frame import KeyFrame
+from image_process import build_matching_graph
+from sequence_manager import SequenceManager
 
 
-class BundleAdjust:
-    def __init__(self, annotation_path, image_path, bounding_box_path):
-        self.width = 1280
-        self.height = 720
+def bundle_adjustment(keyframes):
+    """
+    optimize global rays, camera pose in each key frames
+    :param keyframes:
+    :return:  optimized keyframes
+    """
+    pass
 
-        seq = sio.loadmat(annotation_path)
-        self.annotation = seq["annotation"]
-        self.meta = seq['meta']
 
-        """base parameters"""
-        self.u, self.v = self.annotation[0][0]['camera'][0][0:2]
-        self.base_rotation = np.zeros([3, 3])
-        cv.Rodrigues(self.meta[0][0]["base_rotation"][0], self.base_rotation)
-        self.c = self.meta[0][0]["cc"][0]
+def ut_test_build_adjustment():
 
-        """image path"""
-        self.image_path = image_path
+    input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
+                            "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images",
+                            "/Users/jimmy/PycharmProjects/ptz_slam/Camera-Calibration/basketball/objects_basketball.mat")
 
-        """bounding boxes"""
-        bounding_box_data = sio.loadmat(bounding_box_path)
-        self.bounding_box = bounding_box_data['bounding_box']
+    cc = input.get_camera_center()
+    base_rotation = input.get_base_rotation()
+    u = 1280/2
+    v = 720/2
 
-    def load_bounding_box_mask(self, i):
-        """
-        function to get mask to remove features on players
-        :param i:
-        :return:
-        """
-        tmp_mask = np.ones([self.height, self.width])
-        for j in range(self.bounding_box[0][i].shape[0]):
-            if self.bounding_box[0][i][j][4] > 0.6:
-                for x in range(int(self.bounding_box[0][i][j][0]),
-                               int(self.bounding_box[0][i][j][2])):
-                    for y in range(int(self.bounding_box[0][i][j][1]),
-                                   int(self.bounding_box[0][i][j][3])):
-                        tmp_mask[y, x] = 0
+    image_index = [0, 660, 700, 740, 800]
+    images = []
 
-        return tmp_mask
+    key_frames = []
+    # initialize key frames
+    for i in range(len(image_index)):
+        im = input.get_basketball_image(image_index[i])
+        ptz = input.get_ptz(image_index[i])
+        key_frame = KeyFrame(im, i, cc, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
+        images.append(im)
 
-    def get_image_gray(self, index):
-        """
-        :param index: image index for video sequence
-        :return: gray image
-        """
-        img = cv.imread(self.image_path + self.annotation[0][index]['image_name'][0])
-        img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        return img_gray
+        key_frames.append(key_frame)
 
-    def get_ptz(self, index):
-        return self.annotation[0][index]['ptz'].squeeze()
 
-    def bundle_adj(self, image_sequence):
-        camera_pose = []
-        images = []
-        masks = []
-        for i in image_sequence:
-            camera_pose.append(self.get_ptz(i))
-            images.append(self.get_image_gray(i))
-            masks.append(self.load_bounding_box_mask(i))
 
-        """using detect_compute_sift function to get SIFT features"""
-
-        """
-        Bundle Adjustment...
-        """
+    keypoints, descriptors, landmark_index = build_matching_graph(images, True)
 
 
 if __name__ == '__main__':
-    BundleAdjust_obj = BundleAdjust('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat',
-                                    '/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/',
-                                    '/Users/jimmy/PycharmProjects/ptz_slam/Camera-Calibration/basketball/objects_basketball.mat')
-
-    img_seq = [0, 200, 550, 600, 650, 700]
-    BundleAdjust_obj.bundle_adj(img_seq)
+    ut_test_build_adjustment()

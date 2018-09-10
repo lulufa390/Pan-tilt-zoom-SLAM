@@ -205,11 +205,11 @@ def build_matching_graph(images, verbose = False):
     edge: matched key points and a global index (from zero)
     :param images: RGB image or gay Image
     :param verbose:
-    :return: the graph
+    :return: keypoints, descriptors, landmark index (local --> global)
     """
     N = len(images)
     if verbose:
-        print('build a matching graph: %d images.', N)
+        print('build a matching graph from %d images.' % N)
 
     # step 1: extract key points and descriptors
     keypoints, descriptors = [], []
@@ -229,11 +229,6 @@ def build_matching_graph(images, verbose = False):
             self.dest_image_index = [] # destination
             self.src_kp_index = [] # list of list
             self.dest_kp_index = []   # list of list
-
-            self.local_kp_index_set = set()   # for quick search
-            self.local_kp_index = []   # keypoint index in current node
-            self.landmark_index = []   # global landmark index
-
 
     nodes = []  # node in the graph
     for i in range(N):
@@ -292,11 +287,7 @@ def build_matching_graph(images, verbose = False):
         print('number of landmark is %d' % g_index)
 
     # step 5: output result to key frames
-
-
-
-
-
+    return  keypoints, descriptors, landmark_index_map
 
 
 
