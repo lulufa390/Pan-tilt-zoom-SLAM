@@ -24,6 +24,12 @@ class SequenceManager:
         if bounding_box_path:
             self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
 
+    def get_camera_center(self):
+        return self.c
+
+    def get_base_rotation(self):
+        return self.base_rotation
+
     def get_basketball_image_gray(self, index):
         """
         :param index: image index for sequence
@@ -42,14 +48,14 @@ class SequenceManager:
     def get_basketball_image(self, index):
         """
         :param index: image index for sequence
-        :return: gray image
+        :return: color image
         """
 
         """for soccer!"""
         # img = cv.imread(self.image_path + "00000" + str(index + 515) + ".jpg")
 
         """for basketball!"""
-        img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg")
+        img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
 
         return img
 
