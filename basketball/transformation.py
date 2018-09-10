@@ -200,3 +200,50 @@ class TransFunction:
         position = np.dot(base_r, pos - c)
         return position / position[2]
 
+    @staticmethod
+    def get_observation_from_rays(pan, tilt, f, rays, u, v, height=0, width=0):
+        """
+        from a number of points to corresponding rays im image.
+        :param pan: camera pan
+        :param tilt: camera tilt
+        :param f: camera f
+        :param rays: [N, 2] array
+        :param u: camera parameter
+        :param v: camera parameter
+        :param height: image height
+        :param width: image width
+        :return: 2-d points: [n, 2] array, indexes: [n] array (indexes of points in image)
+        """
+        points = np.ndarray([0, 2])
+        index = np.ndarray([0])
+
+        if height != 0 and width != 0:
+            for j in range(len(rays)):
+                tmp = TransFunction.from_pan_tilt_to_2d(u, v, f, pan, tilt, rays[j][0], rays[j][1])
+                if 0 < tmp[0] < width and 0 < tmp[1] < height:
+                    points = np.row_stack([points, np.asarray(tmp)])
+                    index = np.concatenate([index, [j]], axis=0)
+        else:
+            for j in range(len(rays)):
+                tmp = TransFunction.from_pan_tilt_to_2d(u, v, f, pan, tilt, rays[j][0], rays[j][1])
+                points = np.row_stack([points, np.asarray(tmp)])
+
+        return points, index
+
+    @staticmethod
+    def get_rays_from_observation(pan, tilt, f, points, u, v):
+        """
+        get a list of rays from 2d points and camera pose
+        :param pan:
+        :param tilt:
+        :param f:
+        :param points: [PointNumber, 2]
+        :param u: camera parameter
+        :param v: camera parameter
+        :return: [RayNumber(=PointNumber), 2]
+        """
+        rays = np.ndarray([0, 2])
+        for i in range(len(points)):
+            angles = TransFunction.from_2d_to_pan_tilt(u, v, f, pan, tilt, points[i][0], points[i][1])
+            rays = np.row_stack([rays, angles])
+        return rays
