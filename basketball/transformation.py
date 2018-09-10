@@ -1,6 +1,6 @@
 """
 class 'TransFuntion' provides functions for 2d image projection and ray computing
-All the input and output of functions in class 'TransFunction' is degree
+All the input and output of functions in class 'TransFunction' is in degree!!
 
 """
 

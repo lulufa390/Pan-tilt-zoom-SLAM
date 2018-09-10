@@ -6,7 +6,7 @@ import cv2 as cv
 import numpy as np
 
 
-def detect_sift(gray_img, nfeatures=600):
+def detect_sift(gray_img, nfeatures=50):
     """
     :param gray_img:
     :param nfeatures:
