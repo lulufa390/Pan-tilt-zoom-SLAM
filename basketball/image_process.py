@@ -214,31 +214,31 @@ def build_matching_graph(images, verbose = False):
     # step 1: extract key points and descriptors
     keypoints, descriptors = [], []
     for im in images:
-        kp, des = detect_compute_sift(im, 0, True)
+        kp, des = detect_compute_sift(im, 0, False)
         keypoints.append(kp)
         descriptors.append(des)
 
     # step 2: pair-wise matching between images
-
     # A temporal class to store local matching result
     class Node:
         def __init__(self, kp, des):
-            self.kp = kp
-            self.des = des
-            self.local_matches_image_index = []
-            self.local_matches_from_kp_index = [] # list of list
-            self.local_matches_to_kp_index = []   # list of list
+            self.key_points = kp
+            self.descriptors = des
+
+            # local matches
+            self.dest_image_index = [] # destination
+            self.src_kp_index = [] # list of list
+            self.dest_kp_index = []   # list of list
+
+            self.local_kp_index_set = set()   # for quick search
+            self.local_kp_index = []   # keypoint index in current node
+            self.landmark_index = []   # global landmark index
 
 
-    nodes = []
+    nodes = []  # node in the graph
     for i in range(N):
         node = Node(keypoints[i], descriptors[i])
         nodes.append(node)
-
-    # intialize a graph
-    graph = dict.fromkeys(range(N))
-    for i in range(N):
-        graph[0] = dict.fromkeys(range(N))
 
     # compute and store local matches
     min_match_num = 8  # 4 * 3
@@ -249,9 +249,9 @@ def build_matching_graph(images, verbose = False):
             pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
             assert len(index1) == len(index2)
             if len(index1) > min_match_num:
-                nodes[i].local_matches_image_index.append(j)
-                nodes[i].local_matches_from_kp_index.append(index1)
-                nodes[i].local_matches_to_kp_index.append(index2)
+                nodes[i].dest_image_index.append(j)
+                nodes[i].src_kp_index.append(index1)
+                nodes[i].dest_kp_index.append(index2)
                 if verbose == True:
                     print("%d matches between image: %d and %d" % (len(index1), i, j))
             else:
@@ -260,13 +260,43 @@ def build_matching_graph(images, verbose = False):
 
     # step 3: matching consistency check @todo
 
-    # calculate global match index
+
+
+    # step 4: compute global landmark index
+    landmark_index_map = dict.fromkeys(range(N))
+    for i in range(N):
+        landmark_index_map[i] = dict()
+
+    g_index = 0 # global ray index
+    for i in range(len(nodes)):
+        node = nodes[i]
+        for j, src_idx, dest_idx in zip(node.dest_image_index,
+                                        node.src_kp_index,
+                                        node.dest_kp_index):
+            # check each key point index
+            for idx1, idx2 in zip(src_idx, dest_idx):
+                # update index of landmarks
+                if idx1 in landmark_index_map[i] and idx2 in landmark_index_map[j]:
+                    if landmark_index_map[i][idx1] != landmark_index_map[j][idx2]:
+                        print("Warning: in-consistent matching result! (%d %d) <--> (%d %d)" % (i, idx1, j, idx2))
+                elif idx1 in landmark_index_map[i] and idx2 not in landmark_index_map[j]:
+                    landmark_index_map[j].update({idx2:landmark_index_map[i][idx1]})
+                elif idx1 not in landmark_index_map[i] and idx2 in landmark_index_map[j]:
+                    landmark_index_map[i].update({idx1:landmark_index_map[j][idx2]})
+                else:
+                    landmark_index_map[i].update({idx1:g_index})
+                    landmark_index_map[j].update({idx2:g_index})
+                    g_index += 1
+
+    if verbose:
+        print('number of landmark is %d' % g_index)
+
+    # step 5: output result to key frames
 
 
 
 
 
-    # step 3: maintain a global ray index
 
 
 
