@@ -48,6 +48,20 @@ def detect_compute_sift(im, nfeatures, verbose = False):
 
     return key_point, descriptor
 
+def remove_player_feature(kp, mask):
+    """
+    use bounding box to remove keypoints on players
+    :param kp: list [N] of keypoints object (need use .pt to access point location)
+    :param mask: bounding box mask
+    :return: index array for keypoints out of players
+    """
+    inner_index = np.ndarray([0], dtype=np.int32)
+    for i in range(len(kp)):
+        x, y = int(kp[i].pt[0]), int(kp[i].pt[1])
+        if mask[y, x] == 1:
+            inner_index = np.append(inner_index, i)
+    return inner_index
+
 def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
     # from https://opencv-python-tutroals.readthedocs.io/en
     # /latest/py_tutorials/py_feature2d/py_feature_homography/py_feature_homography.html
