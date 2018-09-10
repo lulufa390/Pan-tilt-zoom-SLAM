@@ -54,6 +54,7 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
     :param descriptor2:
     :param verbose:
     :return: matched 2D points, and matched descriptor index
+    :inlier_matches: for visualization purpose
     """
 
     bf = cv.BFMatcher()
@@ -84,13 +85,13 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
     inlier_index = homography_ransac(pts1, pts2, 1.0)
 
     if verbose == True:
-        print('%d matches passed the homography ransac' % inlier_index.shape[0])
+        print('%d matches passed the homography ransac' % len(inlier_index))
 
     pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
     index1 = index1[inlier_index].tolist()
-    index2 = index2[inlier_index].tolist()
+    index2 = index2[inlier_index].tolist()  #@todo, index1 and index2 is not tested
 
-    return pts1, index1, pts2, index2
+    return pts1, index1, pts2, index2 #, inlier_matches
 
 
 def detect_harris_corner_grid(gray_img, row, column):
@@ -161,7 +162,7 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
     """
     :param points1: N x 2 matched points
     :param points2:
-    :return: N x 1 array, matched index in original points, [0, 3, 4...]
+    :return: list, matched index in original points, [0, 3, 4...]
     """
     ransac_mask = np.ndarray([len(points1)])
     _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
@@ -170,7 +171,6 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
     inner_index = np.ndarray([0])
 
     index = [i for i in range(len(ransac_mask)) if ransac_mask[i] == 1]
-    index = np.array(index)
     return index
 
 def run_ransac(points1, points2, index):
@@ -200,6 +200,31 @@ def visualize_points(img, points, pt_color, rad):
         cv.circle(img, (int(points[j][0]), int(points[j][1])), color=pt_color, radius=rad, thickness=2)
 
 
+def draw_matches(im1, im2, pts1, pts2):
+    """
+    :param im1: RGB image
+    :param im2:
+    :param pts1:  points in image 1
+    :param pts2:  points in image 2
+    :return: lines overlaid on the original image
+    """
+    # step 1: horizontal concat image
+    vis = np.concatenate((im1, im2), axis=1)
+    w = im1.shape[1]
+    N = pts1.shape[0]
+    # step 2:draw lines
+    for i in range(N):
+        p1, p2 = pts1[i], pts2[i]
+        p2[0] += w
+        p1 = p1.astype(np.int32)
+        p2 = p2.astype(np.int32)
+        cv.line(vis, (p1[0], p1[1]), (p2[0], p2[1]), (0, 255, 0), thickness=1)
+    return vis
+
+
+
+
+
 def get_overlap_index(index1, index2):
     index1_overlap = np.ndarray([0], np.int8)
     index2_overlap = np.ndarray([0], np.int8)
@@ -219,16 +244,24 @@ def get_overlap_index(index1, index2):
 
 
 def ut_match_sift_features():
-    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 0)
-    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 0)
+    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
+    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
-    kp1, des1 = detect_compute_sift(im1, 0, True)
-    kp2, des2 = detect_compute_sift(im2, 0, True)
+    im1_gray = cv.cvtColor(im1, cv.COLOR_BGR2GRAY)
+    im2_gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
+    kp1, des1 = detect_compute_sift(im1_gray, 0, True)
+    kp2, des2 = detect_compute_sift(im2_gray, 0, True)
 
     print(type(des1[0]))
     print(des1[0].shape)
 
     pt1, index1, pt2, index2 = match_sift_features(kp1, des1, kp2, des2, True)
+
+    im3 = draw_matches(im1, im2, pt1, pt2)
+    cv.imshow('matches', im3)
+    cv.waitKey(0)
+
+
 
     #print('image shape:', im1.shape)
 
