@@ -17,6 +17,7 @@ from math import *
 class TransFunction:
     @staticmethod
     def from_3d_to_2d(u, v, f, p, t, c, base_r, pos):
+<<<<<<< HEAD
         """
         project 3d point in world coordinate to image
         :param u: camera parameter u
@@ -28,6 +29,18 @@ class TransFunction:
         :param base_r: base rotation matrix 3*3 array
         :param pos: 3d point (world coordinate!)
         :return: tuple (x, y) in image
+=======
+        """  @to do add comments
+        :param u:
+        :param v:
+        :param f:
+        :param p:
+        :param t:
+        :param c:
+        :param base_r:
+        :param pos:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         pan = radians(p)
         tilt = radians(t)
@@ -53,6 +66,7 @@ class TransFunction:
     @staticmethod
     def from_pan_tilt_to_2d(u, v, f, c_p, c_t, p, t):
         """
+<<<<<<< HEAD
         project ray to image
         :param u: camera parameter u
         :param v: camera parameter v
@@ -62,12 +76,24 @@ class TransFunction:
         :param p: ray theta
         :param t: ray phi
         :return: tuple (x, y) in image
+=======
+        @todo add comments
+        :param u:
+        :param v:
+        :param f:
+        :param c_p:
+        :param c_t:
+        :param p:
+        :param t:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         pan = radians(p)
         tilt = radians(t)
         camera_pan = radians(c_p)
         camera_tilt = radians(c_t)
 
+        # @todo why there are magic numbers 1 ?
         relative_pan = atan((tan(pan) * cos(camera_pan) - sin(camera_pan)) /
                             (tan(pan) * sin(camera_pan) * cos(camera_tilt) +
                              tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) *
@@ -89,6 +115,7 @@ class TransFunction:
     @staticmethod
     def from_2d_to_pan_tilt(u, v, f, c_p, c_t, x, y):
         """
+<<<<<<< HEAD
         from image to ray
         :param u: camera parameter u
         :param v: camera parameter v
@@ -99,6 +126,19 @@ class TransFunction:
         :param y: 2d image point y
         :return: ray tuple (theta, phi) in degree
         """
+=======
+        @ add comments and the same problem of 1
+        :param u:
+        :param v:
+        :param f:
+        :param c_p:
+        :param c_t:
+        :param x:
+        :param y:
+        :return:
+        """
+
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         pan = radians(c_p)
         tilt = radians(c_t)
 
@@ -128,11 +168,19 @@ class TransFunction:
     @staticmethod
     def compute_rays(proj_center, pos, base_r):
         """
+<<<<<<< HEAD
         from 3d point (world coordinate) to ray
         :param proj_center: projection center
         :param pos: 3-d position: array [3] in world coordinate
         :param base_r: base rotation 3*3 array
         :return: ray tuple (theta, phi) in degree
+=======
+        @todo add comments
+        :param proj_center:
+        :param pos:
+        :param base_r:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         relative = np.dot(base_r, np.transpose(pos - proj_center))
         x, y, z = relative
@@ -144,10 +192,17 @@ class TransFunction:
     @staticmethod
     def from_ray_to_relative_3d(t, p):
         """
+<<<<<<< HEAD
         from ray to 3d camera coordinate
         :param t: ray theta angle
         :param p: ray phi angle
         :return: 3d point in camera coordinate in tuple (x, y, 1)
+=======
+        @todo add comments
+        :param t:
+        :param p:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         theta = radians(t)
         phi = radians(p)
@@ -158,6 +213,7 @@ class TransFunction:
     @staticmethod
     def from_relative_3d_to_2d(u, v, f, p, t, pos):
         """
+<<<<<<< HEAD
         from 3d camera coordinate to image (The function of K*Q_tilt*Q_pan)
         :param u: camera parameter u
         :param v: camera parameter v
@@ -166,6 +222,16 @@ class TransFunction:
         :param t: tilt
         :param pos: 3-d point in camera coordinate
         :return: 2d point tuple (x,y) in image
+=======
+        @tdo add comments
+        :param u:
+        :param v:
+        :param f:
+        :param p:
+        :param t:
+        :param pos:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         pan = radians(p)
         tilt = radians(t)
@@ -189,11 +255,19 @@ class TransFunction:
     @staticmethod
     def from_3d_to_relative_3d(c, base_r, pos):
         """
+<<<<<<< HEAD
         from 3d world coordinate to camera coordinate (The function of S[I|-C])
         :param c: projection center
         :param base_r: base rotation matrix 3*3 array
         :param pos: 3-d point (array [3]) in world coordinate
         :return: 3d point (array [3]) in camera coordinate
+=======
+        @todo add comments
+        :param c:
+        :param base_r:
+        :param pos:
+        :return:
+>>>>>>> 2be031b639e56fec69596111b3055ffb503ffc41
         """
         position = np.dot(base_r, pos - c)
         return position / position[2]

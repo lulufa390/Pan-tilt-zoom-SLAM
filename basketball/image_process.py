@@ -204,8 +204,8 @@ def draw_matches(im1, im2, pts1, pts2):
     """
     :param im1: RGB image
     :param im2:
-    :param pts1:  points in image 1
-    :param pts2:  points in image 2
+    :param pts1:  N * 2 matrix, points in image 1
+    :param pts2:  N * 2 matrix, points in image 2
     :return: lines overlaid on the original image
     """
     # step 1: horizontal concat image
