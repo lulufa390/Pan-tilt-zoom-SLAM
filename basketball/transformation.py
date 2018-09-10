@@ -17,6 +17,17 @@ from math import *
 class TransFunction:
     @staticmethod
     def from_3d_to_2d(u, v, f, p, t, c, base_r, pos):
+        """  @to do add comments
+        :param u:
+        :param v:
+        :param f:
+        :param p:
+        :param t:
+        :param c:
+        :param base_r:
+        :param pos:
+        :return:
+        """
         pan = radians(p)
         tilt = radians(t)
 
@@ -40,11 +51,23 @@ class TransFunction:
 
     @staticmethod
     def from_pan_tilt_to_2d(u, v, f, c_p, c_t, p, t):
+        """
+        @todo add comments
+        :param u:
+        :param v:
+        :param f:
+        :param c_p:
+        :param c_t:
+        :param p:
+        :param t:
+        :return:
+        """
         pan = radians(p)
         tilt = radians(t)
         camera_pan = radians(c_p)
         camera_tilt = radians(c_t)
 
+        # @todo why there are magic numbers 1 ?
         relative_pan = atan((tan(pan) * cos(camera_pan) - sin(camera_pan)) /
                             (tan(pan) * sin(camera_pan) * cos(camera_tilt) +
                              tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) *
@@ -65,6 +88,18 @@ class TransFunction:
 
     @staticmethod
     def from_2d_to_pan_tilt(u, v, f, c_p, c_t, x, y):
+        """
+        @ add comments and the same problem of 1
+        :param u:
+        :param v:
+        :param f:
+        :param c_p:
+        :param c_t:
+        :param x:
+        :param y:
+        :return:
+        """
+
         pan = radians(c_p)
         tilt = radians(c_t)
 
@@ -93,6 +128,13 @@ class TransFunction:
 
     @staticmethod
     def compute_rays(proj_center, pos, base_r):
+        """
+        @todo add comments
+        :param proj_center:
+        :param pos:
+        :param base_r:
+        :return:
+        """
         relative = np.dot(base_r, np.transpose(pos - proj_center))
         x, y, z = relative
         theta = atan(x / z)
@@ -102,7 +144,12 @@ class TransFunction:
 
     @staticmethod
     def from_ray_to_relative_3d(t, p):
-
+        """
+        @todo add comments
+        :param t:
+        :param p:
+        :return:
+        """
         theta = radians(t)
         phi = radians(p)
         x = tan(theta)
@@ -111,6 +158,16 @@ class TransFunction:
 
     @staticmethod
     def from_relative_3d_to_2d(u, v, f, p, t, pos):
+        """
+        @tdo add comments
+        :param u:
+        :param v:
+        :param f:
+        :param p:
+        :param t:
+        :param pos:
+        :return:
+        """
         pan = radians(p)
         tilt = radians(t)
 
@@ -132,6 +189,13 @@ class TransFunction:
 
     @staticmethod
     def from_3d_to_relative_3d(c, base_r, pos):
+        """
+        @todo add comments
+        :param c:
+        :param base_r:
+        :param pos:
+        :return:
+        """
         position = np.dot(base_r, pos - c)
         return position / position[2]
 
