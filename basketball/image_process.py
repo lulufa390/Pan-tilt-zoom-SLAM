@@ -26,10 +26,14 @@ def detect_sift(gray_img, nfeatures=50):
 
 def detect_compute_sift(im, nfeatures, verbose = False):
     """
-    :param im:
+    :param im: RGB or gray image
     :param nfeatures:
     :return: two lists of key_point (2 dimension), and descriptor (128 dimension)
     """
+    # pre-processing if input is color image
+    if len(im.shape) == 3 and im.shape[0] == 3:
+        im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
+
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
     key_point, descriptor = sift.detectAndCompute(im, None)
 
@@ -54,7 +58,7 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
     :param descriptor2:
     :param verbose:
     :return: matched 2D points, and matched descriptor index
-    :inlier_matches: for visualization purpose
+    : pts1, index1, pts2, index2
     """
 
     bf = cv.BFMatcher()
@@ -91,7 +95,7 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
     index1 = index1[inlier_index].tolist()
     index2 = index2[inlier_index].tolist()  #@todo, index1 and index2 is not tested
 
-    return pts1, index1, pts2, index2 #, inlier_matches
+    return pts1, index1, pts2, index2
 
 
 def detect_harris_corner_grid(gray_img, row, column):
@@ -193,6 +197,78 @@ def run_ransac(points1, points2, index):
 
     return inner_kp, inner_index, ransac_mask
 
+def build_matching_graph(images, verbose = False):
+    """
+    build a graph for a list of images
+    The graph is 2D hash map using list index as key
+    node: image
+    edge: matched key points and a global index (from zero)
+    :param images: RGB image or gay Image
+    :param verbose:
+    :return: the graph
+    """
+    N = len(images)
+    if verbose:
+        print('build a matching graph: %d images.', N)
+
+    # step 1: extract key points and descriptors
+    keypoints, descriptors = [], []
+    for im in images:
+        kp, des = detect_compute_sift(im, 0, True)
+        keypoints.append(kp)
+        descriptors.append(des)
+
+    # step 2: pair-wise matching between images
+
+    # A temporal class to store local matching result
+    class Node:
+        def __init__(self, kp, des):
+            self.kp = kp
+            self.des = des
+            self.local_matches_image_index = []
+            self.local_matches_from_kp_index = [] # list of list
+            self.local_matches_to_kp_index = []   # list of list
+
+
+    nodes = []
+    for i in range(N):
+        node = Node(keypoints[i], descriptors[i])
+        nodes.append(node)
+
+    # intialize a graph
+    graph = dict.fromkeys(range(N))
+    for i in range(N):
+        graph[0] = dict.fromkeys(range(N))
+
+    # compute and store local matches
+    min_match_num = 8  # 4 * 3
+    for i in range(N):
+        kp1, des1 = keypoints[i], descriptors[i]
+        for j in range(i+1, N):
+            kp2, des2 = keypoints[j], descriptors[j]
+            pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
+            assert len(index1) == len(index2)
+            if len(index1) > min_match_num:
+                nodes[i].local_matches_image_index.append(j)
+                nodes[i].local_matches_from_kp_index.append(index1)
+                nodes[i].local_matches_to_kp_index.append(index2)
+                if verbose == True:
+                    print("%d matches between image: %d and %d" % (len(index1), i, j))
+            else:
+                if verbose == True:
+                    print("no enough matches between image: %d and %d" % (i, j))
+
+    # step 3: matching consistency check @todo
+
+    # calculate global match index
+
+
+
+
+
+    # step 3: maintain a global ray index
+
+
 
 def visualize_points(img, points, pt_color, rad):
     """draw some colored points in img"""
@@ -222,9 +298,6 @@ def draw_matches(im1, im2, pts1, pts2):
     return vis
 
 
-
-
-
 def get_overlap_index(index1, index2):
     index1_overlap = np.ndarray([0], np.int8)
     index2_overlap = np.ndarray([0], np.int8)
@@ -247,10 +320,8 @@ def ut_match_sift_features():
     im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
     im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
-    im1_gray = cv.cvtColor(im1, cv.COLOR_BGR2GRAY)
-    im2_gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
-    kp1, des1 = detect_compute_sift(im1_gray, 0, True)
-    kp2, des2 = detect_compute_sift(im2_gray, 0, True)
+    kp1, des1 = detect_compute_sift(im1, 0, True)
+    kp2, des2 = detect_compute_sift(im2, 0, True)
 
     print(type(des1[0]))
     print(des1[0].shape)
@@ -260,10 +331,21 @@ def ut_match_sift_features():
     im3 = draw_matches(im1, im2, pt1, pt2)
     cv.imshow('matches', im3)
     cv.waitKey(0)
-
-
-
     #print('image shape:', im1.shape)
+
+def ut_build_matching_graph():
+    im0 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
+    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
+    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084700.jpg', 1)
+    im3 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084740.jpg', 1)
+    im4 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084800.jpg', 1)
+
+    #cv.imshow('image 0', im0)
+    #cv.imshow('image 4', im4)
+    #cv.waitKey(0)
+    images = [im0, im1, im2, im3, im4]
+    build_matching_graph(images, True)
+
 
 
 def ut_redundant():
@@ -296,4 +378,5 @@ def ut_redundant():
     cv.destroyAllWindows()
 
 if __name__ == "__main__":
-    ut_match_sift_features()
+    #ut_match_sift_features()
+    ut_build_matching_graph()
