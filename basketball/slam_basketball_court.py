@@ -218,24 +218,15 @@ class PtzSlam:
         self.ground_truth_tilt = camera_pos['ground_truth_tilt'].squeeze()
         self.ground_truth_f = camera_pos['ground_truth_f'].squeeze()
 
-    def remove_player_feature(self, index, keypoints):
-        this_mask = self.sequence.get_bounding_box_mask(index)
-        ret_keypoints = np.ndarray([0, 2], dtype=np.float32)
-        for i in range(keypoints.shape[0]):
-            x, y = int(keypoints[i, 0]), int(keypoints[i, 1])
-            if this_mask[y, x] == 1:
-                ret_keypoints = np.row_stack([ret_keypoints, keypoints[i]])
-
-        return ret_keypoints.astype(np.float32)
-
     def init_system(self, index):
         # self.camera_pose = self.get_ptz(index)
         """first frame to initialize global_rays"""
         begin_frame = self.sequence.get_basketball_image_gray(index)
 
-        # first_frame_kp = PtzSlam.detect_harris_corner_grid(first_frame, 4, 4, first)
         begin_frame_kp = detect_sift(begin_frame)
-        begin_frame_kp = self.remove_player_feature(index, begin_frame_kp)
+
+        begin_frame_kp = begin_frame_kp[
+            remove_player_feature(begin_frame_kp, self.sequence.get_bounding_box_mask(index))]
 
         """use key points in first frame to get init rays"""
         init_rays = TransFunction.get_rays_from_observation(
@@ -359,7 +350,8 @@ class PtzSlam:
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
         all_new_frame_kp = detect_sift(img_new)
-        all_new_frame_kp = self.remove_player_feature(i, all_new_frame_kp)
+        all_new_frame_kp = all_new_frame_kp[
+            remove_player_feature(all_new_frame_kp, self.sequence.get_bounding_box_mask(i))]
 
         new_frame_kp = np.ndarray([0, 2])
         """use mask to remove feature points near existing points"""
