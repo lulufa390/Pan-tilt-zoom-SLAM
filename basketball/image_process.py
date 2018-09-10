@@ -24,7 +24,7 @@ def detect_sift(gray_img, nfeatures=50):
     return sift_pts
 
 
-def detect_compute_sift(im, nfeatures):
+def detect_compute_sift(im, nfeatures, verbose = False):
     """
     :param im:
     :param nfeatures:
@@ -35,11 +35,30 @@ def detect_compute_sift(im, nfeatures):
 
     """SIFT may detect more keypoint than set"""
 
-    if len(key_point) > nfeatures:
+    if nfeatures > 0 and len(key_point) > nfeatures:
         key_point = key_point[:nfeatures]
         descriptor = descriptor[:nfeatures]
 
+    if verbose == True:
+        print('detect: %d SIFT keypoints.' % len(key_point))
+
     return key_point, descriptor
+
+def match_sift_features(keypiont1, descrpitor1, keypoint2, descriptor2, verbose = False):
+    # from https://opencv-python-tutroals.readthedocs.io/en
+    # /latest/py_tutorials/py_feature2d/py_feature_homography/py_feature_homography.html
+
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(descrpitor1, descriptor2, k=2)
+
+    # apply ratio test
+    good = []
+    for m, n in matches:
+        if m.distance < 0.7 * n.distance:
+            good.append([m])
+
+    if verbose == True:
+        print('%d matches passed the ratio test' % len(good))
 
 
 def detect_harris_corner_grid(gray_img, row, column):
@@ -146,7 +165,19 @@ def get_overlap_index(index1, index2):
     return index1_overlap, index2_overlap
 
 
-if __name__ == "__main__":
+def ut_match_sift_features():
+    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 0)
+    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 0)
+
+    kp1, des1 = detect_compute_sift(im1, 0, True)
+    kp2, des2 = detect_compute_sift(im2, 0, True)
+
+    match_sift_features(kp1, des1, kp2, des2, True)
+
+    print('image shape:', im1.shape)
+
+
+def ut_redundant():
     im = cv.imread('./two_point_calib_dataset/highlights/seq1/0419.jpg', 0)
     print('image shape:', im.shape)
 
@@ -174,3 +205,6 @@ if __name__ == "__main__":
     cv.imshow('image', im)
     cv.waitKey(0)
     cv.destroyAllWindows()
+
+if __name__ == "__main__":
+    ut_match_sift_features()
