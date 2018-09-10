@@ -25,9 +25,11 @@ class SequenceManager:
             self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
 
     def get_camera_center(self):
+        # interface for camera center
         return self.c
 
     def get_base_rotation(self):
+        # interface for camera base rotation
         return self.base_rotation
 
     def get_basketball_image_gray(self, index):
@@ -80,7 +82,18 @@ class SequenceManager:
         return self.annotation[0][index]['ptz'].squeeze()
 
 
+def ut_camera_center_and_base_rotation():
+    input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
+                            "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images",
+                            "/Users/jimmy/PycharmProjects/ptz_slam/Camera-Calibration/basketball/objects_basketball.mat")
+
+    print(input.get_camera_center())
+    print(input.get_base_rotation())
+
 if __name__ == '__main__':
+
+    #ut_camera_center_and_base_rotation()
+
     obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
                           "./objects_basketball.mat")
     cv.imshow("test", obj.get_bounding_box_mask(100))
