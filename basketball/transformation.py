@@ -1,7 +1,9 @@
 """
-class 'TransFuntion' provides functions for 2d image projection and ray computing
-All the input and output of functions in class 'TransFunction' is in degree!!
+1. class 'TransFuntion' provides functions for projection and ray computing.
 
+2. All the input and output angles of functions in class 'TransFunction' is in degree!!
+
+3. The type of variables is mostly np.float64(default), but it does not have much influence if you use np.float32.
 """
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -24,9 +26,9 @@ class TransFunction:
         :param f: camera parameter f
         :param p: pan
         :param t: tilt
-        :param c: projection center
-        :param base_r: base rotation matrix 3*3 array
-        :param pos: 3d point (world coordinate!)
+        :param c: projection center: array [3]
+        :param base_r: base rotation matrix: array [3, 3]
+        :param pos: 3d point (world coordinate!): array [3]
         :return: tuple (x, y) in image
         """
         pan = radians(p)
@@ -129,9 +131,9 @@ class TransFunction:
     def compute_rays(proj_center, pos, base_r):
         """
         from 3d point (world coordinate) to ray
-        :param proj_center: projection center
-        :param pos: 3-d position: array [3] in world coordinate
-        :param base_r: base rotation 3*3 array
+        :param proj_center: projection center: array [3]
+        :param pos: 3-d position: 3d point in world coordinate: array [3]
+        :param base_r: base rotation: array [3, 3]
         :return: ray tuple (theta, phi) in degree
         """
         relative = np.dot(base_r, np.transpose(pos - proj_center))
@@ -164,7 +166,7 @@ class TransFunction:
         :param f: camera parameter f
         :param p: pan
         :param t: tilt
-        :param pos: 3-d point in camera coordinate
+        :param pos: 3-d point in camera coordinate: array [3]
         :return: 2d point tuple (x,y) in image
         """
         pan = radians(p)
@@ -190,10 +192,10 @@ class TransFunction:
     def from_3d_to_relative_3d(c, base_r, pos):
         """
         from 3d world coordinate to camera coordinate (The function of S[I|-C])
-        :param c: projection center
-        :param base_r: base rotation matrix 3*3 array
-        :param pos: 3-d point (array [3]) in world coordinate
-        :return: 3d point (array [3]) in camera coordinate
+        :param c: projection center: array [3]
+        :param base_r: base rotation matrix: array [3, 3]
+        :param pos: 3-d point in world coordinate: array [3]
+        :return: 3d point in camera coordinate: array [3]
         """
         position = np.dot(base_r, pos - c)
         return position / position[2]
