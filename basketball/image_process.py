@@ -244,7 +244,7 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
     :param images: RGB image or gay Image
     :image_match_mask: optional N * N a list of list [[]], 1 for matched, 0 or can not match
     :param verbose:
-    :return: keypoints, descriptors, src_pt_index, dst_pt_index, landmark_index (global index), landmark_num
+    :return: keypoints, points,descriptors, src_pt_index, dst_pt_index, landmark_index (global index), landmark_num
     """
     N = len(images)
     if verbose:
@@ -362,10 +362,11 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
             key_points_mat[i] = key_points[i].pt
         return key_points_mat
 
-    keypoints = [keypoint_to_matrix(keypoints[i]) for i in range(len(keypoints))]
+    # a list of N x 2 matrix
+    points = [keypoint_to_matrix(keypoints[i]) for i in range(len(keypoints))]
 
     # step 5: output result to key frames
-    return  keypoints, descriptors, src_pt_index, dst_pt_index, landmark_index, landmark_num
+    return  keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num
 
 
 
@@ -443,8 +444,8 @@ def ut_build_matching_graph():
     #cv.imshow('image 4', im4)
     #cv.waitKey(0)
     images = [im0, im1, im2, im3, im4]
-    keypoints, descriptors, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(images, [], True)
-    print(type(keypoints[0]))
+    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(images, [], True)
+    print(type(points[0]))
     print(type(descriptors[0]))
 
 
