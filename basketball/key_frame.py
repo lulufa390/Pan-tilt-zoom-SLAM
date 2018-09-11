@@ -16,7 +16,7 @@ class KeyFrame:
         self.feature_des = []
 
         # a [N] int array of index for keypoint in global_ray
-        self.feature_index = []
+        self.landmark_index = []
 
         """camera pose"""
         self.pan, self.tilt, self.f = pan, tilt, f
@@ -34,7 +34,7 @@ class KeyFrame:
         keyframe_data['img_index'] = self.img_index
         keyframe_data['feature_pts'] = self.feature_pts
         keyframe_data['feature_des'] = self.feature_des
-        keyframe_data['feature_index'] = self.feature_index
+        keyframe_data['landmark_index'] = self.landmark_index
         keyframe_data['camera_pose'] = self.pan, self.tilt, self.f
         keyframe_data['center'] = self.center
         keyframe_data['base_rotation'] = self.base_rotation
@@ -47,7 +47,7 @@ class KeyFrame:
         self.img_index = keyframe_data['img_index'].squeeze(1)
         self.feature_pts = keyframe_data['feature_pts'].squeeze(1)
         self.feature_des = keyframe_data['feature_des'].squeeze(1)
-        self.feature_index = keyframe_data['feature_index'].squeeze(1)
+        self.landmark_index = keyframe_data['landmark_index'].squeeze(1)
         self.pan, self.tilt, self.f = keyframe_data['camera_pose'].squeeze(1)
         self.center = keyframe_data['center'].squeeze(1)
         self.base_rotation = keyframe_data['base_rotation'].squeeze(1)

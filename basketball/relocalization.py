@@ -59,7 +59,7 @@ def relocalization_camera(map, img, pose):
             matched_kp = kp_inlier
             matched_index = index2
 
-    ray_index = map.keyframe_list[nearest_keyframe].feature_index[matched_index]
+    ray_index = map.keyframe_list[nearest_keyframe].landmark_index[matched_index]
     rays = np.array(map.global_ray)[ray_index]
 
     u = map.keyframe_list[nearest_keyframe].u
@@ -125,12 +125,12 @@ if __name__ == '__main__':
 
         map.global_ray.append(np.array([theta, phi]))
 
-    keyframe1.feature_index = np.array([i for i in range(len(kp1))])
+    keyframe1.landmark_index = np.array([i for i in range(len(kp1))])
 
     """second frame"""
-    keyframe2.feature_index = np.ndarray([len(kp2)], dtype=np.int32)
+    keyframe2.landmark_index = np.ndarray([len(kp2)], dtype=np.int32)
     for i in range(len(kp2_inlier)):
-        keyframe2.feature_index[index2[i]] = index1[i]
+        keyframe2.landmark_index[index2[i]] = index1[i]
 
     kp2_outlier_index = list(set([i for i in range(len(des2))]) - set(index2))
 
@@ -140,7 +140,7 @@ if __name__ == '__main__':
             kp2[kp2_outlier_index[i]].pt[1])
         map.global_ray.append(np.array([theta, phi]))
 
-        keyframe2.feature_index[kp2_outlier_index[i]] = len(map.global_ray) - 1
+        keyframe2.landmark_index[kp2_outlier_index[i]] = len(map.global_ray) - 1
 
     map.keyframe_list.append(keyframe1)
     map.keyframe_list.append(keyframe2)
