@@ -101,14 +101,14 @@ def ut_good_new_keyframe():
     keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
     a_map = Map()
-    a_map.add_first_keyframe(keyframe, True)
+    a_map.add_first_keyframe(keyframe, False)
 
     # test the result frames
-    for i in range(0, 3600, 10):
+    for i in range(0, 3600, 1):
         ptz = input.get_ptz(i)
         keyframe = KeyFrame(im, i, camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
-        if a_map.good_new_keyframe(ptz):
+        if a_map.good_new_keyframe(ptz, 3, 25, 1280, False):
             a_map.add_keyframe_without_ba(keyframe)
             print('add key frame from index %d, pan angle %f' % (i, ptz[0]))
 
