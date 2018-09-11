@@ -13,7 +13,9 @@ from image_process import build_matching_graph, draw_matches
 from sequence_manager import SequenceManager
 from transformation import TransFunction
 from scene_map import Map
+from util import overlap_pan_angle
 import random
+
 
 
 def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v, reference_pose, verbose = False):
@@ -96,35 +98,6 @@ def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index,
         print("reprojection error is %f" % (reprojection_err/(n_residual/2)))
     return residual
 
-
-def _overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
-    """
-    :param fl_1: focal length in pixel
-    :param pan_1:  pan angle in degree
-    :param fl_2:
-    :param pan_2:
-    :param im_width: image with in pixel
-    :return: overlapped pan angle
-    """
-    # overlap angle (in degree) between two cameras
-
-    w = im_width/2
-    delta_angle = math.atan(w/fl_1) * 180.0/math.pi
-    pan1_min = pan_1 - delta_angle
-    pan1_max = pan_1 + delta_angle
-
-
-    delta_angle = math.atan(w/fl_2) * 180.0/math.pi
-    pan2_min = pan_2 - delta_angle
-    pan2_max = pan_2 + delta_angle
-
-    angle1 = max(pan1_min, pan2_min)
-    angle2 = min(pan1_max, pan2_max)
-    #print(fl1, pan1, fl2, pan2, angle1, angle2)
-
-    return max(0, angle2 - angle1)
-
-
 def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, v, save_path, verbose = False):
     """
     build a map from image matching: it takes long time
@@ -154,7 +127,7 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
         pan1, fl1 = initial_ptzs[i][0], initial_ptzs[i][2]
         for j in range(N):
             pan2, fl2 = initial_ptzs[j][0], initial_ptzs[j][2]
-            angle = _overlap_pan_angle(fl1, pan1, fl2, pan2, 1280)
+            angle = overlap_pan_angle(fl1, pan1, fl2, pan2, 1280)
             # print('overlap pan angle of (%d %d) is %d'% (i, j, angle))
             if angle > overlap_angle_threshold:
                 image_match_mask[i][j] = 1
