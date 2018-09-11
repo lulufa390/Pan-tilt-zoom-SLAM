@@ -4,7 +4,7 @@ relocalization part is done. @todo: test relocalization when BA is done
 
 import numpy as np
 import cv2 as cv
-from map import Map
+from scene_map import Map
 from image_process import *
 from sequence_manager import SequenceManager
 from transformation import TransFunction
