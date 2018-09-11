@@ -22,7 +22,9 @@ class KeyFrame:
         self.pan, self.tilt, self.f = pan, tilt, f
 
         """camera parameters"""
+        # camera center [3] array
         self.center = center
+        # rotation matrix [3, 3] array
         self.base_rotation = rotation
         self.u = u
         self.v = v
