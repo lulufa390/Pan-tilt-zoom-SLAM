@@ -8,8 +8,14 @@ class KeyFrame:
         self.img_index = img_index
 
         """feature points"""
+
+        # a list of key point object (the first return value of detect_compute_sift function)
         self.feature_pts = []
+
+        # a [N, 128] int array (the second return value of detect_compute_sift function)
         self.feature_des = []
+
+        # a [N] int array of index for keypoint in global_ray
         self.feature_index = []
 
         """camera pose"""
