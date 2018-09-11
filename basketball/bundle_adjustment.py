@@ -6,6 +6,8 @@ import scipy.io as sio
 import cv2 as cv
 import numpy as np
 import math
+from scipy.optimize import least_squares
+
 from key_frame import KeyFrame
 from image_process import build_matching_graph
 from sequence_manager import SequenceManager
@@ -22,80 +24,75 @@ class _FrameToFrameMatch:
         self.des_pts_index = des_pts_index
         self.landmark_index = landmark_index
 
-def bundle_adjustment(keyframes):
+
+def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v):
     """
-    optimize global rays, camera pose in each key frames
-    :param keyframes:
-    :return:  optimized keyframes
+    :param x: N * 3 camera pose, pan, tilt, focal_length + M * 2 landmark, (pan, tilt)
+    :n_pose: camera pose number
+    :n_landmark: landmark number
+    :n_residual: number of residuals
+    :param keypoints: list of N*2 matrix, (x, y) in each frame
+    : src_pt_index, dst_pt_index, landmark_index: 2D list of indices
+    :u, v: image center
+    :return: residual
     """
-    def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v):
-        """
-        :param x: N * 3 camera pose, pan, tilt, focal_length + M * 2 landmark, (pan, tilt)
-        :n_pose: camera pose number
-        :n_landmark: landmark number
-        :n_residual: number of residuals
-        :param keypoints: list of N*2 matrix, (x, y) in each frame
-        : src_pt_index, dst_pt_index, landmark_index: 2D list of indices
-        :u, v: image center
-        :return: residual
-        """
-        N = len(keypoints)
-        assert n_pose == N
-        assert len(src_pt_index) == N
-        assert len(dst_pt_index) == N
-        assert len(landmark_index) == N
+    N = len(keypoints)
+    assert n_pose == N
+    assert len(src_pt_index) == N
+    assert len(dst_pt_index) == N
+    assert len(landmark_index) == N
 
-        for i in range(N):
-            assert len(src_pt_index[i]) == N
-            assert len(dst_pt_index[i]) == N
-            assert len(landmark_index[i]) == N
+    for i in range(N):
+        assert len(src_pt_index[i]) == N
+        assert len(dst_pt_index[i]) == N
+        assert len(landmark_index[i]) == N
 
-        landmark_start_index = n_pose * 3
+    landmark_start_index = n_pose * 3
 
-        residual = np.ndarray(n_residual)
-        residual_idx = 0
-        for i in range(N):
-            for j in range(N):
-                pan1, tilt1, fl1 = x[i * 3 + 0], x[i * 3 + 1], x[i * 3 + 2]  # camera pose
-                pan2, tilt2, fl2 = x[j * 3 + 0], x[j * 3 + 1], x[j * 3 + 2]
+    residual = np.ndarray(n_residual)
+    residual_idx = 0
+    for i in range(N):
+        for j in range(N):
+            pan1, tilt1, fl1 = x[i * 3 + 0], x[i * 3 + 1], x[i * 3 + 2]  # camera pose
+            pan2, tilt2, fl2 = x[j * 3 + 0], x[j * 3 + 1], x[j * 3 + 2]
 
-                # keypoint index
-                for idx1, idx2, idx3 in zip(src_pt_index[i][j], dst_pt_index[i][j], landmark_index[i][j]):
-                    pan, tilt = x[landmark_start_index + idx3 * 2], x[landmark_start_index + idx3 * 2 + 1]  # landmark pan, tilt
-                    x1, y1 = keypoints[i][idx1][0], keypoints[i][idx2][1]
-                    x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
-                    proj_x1, proj_y1 = TransFunction.from_pan_tilt_to_2d(u, v, fl1, pan1, tilt1, pan, tilt)
-                    proj_x2, proj_y2 = TransFunction.from_pan_tilt_to_2d(u, v, fl2, pan2, tilt2, pan, tilt)
+            # keypoint index
+            for idx1, idx2, idx3 in zip(src_pt_index[i][j], dst_pt_index[i][j], landmark_index[i][j]):
+                pan, tilt = x[landmark_start_index + idx3 * 2], x[landmark_start_index + idx3 * 2 + 1]  # landmark pan, tilt
+                x1, y1 = keypoints[i][idx1][0], keypoints[i][idx1][1]
+                x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
+                proj_x1, proj_y1 = TransFunction.from_pan_tilt_to_2d(u, v, fl1, pan1, tilt1, pan, tilt)
+                proj_x2, proj_y2 = TransFunction.from_pan_tilt_to_2d(u, v, fl2, pan2, tilt2, pan, tilt)
 
-                    # point in camera i
+                # point in camera i
 
-                    if i == 0:
-                        residual[residual_idx] = 0
-                    else:
-                        residual[residual_idx] = proj_x1 - x1
-                    residual_idx += 1
+                if i == 0:
+                    residual[residual_idx] = 0
+                else:
+                    residual[residual_idx] = proj_x1 - x1
+                residual_idx += 1
 
-                    if i == 0:
-                        residual[residual_idx] = 0
-                    else:
-                        residual[residual_idx] = proj_y1 - y1
-                    residual_idx += 1
+                if i == 0:
+                    residual[residual_idx] = 0
+                else:
+                    residual[residual_idx] = proj_y1 - y1
+                residual_idx += 1
 
-                    # point in camera j
-                    if j == 0:
-                        residual[residual_idx] = 0
-                    else:
-                        residual[residual_idx] = proj_x2 - x2
-                    residual_idx += 1
+                # point in camera j
+                if j == 0:
+                    residual[residual_idx] = 0
+                else:
+                    residual[residual_idx] = proj_x2 - x2
+                residual_idx += 1
 
-                    if j == 0:
-                        residual[residual_idx] = 0
-                    else:
-                        residual[residual_idx] = proj_y2 - y2
-                    residual_idx += 1
+                if j == 0:
+                    residual[residual_idx] = 0
+                else:
+                    residual[residual_idx] = proj_y2 - y2
+                residual_idx += 1
 
-        assert residual_idx == n_residual
-        return residual
+    assert residual_idx == n_residual
+    return residual
 
 
 
@@ -133,7 +130,7 @@ def ut_test_build_adjustment():
     u = 1280/2
     v = 720/2
 
-    image_index = [0, 660, 710, 730, 800]
+    image_index = [0, 660, 710] # , 730, 800
 
     N = len(image_index)
     key_frames = []
@@ -168,10 +165,54 @@ def ut_test_build_adjustment():
     n_residual = 0
     for i in range(N):
         for j in range(N):
-            n_residual += len(src_pt_index[i][j]) * 2
+            n_residual += len(src_pt_index[i][j]) * 4
     print('residual number is %d.' % n_residual)
 
+    import random
     # initial value of pose and rays
+    pose_gt = np.zeros((N*3))
+    x0 = np.zeros([N*3 + n_landmark*2])
+    for i in range(len(image_index)):
+        ptz = input.get_ptz(image_index[i])
+        x0[i * 3 + 0], x0[i * 3 + 1], x0[i * 3 + 2] = ptz
+        if i != 0:
+            x0[i * 3 + 2] += random.gauss(0, 50)
+
+        pose_gt[i*3:i*3+3] = ptz
+
+    # def from_2d_to_pan_tilt(u, v, f, c_p, c_t, x, y):
+    landmark_start_index = N * 3
+    for i in range(N):
+        ptz1 = x0[i*3: i*3+3]
+        for j in range(N):
+            ptz2 = x0[j*3 : j*3+3]
+            for idx1, idx2, idx3 in zip(src_pt_index[i][j], dst_pt_index[i][j], landmark_index[i][j]):
+                x1, y1 = keypoints[i][idx1][0], keypoints[i][idx1][1]
+                x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
+
+                landmark = TransFunction.from_2d_to_pan_tilt(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
+                x0[landmark_start_index + idx3*2: landmark_start_index + idx3*2 + 2] = landmark
+    n_pose = N
+    optimized = least_squares(compute_residual, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
+                                   args=(n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v))
+
+
+    pose_estimate = optimized.x[0:landmark_start_index]
+
+    dif = pose_gt - pose_estimate
+    dif = dif.reshape((-1, 3))
+    print(dif)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
