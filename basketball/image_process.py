@@ -196,6 +196,23 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
     index = [i for i in range(len(ransac_mask)) if ransac_mask[i] == 1]
     return index
 
+def good_homography(h):
+    # http://answers.opencv.org/question/2588/check-if-homography-is-good/
+    det = h[0][0] *h[1][1] - h[1][0] * h[0][1]
+    if det < 0:
+        return False
+    N1 = math.sqrt(h[0][0]*h[0][0] + h[1][0] * h[1][0])
+    if N1 > 4 or N1 < 0.1:
+        return False
+    N2 = math.sqrt(h[0][1] * h[0][1] + h[1][1] * h[1][1])
+    if N2 > 4 or N2 < 0.1:
+        return False
+    N3 = math.sqrt(h[2][0] * h[2][0] + h[2][1] * h[2][1])
+    if N3 > 0.003:
+        return False
+    return True
+
+
 def run_ransac(points1, points2, index):
     """
     :param points1: N x 2 array, float32 or float64
@@ -204,8 +221,10 @@ def run_ransac(points1, points2, index):
     :return:
     """
     ransac_mask = np.ndarray([len(points1)])
-    _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
-                                       ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
+    homo, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
+                                        ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
+    if good_homography(homo) == False:
+        return [], [], []
     inner_kp = np.ndarray([0, 2])
     inner_index = np.ndarray([0])
 
@@ -266,7 +285,7 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
         nodes.append(node)
 
     # compute and store local matches
-    min_match_num = 8  # 4 * 3
+    min_match_num = 20  # 4 * 3
     for i in range(N):
         kp1, des1 = keypoints[i], descriptors[i]
         for j in range(i+1, N):
@@ -277,7 +296,9 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
             kp2, des2 = keypoints[j], descriptors[j]
             pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
             assert len(index1) == len(index2)
+            #pts3, index3, pts4, index4 = match_sift_features(kp2, des2, kp1, des1, False)
             if len(index1) > min_match_num:
+                # match from image 2 to image 1
                 nodes[i].dest_image_index.append(j)
                 nodes[i].src_kp_index.append(index1)
                 nodes[i].dest_kp_index.append(index2)
