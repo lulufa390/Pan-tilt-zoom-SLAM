@@ -57,7 +57,12 @@ def remove_player_feature(kp, mask):
     """
     inner_index = np.ndarray([0], dtype=np.int32)
     for i in range(len(kp)):
-        x, y = int(kp[i].pt[0]), int(kp[i].pt[1])
+
+        if isinstance(kp, np.ndarray):
+            x, y = int(kp[i, 0]), int(kp[i, 1])
+        else:
+            x, y = int(kp[i].pt[0]), int(kp[i].pt[1])
+
         if mask[y, x] == 1:
             inner_index = np.append(inner_index, i)
     return inner_index

@@ -136,44 +136,6 @@ class PtzSlam:
 
         return jacobi_h
 
-    def get_observation_from_rays(self, pan, tilt, f, rays):
-        """
-        return all 2d points(with features),
-        corresponding rays(with features) and indexes of these points IN THE IMAGE.
-        :param pan:
-        :param tilt:
-        :param f:
-        :param rays: [N, 2]
-        :return: 2-d points: [n, 2] rays: [n, 2], indexes [n]
-        """
-        points = np.ndarray([0, 2])
-        inner_rays = np.ndarray([0, 2])
-        index = np.ndarray([0])
-
-        for j in range(len(rays)):
-            tmp = TransFunction.from_pan_tilt_to_2d(self.sequence.u, self.sequence.v, f, pan, tilt, rays[j][0], rays[j][1])
-            if 0 < tmp[0] < self.sequence.width and 0 < tmp[1] < self.sequence.height:
-                inner_rays = np.row_stack([inner_rays, rays[j]])
-                points = np.row_stack([points, np.asarray(tmp)])
-                index = np.concatenate([index, [j]], axis=0)
-
-        return points, inner_rays, index
-
-    def get_rays_from_observation(self, pan, tilt, f, points):
-        """
-        get a list of rays from 2d points and camera pose
-        :param pan:
-        :param tilt:
-        :param f:
-        :param points: [PointNumber, 2]
-        :return: [RayNumber(=PointNumber), 2]
-        """
-        rays = np.ndarray([0, 2])
-        for i in range(len(points)):
-            angles = TransFunction.from_2d_to_pan_tilt(self.sequence.u, self.sequence.v, f, pan, tilt, points[i][0], points[i][1])
-            rays = np.row_stack([rays, angles])
-        return rays
-
     def output_camera_error(self, now_index):
         """output the error of camera pose compared to ground truth"""
         ground_truth = self.sequence.get_ptz(now_index)
@@ -256,28 +218,19 @@ class PtzSlam:
         self.ground_truth_tilt = camera_pos['ground_truth_tilt'].squeeze()
         self.ground_truth_f = camera_pos['ground_truth_f'].squeeze()
 
-    def remove_player_feature(self, index, keypoints):
-        this_mask = self.sequence.get_bounding_box_mask(index)
-        ret_keypoints = np.ndarray([0, 2], dtype=np.float32)
-        for i in range(keypoints.shape[0]):
-            x, y = int(keypoints[i, 0]), int(keypoints[i, 1])
-            if this_mask[y, x] == 1:
-                ret_keypoints = np.row_stack([ret_keypoints, keypoints[i]])
-
-        return ret_keypoints.astype(np.float32)
-
     def init_system(self, index):
         # self.camera_pose = self.get_ptz(index)
         """first frame to initialize global_rays"""
         begin_frame = self.sequence.get_basketball_image_gray(index)
 
-        # first_frame_kp = PtzSlam.detect_harris_corner_grid(first_frame, 4, 4, first)
         begin_frame_kp = detect_sift(begin_frame)
-        begin_frame_kp = self.remove_player_feature(index, begin_frame_kp)
+
+        begin_frame_kp = begin_frame_kp[
+            remove_player_feature(begin_frame_kp, self.sequence.get_bounding_box_mask(index))]
 
         """use key points in first frame to get init rays"""
-        init_rays = self.get_rays_from_observation(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], begin_frame_kp)
+        init_rays = TransFunction.get_rays_from_observation(
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], begin_frame_kp, self.sequence.u, self.sequence.v)
 
         """add rays in frame 1 to global rays"""
         self.ray_global = np.ndarray([0, 2])
@@ -300,8 +253,9 @@ class PtzSlam:
 
     def ekf_update(self, i, matched_kp, next_index):
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
-        predict_points, predict_rays, inner_point_index = self.get_observation_from_rays(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
+        predict_points, inner_point_index = TransFunction.get_observation_from_rays(
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
+            self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
 
         # compute y_k
         overlap1, overlap2 = get_overlap_index(next_index, inner_point_index)
@@ -379,8 +333,10 @@ class PtzSlam:
         self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
 
     def add_new_points(self, i):
-        points_update, in_rays_update, index_update = self.get_observation_from_rays(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global)
+        points_update, index_update = TransFunction.get_observation_from_rays(
+            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
+            self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
+
         img_new = self.sequence.get_basketball_image_gray(i)
 
         """set the mask"""
@@ -394,7 +350,8 @@ class PtzSlam:
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
         all_new_frame_kp = detect_sift(img_new)
-        all_new_frame_kp = self.remove_player_feature(i, all_new_frame_kp)
+        all_new_frame_kp = all_new_frame_kp[
+            remove_player_feature(all_new_frame_kp, self.sequence.get_bounding_box_mask(i))]
 
         new_frame_kp = np.ndarray([0, 2])
         """use mask to remove feature points near existing points"""
@@ -404,8 +361,8 @@ class PtzSlam:
 
         """if existing new points"""
         if new_frame_kp is not None:
-            new_rays = self.get_rays_from_observation(
-                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp)
+            new_rays = TransFunction.get_rays_from_observation(
+                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp,self.sequence.u, self.sequence.v)
             now_point_num = len(self.ray_global)
 
             """add to global ray and covariance matrix"""
@@ -503,6 +460,12 @@ class PtzSlam:
 
 
 if __name__ == "__main__":
+    """this for soccer"""
+    # slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
+    #                "./objects_soccer.mat",
+    #                "./seq3")
+
+    """this for basketball"""
     slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
                    "./objects_basketball.mat",
                    "./basketball/basketball/images/")
