@@ -9,7 +9,7 @@ import math
 from scipy.optimize import least_squares
 
 from key_frame import KeyFrame
-from image_process import build_matching_graph
+from image_process import build_matching_graph, draw_matches
 from sequence_manager import SequenceManager
 from transformation import TransFunction
 
@@ -25,7 +25,7 @@ class _FrameToFrameMatch:
         self.landmark_index = landmark_index
 
 
-def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v):
+def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v, reference_pose):
     """
     :param x: N * 3 camera pose, pan, tilt, focal_length + M * 2 landmark, (pan, tilt)
     :n_pose: camera pose number
@@ -41,6 +41,7 @@ def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index,
     assert len(src_pt_index) == N
     assert len(dst_pt_index) == N
     assert len(landmark_index) == N
+    assert reference_pose.shape[0] == 3
 
     for i in range(N):
         assert len(src_pt_index[i]) == N
@@ -49,49 +50,54 @@ def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index,
 
     landmark_start_index = n_pose * 3
 
+    # x --> only has "n_pose - 1" poses
+    x0 = np.zeros([n_pose*3 + n_landmark*2])
+    x0[0:3] = reference_pose  # first pose
+    x0[3:] = x                # the rest pose and landmarks
+
     residual = np.ndarray(n_residual)
     residual_idx = 0
+
+    reprojection_err = 0.0
     for i in range(N):
         for j in range(N):
-            pan1, tilt1, fl1 = x[i * 3 + 0], x[i * 3 + 1], x[i * 3 + 2]  # camera pose
-            pan2, tilt2, fl2 = x[j * 3 + 0], x[j * 3 + 1], x[j * 3 + 2]
+            pan1, tilt1, fl1 = x0[i * 3 + 0], x0[i * 3 + 1], x0[i * 3 + 2]  # camera pose
+            pan2, tilt2, fl2 = x0[j * 3 + 0], x0[j * 3 + 1], x0[j * 3 + 2]
 
             # keypoint index
             for idx1, idx2, idx3 in zip(src_pt_index[i][j], dst_pt_index[i][j], landmark_index[i][j]):
-                pan, tilt = x[landmark_start_index + idx3 * 2], x[landmark_start_index + idx3 * 2 + 1]  # landmark pan, tilt
+                pan, tilt = x0[landmark_start_index + idx3 * 2], x0[landmark_start_index + idx3 * 2 + 1]  # landmark pan, tilt
                 x1, y1 = keypoints[i][idx1][0], keypoints[i][idx1][1]
                 x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
                 proj_x1, proj_y1 = TransFunction.from_pan_tilt_to_2d(u, v, fl1, pan1, tilt1, pan, tilt)
                 proj_x2, proj_y2 = TransFunction.from_pan_tilt_to_2d(u, v, fl2, pan2, tilt2, pan, tilt)
 
                 # point in camera i
+                dx = proj_x1 - x1
+                dy = proj_y1 - y1
 
-                if i == 0:
-                    residual[residual_idx] = 0
-                else:
-                    residual[residual_idx] = proj_x1 - x1
+                residual[residual_idx] = dx
                 residual_idx += 1
 
-                if i == 0:
-                    residual[residual_idx] = 0
-                else:
-                    residual[residual_idx] = proj_y1 - y1
+                residual[residual_idx] = dy
                 residual_idx += 1
+
+                reprojection_err += math.sqrt(dx*dx + dy*dy)
 
                 # point in camera j
-                if j == 0:
-                    residual[residual_idx] = 0
-                else:
-                    residual[residual_idx] = proj_x2 - x2
+                dx = proj_x2 - x2
+                dy = proj_y2 - y2
+                residual[residual_idx] = dx
                 residual_idx += 1
 
-                if j == 0:
-                    residual[residual_idx] = 0
-                else:
-                    residual[residual_idx] = proj_y2 - y2
+                residual[residual_idx] = dy
                 residual_idx += 1
+                reprojection_err += math.sqrt(dx * dx + dy * dy)
 
     assert residual_idx == n_residual
+
+    #print("reprojection error is %f" % (reprojection_err/(n_residual/2)))
+
     return residual
 
 
@@ -130,7 +136,7 @@ def ut_test_build_adjustment():
     u = 1280/2
     v = 720/2
 
-    image_index = [0, 660, 710] # , 730, 800
+    image_index = [0, 660, 680] #680, 690, 700, 730, 800
 
     N = len(image_index)
     key_frames = []
@@ -159,6 +165,27 @@ def ut_test_build_adjustment():
     # matching keypoints in images
     keypoints, descriptors, src_pt_index, dst_pt_index, landmark_index, n_landmark = build_matching_graph(images, image_match_mask, True)
 
+    # check landmark index
+    if 0:
+        for i in range(N):
+            for j in range(N):
+                if len(src_pt_index[i][j]) == 0:
+                    continue
+                print('landmark, source, destination: %d %d' % (i, j))
+                for idx1, idx2, idx3 in zip(src_pt_index[i][j], dst_pt_index[i][j], landmark_index[i][j]):
+                    print(idx3, idx1, idx2)
+                print('end.......................')
+
+    if 0:
+        # test image matching result
+        for i in range(N):
+            for j in range(N):
+                if len(src_pt_index[i][j]) != 0:
+                    pts1 = keypoints[i].take(src_pt_index[i][j], axis = 0)
+                    pts2 = keypoints[j].take(dst_pt_index[i][j], axis = 0)
+                    vis = draw_matches(images[i], images[j], pts1, pts2)
+                    cv.imshow('matching result', vis)
+                    cv.waitKey(0)
 
     # prepare data from least square optimization
     # def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v):
@@ -168,6 +195,10 @@ def ut_test_build_adjustment():
             n_residual += len(src_pt_index[i][j]) * 4
     print('residual number is %d.' % n_residual)
 
+    # initialize reference camera pose
+    ref_pose = input.get_ptz(image_index[0])
+
+
     import random
     # initial value of pose and rays
     pose_gt = np.zeros((N*3))
@@ -176,7 +207,7 @@ def ut_test_build_adjustment():
         ptz = input.get_ptz(image_index[i])
         x0[i * 3 + 0], x0[i * 3 + 1], x0[i * 3 + 2] = ptz
         if i != 0:
-            x0[i * 3 + 2] += random.gauss(0, 50)
+            x0[i * 3 + 2] += random.gauss(0, 10)
 
         pose_gt[i*3:i*3+3] = ptz
 
@@ -190,14 +221,19 @@ def ut_test_build_adjustment():
                 x1, y1 = keypoints[i][idx1][0], keypoints[i][idx1][1]
                 x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
 
+                x1 += random.gauss(0, 1)
+                y1 += random.gauss(0, 1)
                 landmark = TransFunction.from_2d_to_pan_tilt(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
                 x0[landmark_start_index + idx3*2: landmark_start_index + idx3*2 + 2] = landmark
     n_pose = N
+
+    x0 = x0[3:] # remove first camera pose
     optimized = least_squares(compute_residual, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
-                                   args=(n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v))
+                                   args=(n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v, ref_pose))
 
 
-    pose_estimate = optimized.x[0:landmark_start_index]
+    pose_estimate = optimized.x[0:landmark_start_index-3]
+    pose_gt = pose_gt[3:]  # remove the first camera pose
 
     dif = pose_gt - pose_estimate
     dif = dif.reshape((-1, 3))
