@@ -14,7 +14,8 @@ class Map:
         """
         good or not as a new keyframe, small overlap with all existing keyframes
         :param ptz: array [3] camera pose
-        :threshold, pan angle overlap in degree
+        :threshold1, pan angle overlap in degree, lower bound, too small, no shared features
+        :threshold2, pan angle overlap in degree, upp bound, an image covers about 30 degrees
         :return: True for good new key frame, false for not
         """
         # check parameter
