@@ -207,11 +207,19 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
 
         # collect all (local, global) pairs from image i
         pairs = []
+        # image i as source image
         for j in range(N):
             if len(src_pt_index[i][j]) == 0:
                 continue
             for idx1, idx3 in zip(src_pt_index[i][j], landmark_index[i][j]):
                 pairs.append((idx1, idx3))
+        # image i as destination image
+        for j in range(N):
+            if len(dst_pt_index[j][i]) == 0:
+                continue
+            for idx2, idx3 in zip(dst_pt_index[j][i], landmark_index[j][i]):
+                pairs.append((idx2, idx3))
+
         pairs = set(pairs)  # remove redundant
         local_index, global_index = [], []
         for pair in pairs:
@@ -223,6 +231,8 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
         key_frame.feature_des = descriptors[i].take(local_index, axis=0)
         key_frame.landmark_index = np.array(global_index, dtype=np.int32)
         keyframes.append(key_frame)
+        if verbose:
+            print('frame %d, landmark number %d' % (image_indices[i], len(key_frame.landmark_index)))
 
     # step 6:
     return optimized_landmarks, keyframes
@@ -387,7 +397,7 @@ def ut_bundle_adjustment_interface():
     u = 1280 / 2
     v = 720 / 2
 
-    image_index = [0, 660, 680]  # 680, 690, 700, 730, 800
+    image_index = [0, 660]  # 680, 690, 700, 730, 800
 
     N = len(image_index)
     initial_ptzs = np.zeros((N, 3))
