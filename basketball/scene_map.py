@@ -76,12 +76,19 @@ class Map:
         # remove the last keyframe as it is not used in bundle adjustment
         self.keyframe_list.pop()
 
+        # check if keyframe has landmarks
         self.global_ray = landmarks
-        self.keyframe_list = keyframes
+        self.keyframe_list = []
+        for i in range(len(keyframes)):
+            keyframe = keyframes[i]
+            if keyframe.get_feature_num() > 0:
+                self.keyframe_list.append(keyframe)
+            else:
+                print('warning: key frame, %d, image index %d is not included in the map' % (i, image_indices[i]))
 
         if verbose:
-            print('updated map, number of key frame: %d, number of landmark %d', len(keyframes), len(landmarks))
-        return landmarks, keyframes
+            print('updated map, number of key frame: %d, number of landmark %d', len(self.keyframe_list), len(landmarks))
+        return landmarks, self.keyframe_list
 
 
     def good_new_keyframe(self, ptz, threshold1 = 5, threshold2 = 20, im_width = 1280, verbose = False):
