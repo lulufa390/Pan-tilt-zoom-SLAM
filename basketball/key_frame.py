@@ -29,6 +29,9 @@ class KeyFrame:
         self.u = u
         self.v = v
 
+    def get_feature_num(self):
+        return len(self.feature_pts)
+
     def save_to_mat(self, path):
         keyframe_data = dict()
         keyframe_data['img_index'] = self.img_index
