@@ -1,6 +1,7 @@
 import numpy as np
 from key_frame import KeyFrame
 from util import overlap_pan_angle
+from bundle_adjustment import bundle_adjustment
 
 
 from sequence_manager import SequenceManager
@@ -35,6 +36,52 @@ class Map:
         assert isinstance(keyframe, KeyFrame)
         self.keyframe_list.append(keyframe)
 
+    def add_keyframe_with_ba(self, keyframe, save_path, verbose = False):
+        """
+        add one keyframe and do bundle adjustment
+        It will take a long time
+        :param keyframe:
+        :param: save_path
+        :param verbose:
+        :return: updated map, please note the original map is updated
+        """
+        # check parameter
+        assert isinstance(keyframe, KeyFrame)
+        assert len(self.keyframe_list) >= 1
+
+        # step 1: get common camera parameters from the first frame
+        ref_frame = self.keyframe_list[0]
+
+        camera_center = ref_frame.center
+        base_rotation = ref_frame.base_rotation
+        u, v = ref_frame.u, ref_frame.v
+
+        # step 2: prepare data for bundle adjustment
+        self.add_keyframe_without_ba(keyframe, False)
+
+        N = len(self.keyframe_list)
+        images = []
+        image_indices = []
+        initial_ptzs = np.zeros((N, 3))
+
+        for i in range(N):
+            keyframe = self.keyframe_list[i]
+            images.append(keyframe.img)
+            image_indices.append(keyframe.img_index)
+            initial_ptzs[i] = keyframe.pan, keyframe.tilt, keyframe.f
+
+        # step 3: bundle adjustment
+        landmarks, keyframes = bundle_adjustment(images, image_indices, initial_ptzs, camera_center, base_rotation, u, v, save_path, verbose)
+
+        # remove the last keyframe as it is not used in bundle adjustment
+        self.keyframe_list.pop()
+
+        self.global_ray = landmarks
+        self.keyframe_list = keyframes
+
+        if verbose:
+            print('updated map, number of key frame: %d, number of landmark %d', len(keyframes), len(landmarks))
+        return landmarks, keyframes
 
 
     def good_new_keyframe(self, ptz, threshold1 = 5, threshold2 = 20, im_width = 1280, verbose = False):
@@ -108,9 +155,40 @@ def ut_good_new_keyframe():
         ptz = input.get_ptz(i)
         keyframe = KeyFrame(im, i, camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
-        if a_map.good_new_keyframe(ptz, 3, 25, 1280, False):
+        if a_map.good_new_keyframe(ptz, 3, 20, 1280, False):
             a_map.add_keyframe_without_ba(keyframe)
             print('add key frame from index %d, pan angle %f' % (i, ptz[0]))
+
+    print('number of keyframe is %d' % (len(a_map.keyframe_list)))
+
+def ut_add_keyframe_with_ba():
+    input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
+                            "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images",
+                            "/Users/jimmy/PycharmProjects/ptz_slam/Camera-Calibration/basketball/objects_basketball.mat")
+
+    camera_center = input.get_camera_center()
+    base_rotation = input.get_base_rotation()
+    u = 1280 / 2
+    v = 720 / 2
+
+    image_index = [0]  # 680, 690, 700, 730, 800
+    im = input.get_basketball_image(image_index[0])
+    ptz = input.get_ptz(image_index[0])
+    keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
+
+    a_map = Map()
+    a_map.add_first_keyframe(keyframe, False)
+
+    # test the result frames
+    for i in range(1, 3600, 5):
+        ptz = input.get_ptz(i)
+        im = input.get_basketball_image(i)
+        keyframe = KeyFrame(im, i, camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
+
+        if a_map.good_new_keyframe(ptz, 10, 25, 1280, False):
+            print('add key frame from index %d, pan angle %f' % (i, ptz[0]))
+            a_map.add_keyframe_with_ba(keyframe, '.', True)
+
 
     print('number of keyframe is %d' % (len(a_map.keyframe_list)))
 
@@ -119,9 +197,11 @@ def ut_good_new_keyframe():
 
 
 
+
 if __name__ == '__main__':
     #ut_add_first_key_frame()
-    ut_good_new_keyframe()
+    #ut_good_new_keyframe()
+    ut_add_keyframe_with_ba()
 
 
 
