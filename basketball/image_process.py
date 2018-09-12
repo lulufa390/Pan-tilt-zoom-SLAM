@@ -403,7 +403,8 @@ def draw_matches(im1, im2, pts1, pts2):
         p1, p2 = pts1[i], pts2[i]
         p1 = p1.astype(np.int32)
         p2 = p2.astype(np.int32)
-        cv.line(vis, (p1[0], p1[1]), (p2[0] + w, p2[1]), (0, 255, 0), thickness=1)
+        p2[0] += w
+        cv.line(vis, (p1[0], p1[1]), (p2[0], p2[1]), (0, 255, 0), thickness=1)
     return vis
 
 
@@ -490,5 +491,5 @@ def ut_redundant():
     cv.destroyAllWindows()
 
 if __name__ == "__main__":
-    #ut_match_sift_features()
-    ut_build_matching_graph()
+    ut_match_sift_features()
+    #ut_build_matching_graph()
