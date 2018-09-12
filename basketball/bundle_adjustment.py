@@ -12,13 +12,13 @@ from key_frame import KeyFrame
 from image_process import build_matching_graph, draw_matches
 from sequence_manager import SequenceManager
 from transformation import TransFunction
-from scene_map import Map
+#from scene_map import Map
 from util import overlap_pan_angle
 import random
 
 
 
-def compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v, reference_pose, verbose = False):
+def _compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index, dst_pt_index, landmark_index, u, v, reference_pose, verbose = False):
     """
     The function compute residuals form N - 1 camera poses and M landmarks
     :param x: N - 1 * 3 camera pose, pan, tilt, focal_length + M * 2 landmark, (pan, tilt)
@@ -184,7 +184,7 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
 
 
     # step 3: camera pose and landmark optimization
-    optimized = least_squares(compute_residual, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
+    optimized = least_squares(_compute_residual, x0, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
                               args=(n_pose, n_landmark, n_residual, points, src_pt_index, dst_pt_index,
                                     landmark_index, u, v, ref_pose))
 
@@ -198,9 +198,9 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
     if verbose:
         print("@todo: check reprojectoin error")
 
-    # step 5: write optimization result to a map
-    scene_map = Map()
-    scene_map.global_ray = optimized_landmarks.reshape(-1, 2)
+    # step 5: write optimization result to a map: N*2 landmarks and a list of keyframes
+    optimized_landmarks = optimized_landmarks.reshape(-1, 2)
+    keyframes = []
     for i in range(N):
         pan, tilt, fl, = all_poses[i * 3:i * 3 + 3]
         key_frame = KeyFrame(images[i], image_indices[i], center, rotation, u, v, pan, tilt, fl)
@@ -222,10 +222,10 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
         key_frame.feature_pts = [keypoints[i][j] for j in local_index]
         key_frame.feature_des = descriptors[i].take(local_index, axis=0)
         key_frame.landmark_index = np.array(global_index, dtype=np.int32)
-        scene_map.keyframe_list.append(key_frame)
+        keyframes.append(key_frame)
 
     # step 6:
-    return scene_map
+    return optimized_landmarks, keyframes
 
 
 
@@ -403,7 +403,7 @@ def ut_bundle_adjustment_interface():
         images.append(im)
 
 
-    bundle_adjustment(images, image_index, initial_ptzs, camera_center, base_rotation, u, v, '.', True)
+    landmarks, keyframes = bundle_adjustment(images, image_index, initial_ptzs, camera_center, base_rotation, u, v, '.', True)
 
 
 

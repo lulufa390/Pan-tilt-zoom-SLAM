@@ -4,6 +4,7 @@ general image processing functions
 
 import cv2 as cv
 import numpy as np
+import random
 
 
 def detect_sift(gray_img, nfeatures=50):
@@ -286,6 +287,7 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
 
     # compute and store local matches
     min_match_num = 20  # 4 * 3
+    max_match_num = 200
     for i in range(N):
         kp1, des1 = keypoints[i], descriptors[i]
         for j in range(i+1, N):
@@ -298,6 +300,14 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
             assert len(index1) == len(index2)
             #pts3, index3, pts4, index4 = match_sift_features(kp2, des2, kp1, des1, False)
             if len(index1) > min_match_num:
+                # randomly remove some matches
+                if len(index1) > max_match_num:
+                    rand_list = list(range(len(index1)))
+                    random.shuffle(rand_list)
+                    rand_list = rand_list[0:max_match_num]
+                    index1 = [index1[idx] for idx in rand_list]
+                    index2 = [index2[idx] for idx in rand_list]
+
                 # match from image 2 to image 1
                 nodes[i].dest_image_index.append(j)
                 nodes[i].src_kp_index.append(index1)
