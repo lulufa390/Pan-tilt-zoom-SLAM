@@ -111,7 +111,9 @@ class Map:
 
         if verbose:
             print('candidate key frame overlap: ', pan_angle_overlaps)
+
         max_overlap = max(pan_angle_overlaps)
+        print("overlap", max_overlap)
         return max_overlap > threshold1 and max_overlap < threshold2
 
 def ut_add_first_key_frame():
