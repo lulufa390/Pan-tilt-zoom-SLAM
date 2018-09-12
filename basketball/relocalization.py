@@ -1,5 +1,5 @@
 """
-relocalization part is done. @todo: test relocalization when BA is done
+relocalization part is done.
 """
 
 import numpy as np
@@ -33,6 +33,31 @@ def compute_residual(pose, rays, points, u, v):
     return residual
 
 
+def _recompute_matching_ray(keyframe, img):
+    """
+    :param keyframe: keyframe object to match
+    :param img: image to relocalize
+    :return: points [N, 2] array in img, rays [N, 2] array in keyframe
+    """
+    kp, des = detect_compute_sift(img, 1000)
+
+    keyframe_kp, keyframe_des = detect_compute_sift(keyframe.img, 1000)
+
+    pt1, index1, pt2, index2 = match_sift_features(kp, des, keyframe_kp, keyframe_des)
+
+    vis = draw_matches(img, keyframe.img, pt1, pt2)
+    cv.imshow("test", vis)
+    cv.waitKey(0)
+
+    rays = np.ndarray([len(index2), 2])
+
+    for i in range(len(index2)):
+        rays[i, 0], rays[i, 1] = TransFunction.from_2d_to_pan_tilt(keyframe.u, keyframe.v, keyframe.f,
+                                                                   keyframe.pan, keyframe.tilt, pt2[i, 0], pt2[i, 1])
+
+    return pt1, rays
+
+
 def relocalization_camera(map, img, pose):
     """
     :param map: object of class Map
@@ -40,35 +65,71 @@ def relocalization_camera(map, img, pose):
     :param pose: lost camera pose: array [3]
     :return: corrected camera pose: array [3]
     """
-    kp, des = detect_compute_sift(img, 100)
+    kp, des = detect_compute_sift(img, 1000)
 
-    nearest_keyframe = 0
+    nearest_keyframe = -1
     max_matched_num = 0
 
-    matched_kp = []
-    matched_index = []
+    matched_keyframe_pt = None
+    matched_keyframe_index = None
+    matched_cur_frame_pt = None
+
     for i in range(len(map.keyframe_list)):
-        kp_i = map.keyframe_list[i].feature_pts
-        des_i = map.keyframe_list[i].feature_des
+        keyframe = map.keyframe_list[i]
+        keyframe_kp, keyframe_des = keyframe.feature_pts, keyframe.feature_des
 
-        kp_inlier, index1, kp_i_inlier, index2 = match_sift_features(kp, des, kp_i, des_i)
+        if len(keyframe_kp) == 0:
+            continue
+        # match from key frame to candidate frame
+        # kp_i_inlier, index2, kp_inlier, index1 = match_sift_features(kp_i, des_i, kp, des)
+        # kp_inlier, index1, kp_i_inlier, index2 = match_sift_features(kp, des, kp_i, des_i)
 
-        if len(kp_inlier) > max_matched_num:
-            max_matched_num = len(kp_inlier)
-            nearest_keyframe = i
-            matched_kp = kp_inlier
-            matched_index = index2
+        print("number", len(keyframe_kp), len(kp))
+        pt1, index1, pt2, index2 = match_sift_features(keyframe_kp, keyframe_des, kp, des)
 
-    ray_index = map.keyframe_list[nearest_keyframe].landmark_index[matched_index]
-    rays = np.array(map.global_ray)[ray_index]
+        if index1 is not None:
+            if len(index1) > max_matched_num:
+                max_matched_num = len(index1)
+                nearest_keyframe = i
+                # matched_keyframe_pt = pt1
+                # matched_keyframe_index = index1
+                # matched_cur_frame_pt = pt2
 
-    u = map.keyframe_list[nearest_keyframe].u
-    v = map.keyframe_list[nearest_keyframe].v
+    if nearest_keyframe == -1:
+        print("No matching keyframe!")
+        # cv.imwrite("./bundle_result/map_frame.jpg", keyframe.img)
+        cv.imwrite("./bundle_result/to_relocalize_frame.jpg", img)
+        return pose
 
-    optimized_pose = least_squares(compute_residual, pose, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
-                                   args=(rays, matched_kp, u, v))
+    else:
+        keyframe = map.keyframe_list[nearest_keyframe]
 
-    return optimized_pose
+        points, rays = _recompute_matching_ray(keyframe, img)
+
+        # for i in range(matched_cur_frame_pt.shape[0]):
+        #     assert matched_cur_frame_pt[i][0] <= 1280
+
+        # vis = draw_matches(keyframe.img, img, matched_keyframe_pt, matched_cur_frame_pt)
+
+        # for i in range(matched_cur_frame_pt.shape[0]):
+        #     assert matched_cur_frame_pt[i][0] <= 1280
+
+        # cv.imwrite("./bundle_result/relocalization_matching.jpg", vis)
+
+        cv.imwrite("./bundle_result/map_frame.jpg", keyframe.img)
+        cv.imwrite("./bundle_result/to_relocalize_frame.jpg", img)
+
+
+        # ray_index = keyframe.landmark_index[matched_keyframe_index]
+        # rays = np.array(map.global_ray)[ray_index]
+
+        u = keyframe.u
+        v = keyframe.v
+
+        optimized_pose = least_squares(compute_residual, pose, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
+                                       args=(rays, points, u, v))
+
+        return optimized_pose.x
 
 
 if __name__ == '__main__':

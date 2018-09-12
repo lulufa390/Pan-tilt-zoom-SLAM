@@ -5,6 +5,7 @@ general image processing functions
 import cv2 as cv
 import numpy as np
 import random
+import math
 
 
 def detect_sift(gray_img, nfeatures=50):
@@ -94,6 +95,10 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
         print('%d matches passed the ratio test' % len(good))
 
     N = len(good)
+    if N <= 8:
+        print('warning: not enough matching')
+        return None, None, None, None
+
     pts1 = np.zeros((N, 2))
     pts2 = np.zeros((N, 2))
     index1 = np.zeros((N), dtype=np.int32)
@@ -188,6 +193,9 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
     :param points2:
     :return: list, matched index in original points, [0, 3, 4...]
     """
+    # chenck parameter
+    assert points1.shape[0] == points2.shape[0]
+    assert points1.shape[0] >= 4
     ransac_mask = np.ndarray([len(points1)])
     _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
                                        ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC, mask=ransac_mask)

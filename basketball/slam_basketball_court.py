@@ -252,7 +252,7 @@ class PtzSlam:
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
-        print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
+        # print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
 
         # update global rays
         for j in range(len(matched_inner_point_index)):
@@ -356,7 +356,7 @@ class PtzSlam:
         matched_percentage = np.zeros([self.sequence.anno_size])
 
         keyframe_map = Map()
-        first_keyframe = KeyFrame(self.sequence.get_basketball_image_gray(first),
+        first_keyframe = KeyFrame(self.sequence.get_basketball_image(first),
                                   first, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
                                   self.sequence.v, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
 
@@ -427,16 +427,10 @@ class PtzSlam:
 
             """this part is for BA and relocalization"""
 
-            # if lost_cnt > 3:
-            #     cv.imshow("bad tracking", next_img)
-            #     cv.waitKey(0)
-            #     lost_cnt = 0
-
-            print(matched_percentage[i])
             if matched_percentage[i] > 80:
                 if keyframe_map.good_new_keyframe(self.camera_pose, 10, 25):
                     print("this is keyframe:", i)
-                    new_keyframe = KeyFrame(self.sequence.get_basketball_image_gray(i),
+                    new_keyframe = KeyFrame(self.sequence.get_basketball_image(i),
                                             i, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
                                             self.sequence.v, self.camera_pose[0], self.camera_pose[1],
                                             self.camera_pose[2])
@@ -445,7 +439,7 @@ class PtzSlam:
 
             elif lost_cnt > 3:
                 if len(keyframe_map.keyframe_list) > 1:
-                    self.camera_pose = relocalization_camera(keyframe_map, next_img, self.camera_pose)
+                    self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_basketball_image(i), self.camera_pose)
                     previous_frame_kp, previous_index = self.init_system(i)
                     lost_cnt = 0
 

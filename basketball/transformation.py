@@ -53,6 +53,50 @@ class TransFunction:
         return position[0] / position[2], position[1] / position[2]
 
     @staticmethod
+    def from_2d_to_3d(u, v, f, p, t, c, base_r, point2d):
+        """
+        this function backproject image to 3d world coordinate
+        z can be set to different value
+        :param u: camera parameter
+        :param v: camera parameter
+        :param f: camera f
+        :param p: camera p
+        :param t: camera t
+        :param c: camera projection center array [3]
+        :param base_r: base rotation array [3, 3]
+        :param point2d: point on image
+        :return: 3d world coordinate point with z = 1
+        """
+
+        z = 0
+        pan = radians(p)
+        tilt = radians(t)
+
+        k = np.array([[f, 0, u],
+                      [0, f, v],
+                      [0, 0, 1]])
+
+        rotation = np.dot(np.array([[1, 0, 0],
+                                    [0, cos(tilt), sin(tilt)],
+                                    [0, -sin(tilt), cos(tilt)]]),
+
+                          np.array([[cos(pan), 0, -sin(pan)],
+                                    [0, 1, 0],
+                                    [sin(pan), 0, cos(pan)]]))
+
+        rotation = np.dot(rotation, base_r)
+
+        inv_mat = np.linalg.inv(np.dot(k, rotation))
+
+        coe = (z - c[2]) / (inv_mat[2, 0] * point2d[0] + inv_mat[2, 1] * point2d[1] + inv_mat[2, 2])
+
+        p = np.dot(inv_mat, coe * np.array([point2d[0], point2d[1], 1])) + c
+
+        return p
+
+
+
+    @staticmethod
     def from_pan_tilt_to_2d(u, v, f, c_p, c_t, p, t):
         """
         project ray to image
@@ -246,4 +290,54 @@ class TransFunction:
         for i in range(len(points)):
             angles = TransFunction.from_2d_to_pan_tilt(u, v, f, pan, tilt, points[i][0], points[i][1])
             rays = np.row_stack([rays, angles])
+        return rays
+
+    """below is function for general slam"""
+    @staticmethod
+    def get_observation_from_3ds(pan, tilt, f, rays, u, v, center, rotation, height=0, width=0):
+        """
+        from a number of points to corresponding rays im image.
+        :param pan: camera pan
+        :param tilt: camera tilt
+        :param f: camera f
+        :param rays: [N, 2] array
+        :param u: camera parameter
+        :param v: camera parameter
+        :param height: image height
+        :param width: image width
+        :return: 2-d points: [n, 2] array, indexes: [n] array (indexes of points in image)
+        """
+        points = np.ndarray([0, 2])
+        index = np.ndarray([0])
+
+        if height != 0 and width != 0:
+            for j in range(len(rays)):
+                tmp = TransFunction.from_3d_to_2d(u, v, f, pan, tilt, center, rotation, rays[j])
+                if 0 < tmp[0] < width and 0 < tmp[1] < height:
+                    points = np.row_stack([points, np.asarray(tmp)])
+                    index = np.concatenate([index, [j]], axis=0)
+        else:
+            for j in range(len(rays)):
+                tmp = TransFunction.from_3d_to_2d(u, v, f, pan, tilt, center, rotation, rays[j])
+                points = np.row_stack([points, np.asarray(tmp)])
+
+        return points, index
+
+    @staticmethod
+    def get_3ds_from_observation(pan, tilt, f, points, u, v, center, rotation):
+        """
+        get a list of rays from 2d points and camera pose
+        :param pan:
+        :param tilt:
+        :param f:
+        :param points: [PointNumber, 2]
+        :param u: camera parameter
+        :param v: camera parameter
+        :return: [RayNumber(=PointNumber), 2]
+        """
+        rays = np.ndarray([0, 3])
+        for i in range(len(points)):
+            position = TransFunction.from_2d_to_3d(u, v, f, pan, tilt, center, rotation, points[i])
+            rays = np.row_stack([rays, position])
+
         return rays
