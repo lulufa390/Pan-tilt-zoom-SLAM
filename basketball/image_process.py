@@ -401,10 +401,9 @@ def draw_matches(im1, im2, pts1, pts2):
     # step 2:draw lines
     for i in range(N):
         p1, p2 = pts1[i], pts2[i]
-        p2[0] += w
         p1 = p1.astype(np.int32)
         p2 = p2.astype(np.int32)
-        cv.line(vis, (p1[0], p1[1]), (p2[0], p2[1]), (0, 255, 0), thickness=1)
+        cv.line(vis, (p1[0], p1[1]), (p2[0] + w, p2[1]), (0, 255, 0), thickness=1)
     return vis
 
 
