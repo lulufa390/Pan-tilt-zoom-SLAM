@@ -8,14 +8,16 @@ import random
 import math
 
 
-def detect_sift(gray_img, nfeatures=1000):
+def detect_sift(im, nfeatures=100):
     """
     :param gray_img:
     :param nfeatures: 0 for all the available sift features
     :return:          N x 2 matrix, sift keypoint location in the image
     """
+    if len(im.shape) == 3 and im.shape[0] == 3:
+        im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
-    kp = sift.detect(gray_img, None)
+    kp = sift.detect(im, None)
 
     sift_pts = np.zeros((len(kp), 2), dtype=np.float32)
     for i in range(len(kp)):
@@ -32,7 +34,8 @@ def detect_orb(im, nfeatures=1000):
     """
     assert isinstance(im, np.ndarray)
     assert nfeatures > 0
-
+    if len(im.shape) == 3 and im.shape[0] == 3:
+        im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
     orb = cv.ORB_create(nfeatures)
     keypoints = orb.detect(im, None)
 
@@ -41,29 +44,6 @@ def detect_orb(im, nfeatures=1000):
     for i in range(N):
         pts[i][0], pts[i][1] = keypoints[i].pt[0], keypoints[i].pt[1]
     return pts
-
-def detect_compute_orb(im, nfeatures=1000, verbose=False):
-    """
-    :param im: gray or color image
-    :param nfeatures: 0 for zero features
-    :param verbose:
-    :return:
-    """
-
-    assert isinstance(im, np.ndarray)
-    assert nfeatures>0
-
-    orb = cv.ORB_create(nfeatures)
-    key_point = orb.detect(im, None)
-    key_point, descriptor = orb.compute(im, key_point)
-
-    if len(key_point) > nfeatures:
-        key_point = key_point[:nfeatures]
-        descriptor = descriptor[:nfeatures]
-
-    if verbose == True:
-        print('detect: %d ORB keypoints.' % len(key_point))
-    return key_point, descriptor
 
 
 def detect_compute_sift(im, nfeatures, verbose = False):
@@ -90,6 +70,62 @@ def detect_compute_sift(im, nfeatures, verbose = False):
         print('detect: %d SIFT keypoints.' % len(key_point))
 
     return key_point, descriptor
+
+
+def detect_compute_orb(im, nfeatures=1000, verbose=False):
+    """
+    :param im: gray or color image
+    :param nfeatures: 0 for zero features
+    :param verbose:
+    :return:
+    """
+
+    assert isinstance(im, np.ndarray)
+    assert nfeatures>0
+
+    orb = cv.ORB_create(nfeatures)
+    key_point = orb.detect(im, None)
+    key_point, descriptor = orb.compute(im, key_point)
+
+    if len(key_point) > nfeatures:
+        key_point = key_point[:nfeatures]
+        descriptor = descriptor[:nfeatures]
+
+    if verbose == True:
+        print('detect: %d ORB keypoints.' % len(key_point))
+    return key_point, descriptor
+
+
+def detect_compute_latch(im, nfeatures=1000, verbose = False):
+    """
+    :param im: RGB or gray image
+    :param nfeatures:
+    :return: two lists of key_point (2 dimension), and descriptor (128 dimension)
+    """
+    # pre-processing if input is color image
+    assert isinstance(im, np.ndarray)
+    if len(im.shape) == 3 and im.shape[0] == 3:
+        im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
+
+    orb = cv.ORB_create(nfeatures)
+    kp_orb = orb.detect(im, None)
+
+    latch = cv.xfeatures2d.LATCH_create(64)
+    kp_latch, des_latch = latch.compute(im, kp_orb)
+
+    # latch = cv.xfeatures2d.LATCH_create(nfeatures)
+    # key_point, descriptor = latch.detectAndCompute(im, None)
+
+    """LATCH may detect more keypoint than set"""
+
+    if nfeatures > 0 and len(kp_latch) > nfeatures:
+        kp_latch = kp_latch[:nfeatures]
+        des_latch = des_latch[:nfeatures]
+
+    if verbose == True:
+        print('detect: %d LATCH keypoints.' % len(kp_latch))
+
+    return kp_latch, des_latch
 
 def remove_player_feature(kp, mask):
     """
@@ -178,6 +214,43 @@ def match_orb_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose =
     bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
     matches = bf.match(descriptor1, descriptor2)
 
+
+    # step 2: remove outlier using RANSAC  @todo this code is same (redundant) as in match_sift_features
+    N = len(matches)
+    pts1, pts2 = np.zeros((N, 2)), np.zeros((N, 2))
+    index1 = np.zeros((N), dtype=np.int32)
+    index2 = np.zeros((N), dtype=np.int32)
+    for i in range(N):
+        idx1, idx2 = matches[i].queryIdx, matches[i].trainIdx  # query is from the first image
+        index1[i], index2[i] = idx1, idx2
+        pts1[i] = keypiont1[idx1].pt
+        pts2[i] = keypoint2[idx2].pt
+
+    # inlier index from homography estimation
+    inlier_index = homography_ransac(pts1, pts2, 1.0)
+
+    if verbose == True:
+        print('%d matches passed the homography ransac' % len(inlier_index))
+
+    pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
+    index1 = index1[inlier_index].tolist()
+    index2 = index2[inlier_index].tolist()
+    return pts1, index1, pts2, index2
+
+def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
+    """
+    :param keypiont1: list of keypoints
+    :param descriptor1:
+    :param keypoint2:
+    :param descriptor2:
+    :param verbose:
+    :return: matched 2D points, and matched descriptor index
+    """
+    assert len(keypiont1) >= 4  # assume homography matching
+
+    # step 1: matching by hamming distance
+    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(descriptor1, descriptor2)
 
     # step 2: remove outlier using RANSAC  @todo this code is same (redundant) as in match_sift_features
     N = len(matches)
@@ -575,9 +648,10 @@ def ut_build_matching_graph():
     print(type(descriptors[0]))
 
 def ut_orb():
-    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
-    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
-
+    # im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
+    # im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
+    im1 = cv.imread("./basketball/basketball/images/00084000.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084660.jpg")
     pts1 = detect_orb(im1, 1000)
     print(pts1.shape)
 
@@ -604,6 +678,35 @@ def ut_orb():
     cv.waitKey(0)
     """
 
+def ut_latch():
+    im1 = cv.imread("./basketball/basketball/images/00084000.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084660.jpg")
+
+    kp1, des1 = detect_compute_latch(im1)
+    kp2, des2 = detect_compute_latch(im2)
+
+    pt1, index1, pt2, index2 = match_latch_features(kp1, des1, kp2, des2, True)
+    im3 = draw_matches(im1, im2, pt1, pt2)
+    cv.imshow('matches', im3)
+    cv.waitKey(0)
+
+    # detect_latch(im1)
+    #
+    # orb = cv.ORB_create(1000)
+    # kp1 = orb.detect(im1, None)
+    #
+    #
+    # latch = cv.xfeatures2d.LATCH_create(16)
+    # kp_l, des_l = latch.compute(im1, kp1)
+    print(len(kp1))
+
+    # kp1, des1 = detect_compute_latch(im1,1000, True)
+
+    # print(len(kp1))
+
+    # vis = cv.drawKeypoints(im1, kp1, None, color=(0, 255, 0), flags=0)
+    # cv.imshow('latch keypoints', vis)
+    # cv.waitKey(0)
 
 def ut_redundant():
     im = cv.imread('./two_point_calib_dataset/highlights/seq1/0419.jpg', 0)
@@ -638,6 +741,7 @@ def ut_redundant():
 
 if __name__ == "__main__":
     #ut_match_sift_features()
-    ut_build_matching_graph()
+    # ut_build_matching_graph()
     #ut_blur_sub_image()
-    #ut_orb()
+    # ut_orb()
+    ut_latch()

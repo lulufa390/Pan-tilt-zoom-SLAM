@@ -1,5 +1,5 @@
 import math
-
+import numpy as np
 
 
 def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
