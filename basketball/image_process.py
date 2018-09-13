@@ -8,7 +8,7 @@ import random
 import math
 
 
-def detect_sift(gray_img, nfeatures=50):
+def detect_sift(gray_img, nfeatures=1000):
     """
     :param gray_img:
     :param nfeatures:
@@ -234,8 +234,8 @@ def run_ransac(points1, points2, index):
     ransac_mask = np.ndarray([len(points1)])
     homo, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
                                         ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
-    if good_homography(homo) == False:
-        return [], [], []
+    # if good_homography(homo) == False:
+    #     return [], [], []
     inner_kp = np.ndarray([0, 2])
     inner_index = np.ndarray([0])
 
@@ -435,6 +435,34 @@ def get_overlap_index(index1, index2):
             ptr2 += 1
     return index1_overlap, index2_overlap
 
+def blur_sub_image(im, x, y, w, h, kernal_size = 31):
+    """
+    @todo
+    :param im:
+    :param x:
+    :param y:
+    :param w:
+    :param h:
+    :param kernal_size:
+    :return:
+    """
+    im[y:y+h, x:x+w] = cv.blur(im[y:y+h, x:x+w], (kernal_size, kernal_size))
+    return im
+
+
+def ut_blur_sub_image():
+    im = cv.imread("./seq3/00000515.jpg")
+    im = blur_sub_image(im, 60, 60, 430, 40)
+    cv.imshow("test", im)
+    cv.waitKey(0)
+
+    for i in range(333):
+        im = cv.imread("./seq3/00000" + str(515+i) + ".jpg")
+        im = blur_sub_image(im, 60, 60, 430, 40)
+        print(i)
+        cv.imwrite("./seq3_blur/00000" + str(515+i) + ".jpg", im)
+
+
 
 def ut_match_sift_features():
     im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
@@ -501,5 +529,6 @@ def ut_redundant():
     cv.destroyAllWindows()
 
 if __name__ == "__main__":
-    ut_match_sift_features()
+    # ut_match_sift_features()
     #ut_build_matching_graph()
+    ut_blur_sub_image()
