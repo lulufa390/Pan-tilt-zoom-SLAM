@@ -25,6 +25,23 @@ def detect_sift(gray_img, nfeatures=1000):
 
     return sift_pts
 
+def detect_orb(im, nfeatures=1000):
+    """
+    :param im: gray or color image
+    :param nfeatures:
+    :return:  N x 2 matrix, ORB keypoint location in the image
+    """
+    assert isinstance(im, np.ndarray)
+    assert nfeatures > 0
+
+    orb = cv.ORB_create(nfeatures)
+    keypoints = orb.detect(im, None)
+
+    N = len(keypoints)
+    pts = np.zeros((N, 2), dtype=np.float32)
+    for i in range(N):
+        pts[i][0], pts[i][1] = keypoints[i].pt[0], keypoints[i].pt[1]
+    return pts
 
 def detect_compute_orb(im, nfeatures=1000, verbose=False):
     """
@@ -48,8 +65,6 @@ def detect_compute_orb(im, nfeatures=1000, verbose=False):
     if verbose == True:
         print('detect: %d ORB keypoints.' % len(key_point))
     return key_point, descriptor
-
-
 
 
 def detect_compute_sift(im, nfeatures, verbose = False):
@@ -272,6 +287,8 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
 
 def good_homography(h):
     # http://answers.opencv.org/question/2588/check-if-homography-is-good/
+    # NOT work
+    assert False
     det = h[0][0] *h[1][1] - h[1][0] * h[0][1]
     if det < 0:
         return False
@@ -548,6 +565,9 @@ def ut_orb():
     im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
     im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
+    pts1 = detect_orb(im1, 1000)
+    print(pts1.shape)
+
     kp1, des1 = detect_compute_orb(im1, 1000, True)
     kp2, des2 = detect_compute_orb(im2, 1000, True)
 
@@ -604,7 +624,7 @@ def ut_redundant():
 
 
 if __name__ == "__main__":
-    ut_match_sift_features()
+    #ut_match_sift_features()
     #ut_build_matching_graph()
     #ut_blur_sub_image()
-    #ut_orb()
+    ut_orb()
