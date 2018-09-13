@@ -7,12 +7,17 @@ from bundle_adjustment import bundle_adjustment
 from sequence_manager import SequenceManager
 
 class Map:
-    def __init__(self):
+    def __init__(self, feature_method):
+        assert feature_method == 'sift' or 'orb'
+
         # [N, 2] float64 array
         self.global_ray = []
 
         # list of KeyFrame object
         self.keyframe_list = []
+
+        # feature detection method. DoG + SIFT or FAST + ORB
+        self.feature_method = 'sift'
 
     def add_first_keyframe(self, keyframe, verbose = False):
         """
@@ -71,7 +76,9 @@ class Map:
             initial_ptzs[i] = keyframe.pan, keyframe.tilt, keyframe.f
 
         # step 3: bundle adjustment
-        landmarks, keyframes = bundle_adjustment(images, image_indices, initial_ptzs, camera_center, base_rotation, u, v, save_path, verbose)
+        feature_method = self.feature_method
+        landmarks, keyframes = bundle_adjustment(images, image_indices, feature_method,
+                                                 initial_ptzs, camera_center, base_rotation, u, v, save_path, verbose)
 
         # remove the last keyframe as it is not used in bundle adjustment
         self.keyframe_list.pop()
@@ -185,7 +192,7 @@ def ut_add_keyframe_with_ba():
     ptz = input.get_ptz(image_index[0])
     keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
-    a_map = Map()
+    a_map = Map('orb')
     a_map.add_first_keyframe(keyframe, False)
 
     # test the result frames

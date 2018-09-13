@@ -98,12 +98,13 @@ def _compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index
         print("reprojection error is %f" % (reprojection_err/(n_residual/2)))
     return residual
 
-def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, v, save_path, verbose = False):
+def bundle_adjustment(images, image_indices, feature_method, initial_ptzs, center, rotation, u, v, save_path, verbose = False):
     """
     build a map from image matching: it takes long time
     assumption: first camera pose is the ground truth
     :param images: a list of images
     :param image_indices: a list of image indices
+    :param feature_method: 'sift' or 'orb'
     :param initial_ptzs: N * 3, pan, tilt, focal_length
     :param center:
     :param rotation: base rotation
@@ -118,6 +119,7 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
     assert len(image_indices) == N
     assert initial_ptzs.shape[0] == N and initial_ptzs.shape[1] == 3
     assert center.shape[0] == 3 and rotation.shape[0] == 3 and rotation.shape[1] == 3
+    assert feature_method == 'sift' or feature_method == 'orb'
 
     # step 1: image matching
     # initial image matching
@@ -133,7 +135,9 @@ def bundle_adjustment(images, image_indices, initial_ptzs, center, rotation, u, 
                 image_match_mask[i][j] = 1
 
     # matching keypoints in images
-    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, n_landmark = build_matching_graph(images, image_match_mask, verbose)
+    keypoints, descriptors, points, \
+    src_pt_index, dst_pt_index, landmark_index, n_landmark = build_matching_graph(images,
+                                                                                  image_match_mask, feature_method, verbose)
 
     # save image matching result for debug
     for i in range(N):
@@ -413,7 +417,7 @@ def ut_bundle_adjustment_interface():
         images.append(im)
 
 
-    landmarks, keyframes = bundle_adjustment(images, image_index, initial_ptzs, camera_center, base_rotation, u, v, '.', True)
+    landmarks, keyframes = bundle_adjustment(images, image_index, 'orb', initial_ptzs, camera_center, base_rotation, u, v, '.', True)
 
 
 

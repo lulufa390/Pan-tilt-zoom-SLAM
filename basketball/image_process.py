@@ -14,7 +14,6 @@ def detect_sift(gray_img, nfeatures=1000):
     :param nfeatures: 0 for all the available sift features
     :return:          N x 2 matrix, sift keypoint location in the image
     """
-
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
     kp = sift.detect(gray_img, None)
 
@@ -138,8 +137,8 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
 
     N = len(good)
     if N <= 8:
-        print('warning: not enough matching')
-        return None, None, None, None
+        print('warning: match sift features failed, not enough matching')
+        return None, [], None, []
 
     pts1 = np.zeros((N, 2))
     pts2 = np.zeros((N, 2))
@@ -326,7 +325,7 @@ def run_ransac(points1, points2, index):
 
     return inner_kp, inner_index, ransac_mask
 
-def build_matching_graph(images, image_match_mask = [], verbose = False):
+def build_matching_graph(images, image_match_mask = [], feature_method = 'sift', verbose = False):
     """
     build a graph for a list of images
     The graph is 2D hash map using list index as key
@@ -334,9 +333,11 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
     edge: matched key points and a global index (from zero)
     :param images: RGB image or gay Image
     :image_match_mask: optional N * N a list of list [[]], 1 for matched, 0 or can not match
+    :feature_method, 'sift', 'orb'
     :param verbose:
     :return: keypoints, points,descriptors, src_pt_index, dst_pt_index, landmark_index (global index), landmark_num
     """
+    assert feature_method == 'sift' or feature_method == 'orb'
     N = len(images)
     if verbose:
         print('build a matching graph from %d images.' % N)
@@ -354,7 +355,13 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
     # step 1: extract key points and descriptors
     keypoints, descriptors = [], []
     for im in images:
-        kp, des = detect_compute_sift(im, 0, False)
+        kp, des = None, None
+        if feature_method == 'sift':
+            kp, des = detect_compute_sift(im, 0, False)
+        elif feature_method == 'orb':
+            kp, des = detect_compute_orb(im, 1500, False)
+        else:
+            assert False
         keypoints.append(kp)
         descriptors.append(des)
 
@@ -386,9 +393,15 @@ def build_matching_graph(images, image_match_mask = [], verbose = False):
                 continue
 
             kp2, des2 = keypoints[j], descriptors[j]
-            pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
+            if feature_method == 'sift':
+                pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
+            elif feature_method == 'orb':
+                pts1, index1, pts2, index2 = match_orb_features(kp1, des1, kp2, des2, False)
+            else:
+                assert False
+
+            # matching is not found
             assert len(index1) == len(index2)
-            #pts3, index3, pts4, index4 = match_sift_features(kp2, des2, kp1, des1, False)
             if len(index1) > min_match_num:
                 # randomly remove some matches
                 if len(index1) > max_match_num:
@@ -557,7 +570,7 @@ def ut_build_matching_graph():
     #cv.imshow('image 4', im4)
     #cv.waitKey(0)
     images = [im0, im1, im2, im3, im4]
-    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(images, [], True)
+    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(images, [], 'orb', True)
     print(type(points[0]))
     print(type(descriptors[0]))
 
@@ -625,6 +638,6 @@ def ut_redundant():
 
 if __name__ == "__main__":
     #ut_match_sift_features()
-    #ut_build_matching_graph()
+    ut_build_matching_graph()
     #ut_blur_sub_image()
-    ut_orb()
+    #ut_orb()
