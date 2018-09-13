@@ -27,3 +27,21 @@ def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
     angle2 = min(pan1_max, pan2_max)
 
     return max(0, angle2 - angle1)
+
+# move from image_process.py
+def get_overlap_index(index1, index2):
+    index1_overlap = np.ndarray([0], np.int8)
+    index2_overlap = np.ndarray([0], np.int8)
+    ptr1 = 0
+    ptr2 = 0
+    while ptr1 < len(index1) and ptr2 < len(index2):
+        if index1[ptr1] == index2[ptr2]:
+            index1_overlap = np.append(index1_overlap, ptr1)
+            index2_overlap = np.append(index2_overlap, ptr2)
+            ptr1 += 1
+            ptr2 += 1
+        elif index1[ptr1] < index2[ptr2]:
+            ptr1 += 1
+        elif index1[ptr1] > index2[ptr2]:
+            ptr2 += 1
+    return index1_overlap, index2_overlap

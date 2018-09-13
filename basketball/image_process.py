@@ -11,7 +11,7 @@ import math
 def detect_sift(gray_img, nfeatures=1000):
     """
     :param gray_img:
-    :param nfeatures:
+    :param nfeatures: 0 for all the available sift features
     :return:          N x 2 matrix, sift keypoint location in the image
     """
 
@@ -24,6 +24,32 @@ def detect_sift(gray_img, nfeatures=1000):
         sift_pts[i][1] = kp[i].pt[1]
 
     return sift_pts
+
+
+def detect_compute_orb(im, nfeatures=1000, verbose=False):
+    """
+    :param im: gray or color image
+    :param nfeatures: 0 for zero features
+    :param verbose:
+    :return:
+    """
+
+    assert isinstance(im, np.ndarray)
+    assert nfeatures>0
+
+    orb = cv.ORB_create(nfeatures)
+    key_point = orb.detect(im, None)
+    key_point, descriptor = orb.compute(im, key_point)
+
+    if len(key_point) > nfeatures:
+        key_point = key_point[:nfeatures]
+        descriptor = descriptor[:nfeatures]
+
+    if verbose == True:
+        print('detect: %d ORB keypoints.' % len(key_point))
+    return key_point, descriptor
+
+
 
 
 def detect_compute_sift(im, nfeatures, verbose = False):
@@ -119,10 +145,47 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
 
     pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
     index1 = index1[inlier_index].tolist()
-    index2 = index2[inlier_index].tolist()  #@todo, index1 and index2 is not tested
+    index2 = index2[inlier_index].tolist()
 
     return pts1, index1, pts2, index2
 
+def match_orb_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
+    """
+    :param keypiont1: list of keypoints
+    :param descriptor1:
+    :param keypoint2:
+    :param descriptor2:
+    :param verbose:
+    :return: matched 2D points, and matched descriptor index
+    """
+    assert len(keypiont1) >= 4  # assume homography matching
+
+    # step 1: matching by hamming distance
+    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(descriptor1, descriptor2)
+
+
+    # step 2: remove outlier using RANSAC  @todo this code is same (redundant) as in match_sift_features
+    N = len(matches)
+    pts1, pts2 = np.zeros((N, 2)), np.zeros((N, 2))
+    index1 = np.zeros((N), dtype=np.int32)
+    index2 = np.zeros((N), dtype=np.int32)
+    for i in range(N):
+        idx1, idx2 = matches[i].queryIdx, matches[i].trainIdx  # query is from the first image
+        index1[i], index2[i] = idx1, idx2
+        pts1[i] = keypiont1[idx1].pt
+        pts2[i] = keypoint2[idx2].pt
+
+    # inlier index from homography estimation
+    inlier_index = homography_ransac(pts1, pts2, 1.0)
+
+    if verbose == True:
+        print('%d matches passed the homography ransac' % len(inlier_index))
+
+    pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
+    index1 = index1[inlier_index].tolist()
+    index2 = index2[inlier_index].tolist()
+    return pts1, index1, pts2, index2
 
 def detect_harris_corner_grid(gray_img, row, column):
     """
@@ -418,32 +481,17 @@ def draw_matches(im1, im2, pts1, pts2):
     return vis
 
 
-def get_overlap_index(index1, index2):
-    index1_overlap = np.ndarray([0], np.int8)
-    index2_overlap = np.ndarray([0], np.int8)
-    ptr1 = 0
-    ptr2 = 0
-    while ptr1 < len(index1) and ptr2 < len(index2):
-        if index1[ptr1] == index2[ptr2]:
-            index1_overlap = np.append(index1_overlap, ptr1)
-            index2_overlap = np.append(index2_overlap, ptr2)
-            ptr1 += 1
-            ptr2 += 1
-        elif index1[ptr1] < index2[ptr2]:
-            ptr1 += 1
-        elif index1[ptr1] > index2[ptr2]:
-            ptr2 += 1
-    return index1_overlap, index2_overlap
+
 
 def blur_sub_image(im, x, y, w, h, kernal_size = 31):
     """
-    @todo
-    :param im:
-    :param x:
+    @blur an image area
+    :param im: image
+    :param x: left top corner (x, y)
     :param y:
-    :param w:
+    :param w: sub image width and height (w, h)
     :param h:
-    :param kernal_size:
+    :param kernal_size: blur kernel size
     :return:
     """
     im[y:y+h, x:x+w] = cv.blur(im[y:y+h, x:x+w], (kernal_size, kernal_size))
@@ -496,7 +544,32 @@ def ut_build_matching_graph():
     print(type(points[0]))
     print(type(descriptors[0]))
 
+def ut_orb():
+    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
+    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
+    kp1, des1 = detect_compute_orb(im1, 1000, True)
+    kp2, des2 = detect_compute_orb(im2, 1000, True)
+
+    pt1, index1, pt2, index2 = match_orb_features(kp1, des1, kp2, des2, True)
+    im3 = draw_matches(im1, im2, pt1, pt2)
+    cv.imshow('matches', im3)
+    cv.waitKey(0)
+
+    """"
+    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+
+    matches = bf.match(des1, des2)
+
+    matches = sorted(matches, key = lambda x:x.distance)
+
+    vis = cv.drawKeypoints(im1, kp1, None, color=(0, 255, 0), flags=0)
+    cv.imshow('orb keypoints', vis)
+
+    vis = cv.drawMatches(im1, kp1, im2, kp2, matches[:100], None, flags=2)
+    cv.imshow('org matches, first 100 keypoints', vis)
+    cv.waitKey(0)
+    """
 
 
 def ut_redundant():
@@ -528,7 +601,10 @@ def ut_redundant():
     cv.waitKey(0)
     cv.destroyAllWindows()
 
+
+
 if __name__ == "__main__":
-    # ut_match_sift_features()
+    ut_match_sift_features()
     #ut_build_matching_graph()
-    ut_blur_sub_image()
+    #ut_blur_sub_image()
+    #ut_orb()
