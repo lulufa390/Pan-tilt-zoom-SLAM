@@ -8,7 +8,7 @@ from sequence_manager import SequenceManager
 
 class Map:
     def __init__(self, feature_method):
-        assert feature_method == 'sift' or 'orb'
+        assert feature_method == 'sift' or 'orb' or 'latch'
 
         # [N, 2] float64 array
         self.global_ray = []
@@ -17,7 +17,7 @@ class Map:
         self.keyframe_list = []
 
         # feature detection method. DoG + SIFT or FAST + ORB
-        self.feature_method = 'sift'
+        self.feature_method = feature_method
 
     def add_first_keyframe(self, keyframe, verbose = False):
         """
