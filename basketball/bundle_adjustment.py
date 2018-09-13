@@ -255,7 +255,7 @@ def ut_build_adjustment_from_image_sequence():
     key_frames = []
     # initialize key frames
     for i in range(len(image_index)):
-        im = input.get_basketball_image(image_index[i])
+        im = input.get_image(image_index[i])
         ptz = input.get_ptz(image_index[i])
         key_frame = KeyFrame(im, i, cc, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
         key_frames.append(key_frame)
@@ -403,7 +403,7 @@ def ut_bundle_adjustment_interface():
     initial_ptzs = np.zeros((N, 3))
     images = []
     for i in range(len(image_index)):
-        im = input.get_basketball_image(image_index[i])
+        im = input.get_image(image_index[i])
         ptz = input.get_ptz(image_index[i])
         # add noise to the rest of cameras
         if i != 0:

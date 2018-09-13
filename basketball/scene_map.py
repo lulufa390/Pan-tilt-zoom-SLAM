@@ -134,7 +134,7 @@ def ut_add_first_key_frame():
     v = 720 / 2
 
     image_index = [0]  # 680, 690, 700, 730, 800
-    im = input.get_basketball_image(image_index[0])
+    im = input.get_image(image_index[0])
     ptz = input.get_ptz(image_index[0])
     keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
@@ -152,7 +152,7 @@ def ut_good_new_keyframe():
     v = 720 / 2
 
     image_index = [0]  # 680, 690, 700, 730, 800
-    im = input.get_basketball_image(image_index[0])
+    im = input.get_image(image_index[0])
     ptz = input.get_ptz(image_index[0])
     keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
@@ -181,7 +181,7 @@ def ut_add_keyframe_with_ba():
     v = 720 / 2
 
     image_index = [0]  # 680, 690, 700, 730, 800
-    im = input.get_basketball_image(image_index[0])
+    im = input.get_image(image_index[0])
     ptz = input.get_ptz(image_index[0])
     keyframe = KeyFrame(im, image_index[0], camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
@@ -191,7 +191,7 @@ def ut_add_keyframe_with_ba():
     # test the result frames
     for i in range(1, 3600, 5):
         ptz = input.get_ptz(i)
-        im = input.get_basketball_image(i)
+        im = input.get_image(i)
         keyframe = KeyFrame(im, i, camera_center, base_rotation, u, v, ptz[0], ptz[1], ptz[2])
 
         if a_map.good_new_keyframe(ptz, 10, 25, 1280, False):

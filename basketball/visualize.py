@@ -37,6 +37,9 @@ class Visualize:
                     (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 5)
 
 
+
+
+
 if __name__ == '__main__':
     visualize = Visualize("./basketball/basketball_model.mat",
                           "./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images")
@@ -47,7 +50,7 @@ if __name__ == '__main__':
     predict_f = camera_pos['predict_f'].squeeze()
 
     for i in range(visualize.sequence.anno_size):
-        img = visualize.sequence.get_basketball_image(i)
+        img = visualize.sequence.get_image(i)
         visualize.draw_line(img, predict_pan[i], predict_tilt[i], predict_f[i])
         cv.imshow("test", img)
         cv.waitKey(0)

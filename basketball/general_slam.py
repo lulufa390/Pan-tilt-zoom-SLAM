@@ -29,6 +29,9 @@ class GeneralSlam:
         """synthesized court does not need bounding box"""
         self.sequence = SequenceManager(annotation_path, image_path, bounding_box_path)
 
+        self.sequence_length = self.sequence.anno_size
+        # self.sequence_length = 333
+
         """parameters to be updated"""
         self.camera_pose = np.ndarray([3])
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
@@ -46,15 +49,10 @@ class GeneralSlam:
                 = self.sequence.get_ptz(i)
 
         """camera pose sequence (basketball)"""
-        self.predict_pan = np.zeros([self.sequence.anno_size])
-        self.predict_tilt = np.zeros([self.sequence.anno_size])
-        self.predict_f = np.zeros([self.sequence.anno_size])
+        self.predict_pan = np.zeros([self.sequence_length])
+        self.predict_tilt = np.zeros([self.sequence_length])
+        self.predict_f = np.zeros([self.sequence_length])
 
-        """camera pose sequence (soccer)"""
-        # self.image_num = 333
-        # self.predict_pan = np.zeros([self.image_num])
-        # self.predict_tilt = np.zeros([self.image_num])
-        # self.predict_f = np.zeros([self.image_num])
 
     def compute_new_jacobi(self, camera_pan, camera_tilt, foc, center, rotation, rays):
         """
@@ -135,7 +133,7 @@ class GeneralSlam:
 
     def init_system(self, index):
         """first frame to initialize global_rays"""
-        begin_frame = self.sequence.get_basketball_image_gray(index)
+        begin_frame = self.sequence.get_image_gray(index)
 
         begin_frame_kp = detect_sift(begin_frame)
 
@@ -146,19 +144,18 @@ class GeneralSlam:
         camera = np.array([self.sequence.u, self.sequence.v, self.sequence.get_ptz(index)[2],
                            self.sequence.get_ptz(index)[0], self.sequence.get_ptz(index)[1],
                            self.sequence.c[0], self.sequence.c[1], self.sequence.c[2]])
-        ground_map = np.ones(shape=self.sequence.get_basketball_image_gray(index).shape)
+        ground_map = np.ones(shape=self.sequence.get_image_gray(index).shape)
         court_mask = ImageGenerator().generate_image(camera, ground_map)
         begin_frame_kp = begin_frame_kp[
             remove_player_feature(begin_frame_kp, court_mask)]
         """end only feature on ground!"""
 
+        """use key points in first frame to get init rays"""
         init_rays = TransFunction.get_3ds_from_observation(self.camera_pose[0], self.camera_pose[1],
                                                            self.camera_pose[2],
                                                            begin_frame_kp, self.sequence.u, self.sequence.v,
                                                            self.sequence.c, self.sequence.base_rotation)
-        """use key points in first frame to get init rays"""
-        # init_rays = TransFunction.get_rays_from_observation(
-        #     self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], begin_frame_kp, self.sequence.u, self.sequence.v)
+
 
         """add rays in frame 1 to global rays"""
         self.ray_global = np.ndarray([0, 3])
@@ -181,10 +178,6 @@ class GeneralSlam:
 
     def ekf_update(self, i, matched_kp, next_index):
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
-        # predict_points, inner_point_index = TransFunction.get_observation_from_rays(
-        #     self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
-        #     self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
-
         predict_points, inner_point_index = TransFunction.get_observation_from_3ds(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
             self.sequence.u, self.sequence.v, self.sequence.c, self.sequence.base_rotation,
@@ -192,17 +185,13 @@ class GeneralSlam:
 
         # compute y_k
         overlap1, overlap2 = get_overlap_index(next_index, inner_point_index)
+
         y_k = matched_kp[overlap1] - predict_points[overlap2]
         y_k = y_k.flatten()
 
         matched_inner_point_index = next_index[overlap1]
 
         # get p matrix for this iteration from p_global
-        # p_index = (np.concatenate([[0, 1, 2], matched_inner_point_index + 3,
-        #                            matched_inner_point_index + len(matched_inner_point_index) + 3,
-        #                           matched_inner_point_index + 2 * len(matched_inner_point_index) + 3]
-        #                           )).astype(int)
-
         p_index = np.array([0, 1, 2])
         for j in range(len(matched_inner_point_index)):
             p_index = np.append(p_index, np.array([3 * matched_inner_point_index[j] + 3,
@@ -283,16 +272,12 @@ class GeneralSlam:
         self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
 
     def add_new_points(self, i):
-        # points_update, index_update = TransFunction.get_observation_from_rays(
-        #     self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
-        #     self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
-
         points_update, index_update = TransFunction.get_observation_from_3ds(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
             self.sequence.u, self.sequence.v, self.sequence.c, self.sequence.base_rotation,
             self.sequence.height, self.sequence.width)
 
-        img_new = self.sequence.get_basketball_image_gray(i)
+        img_new = self.sequence.get_image_gray(i)
 
         """set the mask"""
         mask = np.ones(img_new.shape, np.uint8)
@@ -313,7 +298,7 @@ class GeneralSlam:
         camera = np.array([self.sequence.u, self.sequence.v, self.sequence.get_ptz(i)[2],
                            self.sequence.get_ptz(i)[0], self.sequence.get_ptz(i)[1],
                            self.sequence.c[0], self.sequence.c[1], self.sequence.c[2]])
-        ground_map = np.ones(shape=self.sequence.get_basketball_image_gray(i).shape)
+        ground_map = np.ones(shape=self.sequence.get_image_gray(i).shape)
         court_mask = ImageGenerator().generate_image(camera, ground_map)
         all_new_frame_kp = all_new_frame_kp[
             remove_player_feature(all_new_frame_kp, court_mask)]
@@ -327,8 +312,6 @@ class GeneralSlam:
 
         """if existing new points"""
         if new_frame_kp is not None:
-            # new_rays = TransFunction.get_rays_from_observation(
-            #     self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp,self.sequence.u, self.sequence.v)
 
             new_rays = TransFunction.get_3ds_from_observation(self.camera_pose[0], self.camera_pose[1],
                                                                self.camera_pose[2],
@@ -363,11 +346,7 @@ class GeneralSlam:
         self.camera_pose = self.sequence.get_ptz(first)
         previous_frame_kp, previous_index = self.init_system(first)
 
-        lost_cnt = 0
-        error = np.zeros([self.sequence.anno_size])
-
-
-        for i in range(first + step_length, self.sequence.anno_size, step_length):
+        for i in range(first + step_length, self.sequence_length, step_length):
 
             print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.ray_global))
 
@@ -376,8 +355,8 @@ class GeneralSlam:
             0. feature matching step
             ===============================
             """
-            pre_img = self.sequence.get_basketball_image_gray(i - step_length)
-            next_img = self.sequence.get_basketball_image_gray(i)
+            pre_img = self.sequence.get_image_gray(i - step_length)
+            next_img = self.sequence.get_image_gray(i)
 
             matched_index, ransac_next_kp = optical_flow_matching(pre_img, next_img, previous_frame_kp)
 
@@ -386,14 +365,6 @@ class GeneralSlam:
 
             matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
 
-
-
-            error[i] = len(next_index) / len(previous_frame_kp) * 100
-            if error[i] < 80:
-                lost_cnt += 1
-            else:
-                lost_cnt = 0
-            print("fraction: ", len(next_index) / len(previous_frame_kp))
             """
             ===============================
             1. predict step
@@ -437,7 +408,7 @@ class GeneralSlam:
     def draw_camera_plot(self):
         """percentage"""
         plt.figure("pan percentage error")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         # plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
         plt.plot(x, (self.predict_pan - self.ground_truth_pan) / self.ground_truth_pan * 100, 'b', label='predict')
         plt.xlabel("frame")
@@ -445,7 +416,7 @@ class GeneralSlam:
         plt.legend(loc="best")
 
         plt.figure("tilt percentage error")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         # plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
         plt.plot(x, (self.predict_tilt - self.ground_truth_tilt) / self.ground_truth_tilt * 100, 'b', label='predict')
         plt.xlabel("frame")
@@ -453,7 +424,7 @@ class GeneralSlam:
         plt.legend(loc="best")
 
         plt.figure("f percentage error")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
         plt.plot(x, (self.predict_f - self.ground_truth_f) / self.ground_truth_f * 100, 'b', label='predict')
         plt.xlabel("frame")
@@ -462,7 +433,7 @@ class GeneralSlam:
 
         """absolute value"""
         plt.figure("pan")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
         plt.plot(x, self.predict_pan, 'b', label='predict')
         plt.xlabel("frame")
@@ -470,7 +441,7 @@ class GeneralSlam:
         plt.legend(loc="best")
 
         plt.figure("tilt")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
         plt.plot(x, self.predict_tilt, 'b', label='predict')
         plt.xlabel("frame")
@@ -478,12 +449,41 @@ class GeneralSlam:
         plt.legend(loc="best")
 
         plt.figure("f")
-        x = np.array([i for i in range(self.sequence.anno_size)])
+        x = np.array([i for i in range(self.sequence_length)])
         plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
         plt.plot(x, self.predict_f, 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("f")
         plt.legend(loc="best")
+
+        """this part is for soccer specifically
+        because soccer annotations are less than images"""
+        # plt.figure("pan")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_pan[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_pan, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("pan angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("tilt")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_tilt[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_tilt, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("tilt angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("f")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_f[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_f, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("f")
+        # plt.legend(loc="best")
 
         plt.show()
 
@@ -513,9 +513,9 @@ class GeneralSlam:
 
 if __name__ == "__main__":
     """this for soccer"""
-    # slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
-    #                "./objects_soccer.mat",
-    #                "./seq3")
+    # slam = GeneralSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
+    #                    "./objects_soccer.mat",
+    #                    "./seq3")
 
     """this for basketball"""
     slam = GeneralSlam("./basketball/basketball/basketball_anno.mat",

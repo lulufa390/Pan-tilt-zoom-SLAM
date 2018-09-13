@@ -39,9 +39,9 @@ def _recompute_matching_ray(keyframe, img):
     :param img: image to relocalize
     :return: points [N, 2] array in img, rays [N, 2] array in keyframe
     """
-    kp, des = detect_compute_sift(img, 1000)
+    kp, des = detect_compute_sift(img, 0)
 
-    keyframe_kp, keyframe_des = detect_compute_sift(keyframe.img, 1000)
+    keyframe_kp, keyframe_des = detect_compute_sift(keyframe.img, 0)
 
     pt1, index1, pt2, index2 = match_sift_features(kp, des, keyframe_kp, keyframe_des)
 
@@ -141,8 +141,8 @@ if __name__ == '__main__':
     img1 = 0
     img2 = 390
 
-    gray1 = obj.get_basketball_image_gray(img1)
-    gray2 = obj.get_basketball_image_gray(img2)
+    gray1 = obj.get_image_gray(img1)
+    gray2 = obj.get_image_gray(img2)
 
     pose1 = obj.get_ptz(img1)
     pose2 = obj.get_ptz(img2)
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     kp1_inlier, index1, kp2_inlier, index2 = match_sift_features(kp1, des1, kp2, des2)
 
     cv.imshow("test",
-              draw_matches(obj.get_basketball_image(img1), obj.get_basketball_image(img2), kp1_inlier, kp2_inlier))
+              draw_matches(obj.get_image(img1), obj.get_image(img2), kp1_inlier, kp2_inlier))
     cv.waitKey(0)
 
     map = Map()
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     pose_test = obj.get_ptz(142)
 
-    optimized = relocalization_camera(map=map, img=obj.get_basketball_image_gray(142), pose=np.array([20, -16, 3000]))
+    optimized = relocalization_camera(map=map, img=obj.get_image_gray(142), pose=np.array([20, -16, 3000]))
 
     print(pose_test)
     print(optimized.x)

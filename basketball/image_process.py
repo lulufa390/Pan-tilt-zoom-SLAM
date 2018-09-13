@@ -33,6 +33,7 @@ def detect_compute_sift(im, nfeatures, verbose = False):
     :return: two lists of key_point (2 dimension), and descriptor (128 dimension)
     """
     # pre-processing if input is color image
+    assert isinstance(im, np.ndarray)
     if len(im.shape) == 3 and im.shape[0] == 3:
         im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
 
@@ -130,6 +131,7 @@ def detect_harris_corner_grid(gray_img, row, column):
     :param column:
     :return: harris corner in shape (n ,2)
     """
+
     mask = np.zeros_like(gray_img, dtype=np.uint8)
 
     grid_height = gray_img.shape[0] // row
@@ -154,7 +156,7 @@ def detect_harris_corner_grid(gray_img, row, column):
                 grid_x2 = j * grid_width + grid_width
 
             mask[grid_y1:grid_y2, grid_x1:grid_x2] = 1
-            grid_harris = cv.goodFeaturesToTrack(gray_img, maxCorners=5,
+            grid_harris = cv.goodFeaturesToTrack(gray_img, maxCorners=20,
                                                  qualityLevel=0.2, minDistance=10, mask=mask.astype(np.uint8))
 
             if grid_harris is not None:

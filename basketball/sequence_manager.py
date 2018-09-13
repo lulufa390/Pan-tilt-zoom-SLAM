@@ -1,6 +1,7 @@
 import numpy as np
 import cv2 as cv
 import scipy.io as sio
+from image_process import *
 
 
 class SequenceManager:
@@ -32,32 +33,44 @@ class SequenceManager:
         # interface for camera base rotation
         return self.base_rotation
 
-    def get_basketball_image_gray(self, index):
+    def get_image_gray(self, index, dataset_type=0):
         """
         :param index: image index for sequence
         :return: gray image
         """
 
-        """for soccer!"""
-        # img = cv.imread(self.image_path + "00000" + str(index + 515) + ".jpg")
-
-        """for basketball!"""
-        img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg")
+        if dataset_type == 0:
+            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
+        elif dataset_type == 1:
+            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
+        elif dataset_type == 2:
+            img = cv.imread(self.image_path + "/" + str(index) + ".jpg")
+        else:
+            print("Unknown dataset!")
+            return None
 
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        assert isinstance(img_gray, np.ndarray)
+
         return img_gray
 
-    def get_basketball_image(self, index):
+    def get_image(self, index, dataset_type=0):
         """
         :param index: image index for sequence
         :return: color image
         """
 
-        """for soccer!"""
-        # img = cv.imread(self.image_path + "00000" + str(index + 515) + ".jpg")
+        if dataset_type == 0:
+            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
+        elif dataset_type == 1:
+            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
+        elif dataset_type == 2:
+            img = cv.imread(self.image_path + "/" + str(index) + ".jpg")
+        else:
+            print("Unknown dataset!")
+            return None
 
-        """for basketball!"""
-        img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
+        assert isinstance(img, np.ndarray)
 
         return img
 
@@ -90,11 +103,63 @@ def ut_camera_center_and_base_rotation():
     print(input.get_camera_center())
     print(input.get_base_rotation())
 
-if __name__ == '__main__':
 
-    #ut_camera_center_and_base_rotation()
-
+def vis_keypoints():
     obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
                           "./objects_basketball.mat")
-    cv.imshow("test", obj.get_bounding_box_mask(100))
+
+    img = obj.get_image(0)
+    img2 = np.copy(img)
+
+    mask = obj.get_bounding_box_mask(0)
+    kp = detect_harris_corner_grid(obj.get_image_gray(0), 4, 4)
+    remove_index = remove_player_feature(kp, mask)
+    after_kp = kp[remove_index]
+
+    chacha_length = 7
+
+    for i in range(len(kp)):
+        x = int(kp[i][0])
+        y = int(kp[i][1])
+        cv.line(img, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length), color=(0, 255, 0),
+                thickness=2)
+        cv.line(img, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length), color=(0, 255, 0),
+                thickness=2)
+
+    for i in range(len(after_kp)):
+        x = int(after_kp[i][0])
+        y = int(after_kp[i][1])
+        cv.line(img2, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length), color=(0, 255, 0),
+                thickness=2)
+        cv.line(img2, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length), color=(0, 255, 0),
+                thickness=2)
+
+    for j in range(obj.bounding_box[0][0].shape[0]):
+        if obj.bounding_box[0][0][j][4] > 0.6:
+            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][1]),
+                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][1]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][1]),
+                    (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][3]),
+                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][1]),
+                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
+
+    cv.imshow("test2", img2)
+    cv.imshow("test", img)
+
+    cv.imwrite("./img_keypoints.jpg", img)
+    cv.imwrite("./img_keypoints_detection.jpg", img2)
+
     cv.waitKey(0)
+
+
+if __name__ == '__main__':
+    # ut_camera_center_and_base_rotation()
+
+    vis_keypoints()
+
+    # obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
+    #                       "./objects_basketball.mat")
+    # cv.imshow("test", obj.get_bounding_box_mask(100))
+    # cv.waitKey(0)
