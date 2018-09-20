@@ -1,10 +1,8 @@
-# Camera-Calibration
+# Pan-tilt-zoom SLAM
 
-Camera calibration using python. 
+Pan-tilt-zoom SLAM project. Implemented with Python 3.6.
 
 Files:
-  1. learn_camera is a folder for two toy sample code: 1. draw soccer lines; 2. composition of two frames.
-  2. basketball folder is used to store code with basketball data.
-  3. soccer folder is used to store code with soccer data.
-  4. transformation.py define functions for projection among rays, 3-d locations and 2-d locations in images.
-  5. bundle_adjustment.py is testing code for bundle adjustment
+  1. basketball folder is for our main algorithms. 
+  2. learning is a folder for two toy sample code: 1. draw soccer lines; 2. composition of two frames.
+  3. soccer folder is used to store code with synthesized data on soccer field.
