@@ -1,6 +1,7 @@
 """
-This is a Prototype for PTZ camera SLAM on sports applications.
-2018.9
+Main part of our system. Ray landmarks based PTZ SLAM.
+
+Created by Luke, 2018.9
 """
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,7 @@ import random
 import cv2 as cv
 import statistics
 import scipy.signal as sig
+import time
 from sklearn.preprocessing import normalize
 from math import *
 from transformation import TransFunction
@@ -20,13 +22,20 @@ from relocalization import relocalization_camera
 from scene_map import Map
 from bundle_adjustment import bundle_adjustment
 from key_frame import KeyFrame
+from util import *
 
 
-def add_gauss(points):
+def add_gauss(points, var):
+    """
+    add gauss to points.
+    :param points: array [N, 2]
+    :param var: variance for Gauss distribution
+    :return: array [N, 2] with noise
+    """
     noise_points = np.zeros_like(points)
     for i in range(len(points)):
-        noise_points[i, 0] = points[i, 0] + random.gauss(0, 0)
-        noise_points[i, 1] = points[i, 1] + random.gauss(0, 0)
+        noise_points[i, 0] = points[i, 0] + random.gauss(0, var)
+        noise_points[i, 1] = points[i, 1] + random.gauss(0, var)
 
         if noise_points[i, 0] > 1279:
             noise_points[i, 0] = 1279
@@ -55,8 +64,8 @@ class PtzSlam:
         self.sequence = SequenceManager(annotation_path, image_path, bounding_box_path)
         # self.sequence = SequenceManager(annotation_path, image_path)
 
-        # self.sequence_length = self.sequence.anno_size
-        self.sequence_length = 333
+        self.sequence_length = self.sequence.anno_size
+        # self.sequence_length = 333
 
         """parameters to be updated"""
         self.camera_pose = np.ndarray([3])
@@ -84,7 +93,6 @@ class PtzSlam:
         self.predict_tilt = np.zeros([self.sequence_length])
         self.predict_f = np.zeros([self.sequence_length])
 
-
     def compute_new_jacobi(self, camera_pan, camera_tilt, foc, rays):
         """
         compute jacobi matrix
@@ -101,6 +109,7 @@ class PtzSlam:
 
         jacobi_h = np.ndarray([2 * ray_num, 3 + 2 * ray_num])
 
+        """use approximate method to compute partial derivative."""
         for i in range(ray_num):
             x_delta_pan1, y_delta_pan1 = TransFunction.from_pan_tilt_to_2d(
                 self.sequence.u, self.sequence.v, foc, camera_pan - delta_angle, camera_tilt, rays[i][0], rays[i][1])
@@ -159,9 +168,10 @@ class PtzSlam:
         """
 
         """first frame to initialize global_rays"""
-        begin_frame = self.sequence.get_image_gray(index, 1)
+        begin_frame = self.sequence.get_image_gray(index, 0)
 
-        begin_frame_kp = detect_sift(begin_frame)
+        begin_frame_kp = detect_sift(begin_frame, 50)
+        # begin_frame_kp = detect_orb(begin_frame, 300)
 
         # begin_frame_kp = add_gauss(begin_frame_kp)
 
@@ -194,6 +204,12 @@ class PtzSlam:
         return previous_frame_kp, previous_index
 
     def ekf_update(self, i, matched_kp, next_index):
+        """
+        :param i: index for frame
+        :param matched_kp: matched keypoint in that frame
+        :param next_index: matched keypoint index in global ray
+        """
+
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
         predict_points, inner_point_index = TransFunction.get_observation_from_rays(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
@@ -236,7 +252,7 @@ class PtzSlam:
 
         # output result for updating camera: before
         print("before update camera:\n")
-        # self.output_camera_error(i)
+        self.output_camera_error(i)
 
         # update camera pose
         self.camera_pose += k_mul_y[0:3]
@@ -245,7 +261,7 @@ class PtzSlam:
 
         # output result for updating camera: after
         print("after update camera:\n")
-        # self.output_camera_error(i)
+        self.output_camera_error(i)
 
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
@@ -271,7 +287,10 @@ class PtzSlam:
     def delete_outliers(self, ransac_mask):
         """
         delete ransac outliers from global ray
+        :param ransac_mask: 0 for ourliers, 1 for inliers
         """
+
+        # delete global ray
         delete_index = np.ndarray([0])
         for j in range(len(ransac_mask)):
             if ransac_mask[j] == 0:
@@ -279,7 +298,7 @@ class PtzSlam:
 
         self.ray_global = np.delete(self.ray_global, delete_index, axis=0)
 
-        # p_delete_index = np.concatenate([delete_index + 3, delete_index + len(delete_index) + 3], axis=0)
+        # delete covariance matrix
         p_delete_index = np.ndarray([0])
         for i in range(len(delete_index)):
             p_delete_index = np.append(p_delete_index, np.array([2 * delete_index[i] + 3,
@@ -289,13 +308,15 @@ class PtzSlam:
         self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
 
     def add_new_points(self, i):
+        """
+        :param i: frame index
+        :return: previous keypoints and indexes
+        """
         points_update, index_update = TransFunction.get_observation_from_rays(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
             self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
 
-        # img_new = self.sequence.get_image_gray(i)
-        img_new = self.sequence.get_image_gray(i, 1)
-
+        img_new = self.sequence.get_image_gray(i, 0)
 
         """set the mask"""
         mask = np.ones(img_new.shape, np.uint8)
@@ -307,7 +328,9 @@ class PtzSlam:
             right_bound = int(min(self.sequence.width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        all_new_frame_kp = detect_sift(img_new)
+        all_new_frame_kp = detect_sift(img_new, 50)
+        # all_new_frame_kp = detect_orb(img_new, 300)
+
         # all_new_frame_kp = add_gauss(all_new_frame_kp)
         all_new_frame_kp = all_new_frame_kp[
             remove_player_feature(all_new_frame_kp, self.sequence.get_bounding_box_mask(i))]
@@ -353,14 +376,18 @@ class PtzSlam:
         previous_frame_kp, previous_index = self.init_system(first)
 
         lost_cnt = 0
+        lost_frame_threshold = 3
         matched_percentage = np.zeros([self.sequence_length])
+        percentage_threshold = 80
 
-        keyframe_map = Map()
-        im = self.sequence.get_image(first, 1)
+        keyframe_map = Map('sift')
+        im = self.sequence.get_image(first, 0)
         first_keyframe = KeyFrame(im, first, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
                                   self.sequence.v, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
 
         keyframe_map.add_first_keyframe(first_keyframe)
+
+        start = time.time()
 
         for i in range(first + step_length, self.sequence_length, step_length):
 
@@ -371,8 +398,8 @@ class PtzSlam:
             0. feature matching step
             ===============================
             """
-            pre_img = self.sequence.get_image_gray(i - step_length, 1)
-            next_img = self.sequence.get_image_gray(i, 1)
+            pre_img = self.sequence.get_image_gray(i - step_length, 0)
+            next_img = self.sequence.get_image_gray(i, 0)
 
             matched_index, ransac_next_kp = optical_flow_matching(pre_img, next_img, previous_frame_kp)
 
@@ -427,112 +454,123 @@ class PtzSlam:
 
             """this part is for BA and relocalization"""
 
-            if matched_percentage[i] > 80:
+            if matched_percentage[i] > percentage_threshold:
+                # origin set to (10, 25)
                 if keyframe_map.good_new_keyframe(self.camera_pose, 10, 25):
+                    # if keyframe_map.good_new_keyframe(self.camera_pose, 10, 15):
                     print("this is keyframe:", i)
-                    new_keyframe = KeyFrame(self.sequence.get_image(i, 1),
+                    new_keyframe = KeyFrame(self.sequence.get_image(i, 0),
                                             i, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
                                             self.sequence.v, self.camera_pose[0], self.camera_pose[1],
                                             self.camera_pose[2])
                     keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
 
-
-            elif lost_cnt > 3:
+            elif lost_cnt > lost_frame_threshold:
                 if len(keyframe_map.keyframe_list) > 1:
-                    self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 1), self.camera_pose)
+                    self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 0),
+                                                             self.camera_pose)
                     previous_frame_kp, previous_index = self.init_system(i)
                     lost_cnt = 0
 
+        # print("100 tracking time:", end-start)
+
     def output_camera_error(self, now_index):
-        """output the error of camera pose compared to ground truth"""
+        """
+        output the error of camera pose compared to ground truth
+        :param now_index: frame index
+        """
         ground_truth = np.array(
             [self.ground_truth_pan[now_index], self.ground_truth_tilt[now_index], self.ground_truth_f[now_index]])
         pan, tilt, f = self.camera_pose - ground_truth
         print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
 
     def draw_camera_plot(self):
-        """percentage"""
-        # plt.figure("pan percentage error")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # # plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
-        # plt.plot(x, (self.predict_pan - self.ground_truth_pan) / self.ground_truth_pan * 100, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("error %")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("tilt percentage error")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # # plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
-        # plt.plot(x, (self.predict_tilt - self.ground_truth_tilt) / self.ground_truth_tilt * 100, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("error %")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("f percentage error")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
-        # plt.plot(x, (self.predict_f - self.ground_truth_f) / self.ground_truth_f * 100, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("error %")
-        # plt.legend(loc="best")
-        #
-        # """absolute value"""
-        # plt.figure("pan")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
-        # plt.plot(x, self.predict_pan, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("pan angle")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("tilt")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
-        # plt.plot(x, self.predict_tilt, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("tilt angle")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("f")
-        # x = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
-        # plt.plot(x, self.predict_f, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("f")
-        # plt.legend(loc="best")
+        """
+        draw plot for ground truth and estimated camera pose.
+        """
+        plt.figure("pan percentage error")
+        x = np.array([i for i in range(self.sequence_length)])
+        plt.plot(x, (self.predict_pan - self.ground_truth_pan) / self.ground_truth_pan * 100, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc="best")
 
-        """this part is for soccer specifically
-        because soccer annotations are less than images"""
+        plt.figure("tilt percentage error")
+        x = np.array([i for i in range(self.sequence_length)])
+        plt.plot(x, (self.predict_tilt - self.ground_truth_tilt) / self.ground_truth_tilt * 100, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc="best")
+
+        plt.figure("f percentage error")
+        x = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
+        plt.plot(x, (self.predict_f - self.ground_truth_f) / self.ground_truth_f * 100, 'b', label='predict')
+        plt.xlabel("frame")
+        plt.ylabel("error %")
+        plt.legend(loc="best")
+
+        """absolute value"""
         plt.figure("pan")
-        x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        x2 = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x1, self.ground_truth_pan[:self.sequence_length // 6], 'r', label='ground truth')
-        plt.plot(x2, self.predict_pan, 'b', label='predict')
+        x = np.array([i for i in range(self.sequence_length)])
+        plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
+        plt.plot(x, self.predict_pan, 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("pan angle")
         plt.legend(loc="best")
 
         plt.figure("tilt")
-        x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        x2 = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x1, self.ground_truth_tilt[:self.sequence_length // 6], 'r', label='ground truth')
-        plt.plot(x2, self.predict_tilt, 'b', label='predict')
+        x = np.array([i for i in range(self.sequence_length)])
+        plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
+        plt.plot(x, self.predict_tilt, 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("tilt angle")
         plt.legend(loc="best")
 
         plt.figure("f")
-        x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        x2 = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x1, self.ground_truth_f[:self.sequence_length // 6], 'r', label='ground truth')
-        plt.plot(x2, self.predict_f, 'b', label='predict')
+        x = np.array([i for i in range(self.sequence_length)])
+        plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
+        plt.plot(x, self.predict_f, 'b', label='predict')
         plt.xlabel("frame")
         plt.ylabel("f")
         plt.legend(loc="best")
 
+        """this part is for soccer specifically
+        because soccer annotations are less than images"""
+        # plt.figure("pan")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_pan[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_pan, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("pan angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("tilt")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_tilt[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_tilt, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("tilt angle")
+        # plt.legend(loc="best")
+        #
+        # plt.figure("f")
+        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
+        # x2 = np.array([i for i in range(self.sequence_length)])
+        # plt.plot(x1, self.ground_truth_f[:self.sequence_length // 6], 'r', label='ground truth')
+        # plt.plot(x2, self.predict_f, 'b', label='predict')
+        # plt.xlabel("frame")
+        # plt.ylabel("f")
+        # plt.legend(loc="best")
+
         plt.show()
 
     def save_camera_to_mat(self):
+        """
+        save ground truth and estimated camera pose into .mat file.
+        :return:
+        """
         camera_pose = dict()
 
         camera_pose['ground_truth_pan'] = self.ground_truth_pan
@@ -546,6 +584,10 @@ class PtzSlam:
         sio.savemat('camera_pose.mat', mdict=camera_pose)
 
     def load_camera_mat(self, path):
+        """
+        load ground truth and estimated camera pose
+        :param path: .mat file path
+        """
         camera_pos = sio.loadmat(path)
         self.predict_pan = camera_pos['predict_pan'].squeeze()
         self.predict_tilt = camera_pos['predict_tilt'].squeeze()
@@ -558,14 +600,14 @@ class PtzSlam:
 
 if __name__ == "__main__":
     """this for soccer"""
-    slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
-                   "./objects_soccer.mat",
-                   "./seq3")
+    # slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
+    #                "./objects_soccer.mat",
+    #                "./seq3_blur")
 
     """this for basketball"""
-    # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
-    #                "./objects_basketball.mat",
-    #                "./basketball/basketball/images/")
+    slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
+                   "./objects_basketball.mat",
+                   "./basketball/basketball/images/")
 
     """this for synthesized basketball court"""
     # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",

@@ -1,9 +1,28 @@
+"""
+Key frame class.
+
+Created by Luke, 2018.9
+"""
+
+
 import numpy as np
 import scipy.io as sio
 
 
 class KeyFrame:
+    """This is a class for keyframe in mapping."""
     def __init__(self, img, img_index, center, rotation, u, v, pan, tilt, f):
+        """
+        :param img: image array for keyframe
+        :param img_index: index in sequence
+        :param center: camera center array [3]
+        :param rotation: base rotation matrix array [3, 3]
+        :param u: parameter u
+        :param v: parameter v
+        :param pan: camera pose, pan angle
+        :param tilt: camera pose, tilt angle
+        :param f: camera pose, focal length
+        """
         self.img = img
         self.img_index = img_index
 
@@ -30,9 +49,15 @@ class KeyFrame:
         self.v = v
 
     def get_feature_num(self):
+        """
+        :return: keypoint number
+        """
         return len(self.feature_pts)
 
     def save_to_mat(self, path):
+        """
+        :param path: save path for key frame
+        """
         keyframe_data = dict()
         keyframe_data['img_index'] = self.img_index
         keyframe_data['feature_pts'] = self.feature_pts
@@ -46,6 +71,9 @@ class KeyFrame:
         sio.savemat(path, mdict=keyframe_data)
 
     def load_mat(self, path):
+        """
+        :param path: load path for .mat file
+        """
         keyframe_data = sio.loadmat(path)
         self.img_index = keyframe_data['img_index'].squeeze(1)
         self.feature_pts = keyframe_data['feature_pts'].squeeze(1)

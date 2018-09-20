@@ -4,9 +4,10 @@
 2. All the input and output angles of functions in class 'TransFunction' is in degree!!
 
 3. The type of variables is mostly np.float64(default), but it does not have much influence if you use np.float32.
+
+Created by Luke, 2018.9
 """
 
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as sio
@@ -14,6 +15,7 @@ import random
 import cv2 as cv
 from sklearn.preprocessing import normalize
 from math import *
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class TransFunction:
@@ -93,8 +95,6 @@ class TransFunction:
         p = np.dot(inv_mat, coe * np.array([point2d[0], point2d[1], 1])) + c
 
         return p
-
-
 
     @staticmethod
     def from_pan_tilt_to_2d(u, v, f, c_p, c_t, p, t):
@@ -199,7 +199,7 @@ class TransFunction:
         phi = radians(p)
         x = tan(theta)
         y = - tan(phi) * sqrt(pow(tan(theta), 2) + 1)
-        return np.array([x,y,1])
+        return np.array([x, y, 1])
 
     @staticmethod
     def from_relative_3d_to_2d(u, v, f, p, t, pos):
@@ -293,6 +293,7 @@ class TransFunction:
         return rays
 
     """below is function for general slam"""
+
     @staticmethod
     def get_observation_from_3ds(pan, tilt, f, rays, u, v, center, rotation, height=0, width=0):
         """

@@ -1,3 +1,9 @@
+"""
+Other functions.
+
+Create by Jimmy, 2018.9
+"""
+
 import math
 import numpy as np
 
@@ -30,6 +36,11 @@ def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
 
 # move from image_process.py
 def get_overlap_index(index1, index2):
+    """
+    :param index1: array 1
+    :param index2: array 2
+    :return: overlapped numbers in two array
+    """
     index1_overlap = np.ndarray([0], np.int8)
     index2_overlap = np.ndarray([0], np.int8)
     ptr1 = 0

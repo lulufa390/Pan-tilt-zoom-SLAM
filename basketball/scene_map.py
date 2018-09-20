@@ -1,10 +1,16 @@
+"""
+Map class.
+
+Create by Jimmy, 2018.9
+"""
+
 import numpy as np
+import time
 from key_frame import KeyFrame
 from util import overlap_pan_angle
 from bundle_adjustment import bundle_adjustment
-
-
 from sequence_manager import SequenceManager
+
 
 class Map:
     def __init__(self, feature_method):
@@ -19,7 +25,7 @@ class Map:
         # feature detection method. DoG + SIFT or FAST + ORB
         self.feature_method = feature_method
 
-    def add_first_keyframe(self, keyframe, verbose = False):
+    def add_first_keyframe(self, keyframe, verbose=False):
         """
         add first key frame, no bundle adjustment
         :param keyframe:
@@ -31,7 +37,7 @@ class Map:
         if verbose:
             print('first key frame is added, no bundle adjustment and landmark')
 
-    def add_keyframe_without_ba(self, keyframe, verbose = False):
+    def add_keyframe_without_ba(self, keyframe, verbose=False):
         """
         add keyframe without bundle adjustment
         :param keyframe:
@@ -41,7 +47,7 @@ class Map:
         assert isinstance(keyframe, KeyFrame)
         self.keyframe_list.append(keyframe)
 
-    def add_keyframe_with_ba(self, keyframe, save_path, verbose = False):
+    def add_keyframe_with_ba(self, keyframe, save_path, verbose=False):
         """
         add one keyframe and do bundle adjustment
         It will take a long time
@@ -50,6 +56,7 @@ class Map:
         :param verbose:
         :return: updated map, please note the original map is updated
         """
+
         # check parameter
         assert isinstance(keyframe, KeyFrame)
         assert len(self.keyframe_list) >= 1
@@ -77,8 +84,13 @@ class Map:
 
         # step 3: bundle adjustment
         feature_method = self.feature_method
+
+        start = time.time()
+
         landmarks, keyframes = bundle_adjustment(images, image_indices, feature_method,
                                                  initial_ptzs, camera_center, base_rotation, u, v, save_path, verbose)
+
+        end = time.time()
 
         # remove the last keyframe as it is not used in bundle adjustment
         self.keyframe_list.pop()
@@ -94,11 +106,14 @@ class Map:
                 print('warning: key frame, %d, image index %d is not included in the map' % (i, image_indices[i]))
 
         if verbose:
-            print('updated map, number of key frame: %d, number of landmark %d', len(self.keyframe_list), len(landmarks))
+            print('updated map, number of key frame: %d, number of landmark %d', len(self.keyframe_list),
+                  len(landmarks))
+
+        print("BA time", end - start)
+
         return landmarks, self.keyframe_list
 
-
-    def good_new_keyframe(self, ptz, threshold1 = 5, threshold2 = 20, im_width = 1280, verbose = False):
+    def good_new_keyframe(self, ptz, threshold1=5, threshold2=20, im_width=1280, verbose=False):
         """
         good or not as a new keyframe, small overlap with all existing keyframes
         :param ptz: array [3] camera pose
@@ -130,6 +145,7 @@ class Map:
         print("overlap", max_overlap)
         return max_overlap > threshold1 and max_overlap < threshold2
 
+
 def ut_add_first_key_frame():
     input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
                             "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images",
@@ -147,6 +163,7 @@ def ut_add_first_key_frame():
 
     a_map = Map()
     a_map.add_first_keyframe(keyframe, True)
+
 
 def ut_good_new_keyframe():
     input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
@@ -177,6 +194,7 @@ def ut_good_new_keyframe():
 
     print('number of keyframe is %d' % (len(a_map.keyframe_list)))
 
+
 def ut_add_keyframe_with_ba():
     input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
                             "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images",
@@ -205,21 +223,10 @@ def ut_add_keyframe_with_ba():
             print('add key frame from index %d, pan angle %f' % (i, ptz[0]))
             a_map.add_keyframe_with_ba(keyframe, '.', True)
 
-
     print('number of keyframe is %d' % (len(a_map.keyframe_list)))
 
 
-
-
-
-
-
 if __name__ == '__main__':
-    #ut_add_first_key_frame()
-    #ut_good_new_keyframe()
+    # ut_add_first_key_frame()
+    # ut_good_new_keyframe()
     ut_add_keyframe_with_ba()
-
-
-
-
-

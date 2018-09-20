@@ -1,3 +1,10 @@
+"""
+Functions to deal with a video sequence
+
+Created by Luke, 2018.9
+
+"""
+
 import numpy as np
 import cv2 as cv
 import scipy.io as sio
@@ -82,6 +89,10 @@ class SequenceManager:
         """
         if len(self.bounding_box) > 0:
             tmp_mask = np.ones([self.height, self.width])
+
+            # this only for soccer
+            # tmp_mask[60:100, 60:490] = 0
+
             for j in range(self.bounding_box[0][index].shape[0]):
                 if self.bounding_box[0][index][j][4] > 0.6:
                     for x in range(int(self.bounding_box[0][index][j][0]),
@@ -105,14 +116,23 @@ def ut_camera_center_and_base_rotation():
 
 
 def vis_keypoints():
-    obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
-                          "./objects_basketball.mat")
+    """
+    This function is used to generate player detection result figure in paper.
+    """
 
-    img = obj.get_image(0)
+    # obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
+    #                       "./objects_basketball.mat")
+
+    obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./seq3_blur/",
+                          "./objects_soccer.mat")
+
+    img = obj.get_image(192, 1)
     img2 = np.copy(img)
 
-    mask = obj.get_bounding_box_mask(0)
-    kp = detect_harris_corner_grid(obj.get_image_gray(0), 4, 4)
+    mask = obj.get_bounding_box_mask(192)
+
+    kp = detect_sift(obj.get_image_gray(192, 1), 400)
+    # kp = detect_harris_corner_grid(obj.get_image_gray(0, 1), 4, 4)
     remove_index = remove_player_feature(kp, mask)
     after_kp = kp[remove_index]
 
@@ -121,29 +141,34 @@ def vis_keypoints():
     for i in range(len(kp)):
         x = int(kp[i][0])
         y = int(kp[i][1])
-        cv.line(img, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length), color=(0, 255, 0),
+        cv.line(img, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length),
+                color=(0, 255, 255),
                 thickness=2)
-        cv.line(img, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length), color=(0, 255, 0),
+        cv.line(img, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length),
+                color=(0, 255, 255),
                 thickness=2)
 
     for i in range(len(after_kp)):
         x = int(after_kp[i][0])
         y = int(after_kp[i][1])
-        cv.line(img2, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length), color=(0, 255, 0),
+        cv.line(img2, (x - chacha_length, y - chacha_length), (x + chacha_length, y + chacha_length),
+                color=(0, 255, 255),
                 thickness=2)
-        cv.line(img2, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length), color=(0, 255, 0),
+        cv.line(img2, (x - chacha_length, y + chacha_length), (x + chacha_length, y - chacha_length),
+                color=(0, 255, 255),
                 thickness=2)
 
-    for j in range(obj.bounding_box[0][0].shape[0]):
-        if obj.bounding_box[0][0][j][4] > 0.6:
-            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][1]),
-                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][1]), color=(255, 255, 255), thickness=5)
-            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][1]),
-                    (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
-            cv.line(img2, (obj.bounding_box[0][0][j][0], obj.bounding_box[0][0][j][3]),
-                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
-            cv.line(img2, (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][1]),
-                    (obj.bounding_box[0][0][j][2], obj.bounding_box[0][0][j][3]), color=(255, 255, 255), thickness=5)
+    boxes = obj.bounding_box[0][192]
+    for j in range(boxes.shape[0]):
+        if boxes[j][4] > 0.6:
+            cv.line(img2, (boxes[j][0], boxes[j][1]),
+                    (boxes[j][2], boxes[j][1]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (boxes[j][0], boxes[j][1]),
+                    (boxes[j][0], boxes[j][3]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (boxes[j][0], boxes[j][3]),
+                    (boxes[j][2], boxes[j][3]), color=(255, 255, 255), thickness=5)
+            cv.line(img2, (boxes[j][2], boxes[j][1]),
+                    (boxes[j][2], boxes[j][3]), color=(255, 255, 255), thickness=5)
 
     cv.imshow("test2", img2)
     cv.imshow("test", img)

@@ -1,14 +1,17 @@
 """
 general image processing functions
+
+Create by Jimmy and Luke, 2018.9
 """
 
 import cv2 as cv
 import numpy as np
 import random
 import math
+import time
 
 
-def detect_sift(im, nfeatures=100):
+def detect_sift(im, nfeatures=50):
     """
     :param gray_img:
     :param nfeatures: 0 for all the available sift features
@@ -25,6 +28,7 @@ def detect_sift(im, nfeatures=100):
         sift_pts[i][1] = kp[i].pt[1]
 
     return sift_pts
+
 
 def detect_orb(im, nfeatures=1000):
     """
@@ -46,7 +50,7 @@ def detect_orb(im, nfeatures=1000):
     return pts
 
 
-def detect_compute_sift(im, nfeatures, verbose = False):
+def detect_compute_sift(im, nfeatures, verbose=False):
     """
     :param im: RGB or gray image
     :param nfeatures:
@@ -54,8 +58,8 @@ def detect_compute_sift(im, nfeatures, verbose = False):
     """
     # pre-processing if input is color image
     assert isinstance(im, np.ndarray)
-    if len(im.shape) == 3 and im.shape[0] == 3:
-        im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
+    # if len(im.shape) == 3 and im.shape[0] == 3:
+    #     im = cv.cvtColor(im, cv.COLOR_BGR2GRAY)
 
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
     key_point, descriptor = sift.detectAndCompute(im, None)
@@ -81,7 +85,7 @@ def detect_compute_orb(im, nfeatures=1000, verbose=False):
     """
 
     assert isinstance(im, np.ndarray)
-    assert nfeatures>0
+    assert nfeatures > 0
 
     orb = cv.ORB_create(nfeatures)
     key_point = orb.detect(im, None)
@@ -96,7 +100,7 @@ def detect_compute_orb(im, nfeatures=1000, verbose=False):
     return key_point, descriptor
 
 
-def detect_compute_latch(im, nfeatures=1000, verbose = False):
+def detect_compute_latch(im, nfeatures=1500, verbose=False):
     """
     :param im: RGB or gray image
     :param nfeatures:
@@ -113,9 +117,6 @@ def detect_compute_latch(im, nfeatures=1000, verbose = False):
     latch = cv.xfeatures2d.LATCH_create(64)
     kp_latch, des_latch = latch.compute(im, kp_orb)
 
-    # latch = cv.xfeatures2d.LATCH_create(nfeatures)
-    # key_point, descriptor = latch.detectAndCompute(im, None)
-
     """LATCH may detect more keypoint than set"""
 
     if nfeatures > 0 and len(kp_latch) > nfeatures:
@@ -126,6 +127,7 @@ def detect_compute_latch(im, nfeatures=1000, verbose = False):
         print('detect: %d LATCH keypoints.' % len(kp_latch))
 
     return kp_latch, des_latch
+
 
 def remove_player_feature(kp, mask):
     """
@@ -146,7 +148,8 @@ def remove_player_feature(kp, mask):
             inner_index = np.append(inner_index, i)
     return inner_index
 
-def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
+
+def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose=False):
     # from https://opencv-python-tutroals.readthedocs.io/en
     # /latest/py_tutorials/py_feature2d/py_feature_homography/py_feature_homography.html
     """
@@ -160,7 +163,7 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
     """
 
     bf = cv.BFMatcher()
-    matches = bf.knnMatch(descriptor1, descriptor2, k=2) # (query_data, train_data)
+    matches = bf.knnMatch(descriptor1, descriptor2, k=2)  # (query_data, train_data)
 
     # step 1: apply ratio test
     good = []
@@ -199,45 +202,8 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose 
 
     return pts1, index1, pts2, index2
 
-def match_orb_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
-    """
-    :param keypiont1: list of keypoints
-    :param descriptor1:
-    :param keypoint2:
-    :param descriptor2:
-    :param verbose:
-    :return: matched 2D points, and matched descriptor index
-    """
-    assert len(keypiont1) >= 4  # assume homography matching
 
-    # step 1: matching by hamming distance
-    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(descriptor1, descriptor2)
-
-
-    # step 2: remove outlier using RANSAC  @todo this code is same (redundant) as in match_sift_features
-    N = len(matches)
-    pts1, pts2 = np.zeros((N, 2)), np.zeros((N, 2))
-    index1 = np.zeros((N), dtype=np.int32)
-    index2 = np.zeros((N), dtype=np.int32)
-    for i in range(N):
-        idx1, idx2 = matches[i].queryIdx, matches[i].trainIdx  # query is from the first image
-        index1[i], index2[i] = idx1, idx2
-        pts1[i] = keypiont1[idx1].pt
-        pts2[i] = keypoint2[idx2].pt
-
-    # inlier index from homography estimation
-    inlier_index = homography_ransac(pts1, pts2, 1.0)
-
-    if verbose == True:
-        print('%d matches passed the homography ransac' % len(inlier_index))
-
-    pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
-    index1 = index1[inlier_index].tolist()
-    index2 = index2[inlier_index].tolist()
-    return pts1, index1, pts2, index2
-
-def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose = False):
+def match_orb_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose=False):
     """
     :param keypiont1: list of keypoints
     :param descriptor1:
@@ -273,6 +239,45 @@ def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose
     index1 = index1[inlier_index].tolist()
     index2 = index2[inlier_index].tolist()
     return pts1, index1, pts2, index2
+
+
+def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose=False):
+    """
+    :param keypiont1: list of keypoints
+    :param descriptor1:
+    :param keypoint2:
+    :param descriptor2:
+    :param verbose:
+    :return: matched 2D points, and matched descriptor index
+    """
+    assert len(keypiont1) >= 4  # assume homography matching
+
+    # step 1: matching by hamming distance
+    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(descriptor1, descriptor2)
+
+    # step 2: remove outlier using RANSAC  @todo this code is same (redundant) as in match_sift_features
+    N = len(matches)
+    pts1, pts2 = np.zeros((N, 2)), np.zeros((N, 2))
+    index1 = np.zeros((N), dtype=np.int32)
+    index2 = np.zeros((N), dtype=np.int32)
+    for i in range(N):
+        idx1, idx2 = matches[i].queryIdx, matches[i].trainIdx  # query is from the first image
+        index1[i], index2[i] = idx1, idx2
+        pts1[i] = keypiont1[idx1].pt
+        pts2[i] = keypoint2[idx2].pt
+
+    # inlier index from homography estimation
+    inlier_index = homography_ransac(pts1, pts2, 1.0)
+
+    if verbose == True:
+        print('%d matches passed the homography ransac' % len(inlier_index))
+
+    pts1, pts2 = pts1[inlier_index, :], pts2[inlier_index, :]
+    index1 = index1[inlier_index].tolist()
+    index2 = index2[inlier_index].tolist()
+    return pts1, index1, pts2, index2
+
 
 def detect_harris_corner_grid(gray_img, row, column):
     """
@@ -339,7 +344,8 @@ def optical_flow_matching(img, next_img, points, ssd_threshold=20):
 
     return matched_index, next_points
 
-def homography_ransac(points1, points2, reprojection_threshold = 0.5):
+
+def homography_ransac(points1, points2, reprojection_threshold=0.5):
     """
     :param points1: N x 2 matched points
     :param points2:
@@ -350,21 +356,23 @@ def homography_ransac(points1, points2, reprojection_threshold = 0.5):
     assert points1.shape[0] >= 4
     ransac_mask = np.ndarray([len(points1)])
     _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
-                                       ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC, mask=ransac_mask)
+                                       ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC,
+                                       mask=ransac_mask)
     inner_kp = np.ndarray([0, 2])
     inner_index = np.ndarray([0])
 
     index = [i for i in range(len(ransac_mask)) if ransac_mask[i] == 1]
     return index
 
+
 def good_homography(h):
     # http://answers.opencv.org/question/2588/check-if-homography-is-good/
     # NOT work
     assert False
-    det = h[0][0] *h[1][1] - h[1][0] * h[0][1]
+    det = h[0][0] * h[1][1] - h[1][0] * h[0][1]
     if det < 0:
         return False
-    N1 = math.sqrt(h[0][0]*h[0][0] + h[1][0] * h[1][0])
+    N1 = math.sqrt(h[0][0] * h[0][0] + h[1][0] * h[1][0])
     if N1 > 4 or N1 < 0.1:
         return False
     N2 = math.sqrt(h[0][1] * h[0][1] + h[1][1] * h[1][1])
@@ -385,7 +393,7 @@ def run_ransac(points1, points2, index):
     """
     ransac_mask = np.ndarray([len(points1)])
     homo, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
-                                        ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
+                                          ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
     # if good_homography(homo) == False:
     #     return [], [], []
     inner_kp = np.ndarray([0, 2])
@@ -398,7 +406,8 @@ def run_ransac(points1, points2, index):
 
     return inner_kp, inner_index, ransac_mask
 
-def build_matching_graph(images, image_match_mask = [], feature_method = 'sift', verbose = False):
+
+def build_matching_graph(images, image_match_mask=[], feature_method='sift', verbose=False):
     """
     build a graph for a list of images
     The graph is 2D hash map using list index as key
@@ -410,7 +419,7 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
     :param verbose:
     :return: keypoints, points,descriptors, src_pt_index, dst_pt_index, landmark_index (global index), landmark_num
     """
-    assert feature_method == 'sift' or feature_method == 'orb'
+    assert feature_method == 'sift' or feature_method == 'orb' or feature_method == 'latch'
     N = len(images)
     if verbose:
         print('build a matching graph from %d images.' % N)
@@ -430,9 +439,11 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
     for im in images:
         kp, des = None, None
         if feature_method == 'sift':
-            kp, des = detect_compute_sift(im, 0, False)
+            kp, des = detect_compute_sift(im, 1500, False)
         elif feature_method == 'orb':
-            kp, des = detect_compute_orb(im, 1500, False)
+            kp, des = detect_compute_orb(im, 6000, False)
+        elif feature_method == 'latch':
+            kp, des = detect_compute_latch(im, 5000, False)
         else:
             assert False
         keypoints.append(kp)
@@ -446,9 +457,9 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
             self.descriptors = des
 
             # local matches
-            self.dest_image_index = [] # destination
-            self.src_kp_index = [] # list of list
-            self.dest_kp_index = []   # list of list
+            self.dest_image_index = []  # destination
+            self.src_kp_index = []  # list of list
+            self.dest_kp_index = []  # list of list
 
     nodes = []  # node in the graph
     for i in range(N):
@@ -460,7 +471,7 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
     max_match_num = 200
     for i in range(N):
         kp1, des1 = keypoints[i], descriptors[i]
-        for j in range(i+1, N):
+        for j in range(i + 1, N):
             # skip un-matched frames
             if (len(image_match_mask) != 0 and image_match_mask[i][j] == 0):
                 continue
@@ -470,6 +481,8 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
                 pts1, index1, pts2, index2 = match_sift_features(kp1, des1, kp2, des2, False)
             elif feature_method == 'orb':
                 pts1, index1, pts2, index2 = match_orb_features(kp1, des1, kp2, des2, False)
+            elif feature_method == 'latch':
+                pts1, index1, pts2, index2 = match_latch_features(kp1, des1, kp2, des2, False)
             else:
                 assert False
 
@@ -514,12 +527,12 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
                     if landmark_index_map[i][idx1] != landmark_index_map[j][idx2]:
                         print("Warning: in-consistent matching result! (%d %d) <--> (%d %d)" % (i, idx1, j, idx2))
                 elif idx1 in landmark_index_map[i] and idx2 not in landmark_index_map[j]:
-                    landmark_index_map[j].update({idx2:landmark_index_map[i][idx1]})
+                    landmark_index_map[j].update({idx2: landmark_index_map[i][idx1]})
                 elif idx1 not in landmark_index_map[i] and idx2 in landmark_index_map[j]:
-                    landmark_index_map[i].update({idx1:landmark_index_map[j][idx2]})
+                    landmark_index_map[i].update({idx1: landmark_index_map[j][idx2]})
                 else:
-                    landmark_index_map[i].update({idx1:g_index})
-                    landmark_index_map[j].update({idx2:g_index})
+                    landmark_index_map[i].update({idx1: g_index})
+                    landmark_index_map[j].update({idx2: g_index})
                     g_index += 1
 
     if verbose:
@@ -552,8 +565,7 @@ def build_matching_graph(images, image_match_mask = [], feature_method = 'sift',
     points = [keypoint_to_matrix(keypoints[i]) for i in range(len(keypoints))]
 
     # step 5: output result to key frames
-    return  keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num
-
+    return keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num
 
 
 def visualize_points(img, points, pt_color, rad):
@@ -584,9 +596,7 @@ def draw_matches(im1, im2, pts1, pts2):
     return vis
 
 
-
-
-def blur_sub_image(im, x, y, w, h, kernal_size = 31):
+def blur_sub_image(im, x, y, w, h, kernal_size=31):
     """
     @blur an image area
     :param im: image
@@ -597,7 +607,7 @@ def blur_sub_image(im, x, y, w, h, kernal_size = 31):
     :param kernal_size: blur kernel size
     :return:
     """
-    im[y:y+h, x:x+w] = cv.blur(im[y:y+h, x:x+w], (kernal_size, kernal_size))
+    im[y:y + h, x:x + w] = cv.blur(im[y:y + h, x:x + w], (kernal_size, kernal_size))
     return im
 
 
@@ -608,19 +618,24 @@ def ut_blur_sub_image():
     cv.waitKey(0)
 
     for i in range(333):
-        im = cv.imread("./seq3/00000" + str(515+i) + ".jpg")
+        im = cv.imread("./seq3/00000" + str(515 + i) + ".jpg")
         im = blur_sub_image(im, 60, 60, 430, 40)
         print(i)
-        cv.imwrite("./seq3_blur/00000" + str(515+i) + ".jpg", im)
-
+        cv.imwrite("./seq3_blur/00000" + str(515 + i) + ".jpg", im)
 
 
 def ut_match_sift_features():
-    im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
-    im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
+    # im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
+    # im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
-    kp1, des1 = detect_compute_sift(im1, 0, True)
-    kp2, des2 = detect_compute_sift(im2, 0, True)
+    im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
+
+    # im1 = cv.imread("./seq3_blur/00000733.jpg")
+    # im2 = cv.imread("./seq3_blur/00000800.jpg")
+
+    kp1, des1 = detect_compute_sift(im1, 200, True)
+    kp2, des2 = detect_compute_sift(im2, 200, True)
 
     print(type(des1[0]))
     print(des1[0].shape)
@@ -630,7 +645,8 @@ def ut_match_sift_features():
     im3 = draw_matches(im1, im2, pt1, pt2)
     cv.imshow('matches', im3)
     cv.waitKey(0)
-    #print('image shape:', im1.shape)
+    # print('image shape:', im1.shape)
+
 
 def ut_build_matching_graph():
     im0 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
@@ -639,24 +655,30 @@ def ut_build_matching_graph():
     im3 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084740.jpg', 1)
     im4 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084800.jpg', 1)
 
-    #cv.imshow('image 0', im0)
-    #cv.imshow('image 4', im4)
-    #cv.waitKey(0)
+    # cv.imshow('image 0', im0)
+    # cv.imshow('image 4', im4)
+    # cv.waitKey(0)
     images = [im0, im1, im2, im3, im4]
-    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(images, [], 'orb', True)
+    keypoints, descriptors, points, src_pt_index, dst_pt_index, landmark_index, landmark_num = build_matching_graph(
+        images, [], 'orb', True)
     print(type(points[0]))
     print(type(descriptors[0]))
+
 
 def ut_orb():
     # im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
     # im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
-    im1 = cv.imread("./basketball/basketball/images/00084000.jpg")
-    im2 = cv.imread("./basketball/basketball/images/00084660.jpg")
-    pts1 = detect_orb(im1, 1000)
-    print(pts1.shape)
+    im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
 
-    kp1, des1 = detect_compute_orb(im1, 1000, True)
-    kp2, des2 = detect_compute_orb(im2, 1000, True)
+    # im1 = cv.imread("./seq3_blur/00000733.jpg")
+    # im2 = cv.imread("./seq3_blur/00000800.jpg")
+
+    # pts1 = detect_orb(im1, 1000)
+    # print(pts1.shape)
+
+    kp1, des1 = detect_compute_orb(im1, 6000, True)
+    kp2, des2 = detect_compute_orb(im2, 6000, True)
 
     pt1, index1, pt2, index2 = match_orb_features(kp1, des1, kp2, des2, True)
     im3 = draw_matches(im1, im2, pt1, pt2)
@@ -678,12 +700,15 @@ def ut_orb():
     cv.waitKey(0)
     """
 
-def ut_latch():
-    im1 = cv.imread("./basketball/basketball/images/00084000.jpg")
-    im2 = cv.imread("./basketball/basketball/images/00084660.jpg")
 
-    kp1, des1 = detect_compute_latch(im1)
-    kp2, des2 = detect_compute_latch(im2)
+def ut_latch():
+    # im1 = cv.imread("./basketball/basketball/images/00084000.jpg")
+    # im2 = cv.imread("./basketball/basketball/images/00084660.jpg")
+    im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
+
+    kp1, des1 = detect_compute_latch(im1, 3000)
+    kp2, des2 = detect_compute_latch(im2, 3000)
 
     pt1, index1, pt2, index2 = match_latch_features(kp1, des1, kp2, des2, True)
     im3 = draw_matches(im1, im2, pt1, pt2)
@@ -707,6 +732,7 @@ def ut_latch():
     # vis = cv.drawKeypoints(im1, kp1, None, color=(0, 255, 0), flags=0)
     # cv.imshow('latch keypoints', vis)
     # cv.waitKey(0)
+
 
 def ut_redundant():
     im = cv.imread('./two_point_calib_dataset/highlights/seq1/0419.jpg', 0)
@@ -738,10 +764,50 @@ def ut_redundant():
     cv.destroyAllWindows()
 
 
-
 if __name__ == "__main__":
-    #ut_match_sift_features()
+    # ut_match_sift_features()
     # ut_build_matching_graph()
-    #ut_blur_sub_image()
+    # ut_blur_sub_image()
     # ut_orb()
-    ut_latch()
+
+    im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
+
+
+
+    start = time.time()
+
+    for i in range(10):
+        # DoG
+        # kp = detect_sift(im1, 50)
+
+        # fast
+        # kp = detect_orb(im1, 50)
+
+
+        # sift
+        # kp1, des1 = detect_compute_sift(im1, 1500, False)
+        # kp2, des2 = detect_compute_sift(im2, 1500, False)
+        #
+        # pt1, index1, pt2, index2 = match_sift_features(kp1, des1, kp2, des2, True)
+
+
+        # orb
+        # kp1, des1 = detect_compute_orb(im1, 6000, False)
+        # kp2, des2 = detect_compute_orb(im2, 6000, False)
+        #
+        # pt1, index1, pt2, index2 = match_orb_features(kp1, des1, kp2, des2, True)
+
+        # latch
+        kp1, des1 = detect_compute_latch(im1, 5000)
+        kp2, des2 = detect_compute_latch(im2, 5000)
+
+        pt1, index1, pt2, index2 = match_latch_features(kp1, des1, kp2, des2, True)
+
+    # ut_latch()
+
+
+    end = time.time()
+    print(end-start)
+
+    # ut_match_sift_features()
