@@ -9,7 +9,7 @@ import numpy as np
 import scipy.io as sio
 import random
 import cv2 as cv
-import statistics
+#import statistics
 import scipy.signal as sig
 import time
 from sklearn.preprocessing import normalize
@@ -27,6 +27,7 @@ from util import *
 
 def add_gauss(points, var):
     """
+    @ move this function to another file? what is the number 1279, 719 for?
     add gauss to points.
     :param points: array [N, 2]
     :param var: variance for Gauss distribution
@@ -95,6 +96,9 @@ class PtzSlam:
 
     def compute_new_jacobi(self, camera_pan, camera_tilt, foc, rays):
         """
+        @this function is very important, please add related math
+        @ the purpose of the function.
+        @ how is the result related to the variables in EKF
         compute jacobi matrix
         :param camera_pan:
         :param camera_tilt:
@@ -149,6 +153,7 @@ class PtzSlam:
             jacobi_h[2 * i + 1][2] = (y_delta_f2 - y_delta_f1) / (2 * delta_f)
 
             for j in range(ray_num):
+                # @todo why it is special when j == i
                 if j == i:
                     jacobi_h[2 * i][3 + 2 * j] = (x_delta_theta2 - x_delta_theta1) / (2 * delta_angle)
                     jacobi_h[2 * i][3 + 2 * j + 1] = (x_delta_phi2 - x_delta_phi1) / (2 * delta_angle)
@@ -163,6 +168,7 @@ class PtzSlam:
 
     def init_system(self, index):
         """
+        @todo: the purpose of the function
         :param index: begin frame index
         :return: [N, 2] array keypoints, [N] array index in global ray
         """
@@ -191,6 +197,7 @@ class PtzSlam:
         self.ray_global = np.row_stack([self.ray_global, init_rays])
 
         """initialize global p using global rays"""
+        #@ not every sure about the 0.001 and 1
         self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
         self.p_global[2][2] = 1
 
@@ -205,6 +212,8 @@ class PtzSlam:
 
     def ekf_update(self, i, matched_kp, next_index):
         """
+        @This function is important. Please add Math and add note for variables
+        @ for example: y_k, dimension, y_k is xxxx in the equation xxx
         :param i: index for frame
         :param matched_kp: matched keypoint in that frame
         :param next_index: matched keypoint index in global ray
@@ -286,6 +295,8 @@ class PtzSlam:
 
     def delete_outliers(self, ransac_mask):
         """
+        @ is it remove outliers in the global ray?
+        @ for example, a ray that is located in the player body?
         delete ransac outliers from global ray
         :param ransac_mask: 0 for ourliers, 1 for inliers
         """
@@ -309,6 +320,11 @@ class PtzSlam:
 
     def add_new_points(self, i):
         """
+        @ is it add new rays (landmarks)?
+        @ there are some names that are similar
+        @ point: generally means 2D image point (or keypoint)
+        @ 3D point:
+        @ landmark: can be 3D point or 2-dimenstional ray
         :param i: frame index
         :return: previous keypoints and indexes
         """
@@ -375,11 +391,14 @@ class PtzSlam:
         # self.camera_pose = self.sequence.get_ptz(first)
         previous_frame_kp, previous_index = self.init_system(first)
 
+
         lost_cnt = 0
         lost_frame_threshold = 3
         matched_percentage = np.zeros([self.sequence_length])
         percentage_threshold = 80
 
+        # @ idealy 'sift' should can be set from a parameter
+        # or we develop a system that uses 'sift' only
         keyframe_map = Map('sift')
         im = self.sequence.get_image(first, 0)
         first_keyframe = KeyFrame(im, first, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
@@ -450,6 +469,7 @@ class PtzSlam:
             4.  add new features & update previous frame
             ===============================
             """
+            # @todo do not understand this part, what is the purpose for this function?
             previous_frame_kp, previous_index = self.add_new_points(i)
 
             """this part is for BA and relocalization"""
@@ -476,6 +496,7 @@ class PtzSlam:
 
     def output_camera_error(self, now_index):
         """
+        @todo move this function to util.py
         output the error of camera pose compared to ground truth
         :param now_index: frame index
         """
@@ -486,6 +507,8 @@ class PtzSlam:
 
     def draw_camera_plot(self):
         """
+        @ modify as move this fuction to visualize.py
+        @ or we need a new file vis_util.py
         draw plot for ground truth and estimated camera pose.
         """
         plt.figure("pan percentage error")
@@ -568,6 +591,7 @@ class PtzSlam:
 
     def save_camera_to_mat(self):
         """
+        @ move this function to util.py
         save ground truth and estimated camera pose into .mat file.
         :return:
         """
@@ -585,6 +609,7 @@ class PtzSlam:
 
     def load_camera_mat(self, path):
         """
+        @ move this function to util.py
         load ground truth and estimated camera pose
         :param path: .mat file path
         """
@@ -605,16 +630,20 @@ if __name__ == "__main__":
     #                "./seq3_blur")
 
     """this for basketball"""
-    slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
+    #slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
+    #               "./objects_basketball.mat",
+    #               "./basketball/basketball/images/")
+
+    slam = PtzSlam("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
                    "./objects_basketball.mat",
-                   "./basketball/basketball/images/")
+                   "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/")
 
     """this for synthesized basketball court"""
     # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
     #                "./objects_basketball.mat",
     #                "./basketball/basketball/synthesize_images/")
 
-    slam.main_algorithm(first=0, step_length=1)
+    slam.main_algorithm(first=0, step_length=5)
 
     slam.draw_camera_plot()
     slam.save_camera_to_mat()

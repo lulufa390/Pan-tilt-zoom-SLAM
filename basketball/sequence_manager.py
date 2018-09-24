@@ -42,6 +42,8 @@ class SequenceManager:
 
     def get_image_gray(self, index, dataset_type=0):
         """
+        @todo what is dataset_type 0, 1, 2 for
+        @ an option is to pre-processing the data to simplify this function
         :param index: image index for sequence
         :return: gray image
         """
