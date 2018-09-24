@@ -17,7 +17,12 @@ from sklearn.preprocessing import normalize
 from math import *
 from mpl_toolkits.mplot3d import Axes3D
 
-
+# @todo this class is actually the projection and back-projection in 3D vision
+# for example: from_3d_to_2d() is projection and from from_2d_to_3d() is back-projection
+# we cane put these function into two classes Camera and PTZCamera
+# Camera: is the general perspective camera
+# PTZCamera: is pan-tilt-zoom camera
+# if we use base_rotation, the general camera becomes pan-tilt-zoom camera
 class TransFunction:
     @staticmethod
     def from_3d_to_2d(u, v, f, p, t, c, base_r, pos):
@@ -114,6 +119,8 @@ class TransFunction:
         camera_pan = radians(c_p)
         camera_tilt = radians(c_t)
 
+        #@todo how to get these equations?
+        #@todo add these equations in the document
         relative_pan = atan((tan(pan) * cos(camera_pan) - sin(camera_pan)) /
                             (tan(pan) * sin(camera_pan) * cos(camera_tilt) +
                              tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) *
@@ -148,6 +155,7 @@ class TransFunction:
         pan = radians(c_p)
         tilt = radians(c_t)
 
+        # @todo what are thse xxx_skim?
         theta_skim = atan((x - u) / f)
         phi_skim = atan((y - v) / (-f * sqrt(1 + pow((x - u) / f, 2))))
 

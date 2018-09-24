@@ -220,6 +220,7 @@ class PtzSlam:
         """
 
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
+        # @todo what is inner_point_index?
         predict_points, inner_point_index = TransFunction.get_observation_from_rays(
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
             self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
@@ -236,7 +237,7 @@ class PtzSlam:
         #                            matched_inner_point_index + len(matched_inner_point_index) + 3])).astype(int)
 
         # print(p_index)
-
+        # what is p_index?
         p_index = np.array([0, 1, 2])
         for j in range(len(matched_inner_point_index)):
             p_index = np.append(p_index, np.array([2 * matched_inner_point_index[j] + 3,
@@ -248,6 +249,7 @@ class PtzSlam:
         p = self.p_global[p_index][:, p_index]
 
         # compute jacobi
+        # is this the H_k in the EKF wikipedia?
         jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0], camera_tilt=self.camera_pose[1],
                                          foc=self.camera_pose[2],
                                          rays=self.ray_global[matched_inner_point_index.astype(int)])
