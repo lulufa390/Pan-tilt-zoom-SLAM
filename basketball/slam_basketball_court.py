@@ -36,8 +36,6 @@ class PtzSlam:
         self.sequence = SequenceManager(annotation_path, image_path, ground_truth_path, bounding_box_path)
         # self.sequence = SequenceManager(annotation_path, image_path, ground_truth_path)
 
-        self.sequence_length = self.sequence.anno_size
-
         """parameters to be updated"""
         self.camera_pose = np.ndarray([3])
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
@@ -47,9 +45,9 @@ class PtzSlam:
         self.p_global = np.zeros([3, 3])
 
         """camera pose sequence"""
-        self.predict_pan = np.zeros([self.sequence_length])
-        self.predict_tilt = np.zeros([self.sequence_length])
-        self.predict_f = np.zeros([self.sequence_length])
+        self.predict_pan = np.zeros([self.sequence.anno_size])
+        self.predict_tilt = np.zeros([self.sequence.anno_size])
+        self.predict_f = np.zeros([self.sequence.anno_size])
 
     def compute_H(self, pan, tilt, focal_length, rays):
         """
@@ -68,38 +66,33 @@ class PtzSlam:
         delta_angle = 0.001
         delta_f = 0.1
 
-        jacobi_h = np.ndarray([2 * ray_num, 3 + 2 * ray_num])
+        jacobi_h = np.zeros([2 * ray_num, 3 + 2 * ray_num])
 
         """use approximate method to compute partial derivative."""
         for i in range(ray_num):
-            x_delta_pan1, y_delta_pan1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan - delta_angle, tilt, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan -delta_angle, tilt, focal_length])
+            x_delta_pan1, y_delta_pan1 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_pan2, y_delta_pan2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan + delta_angle, tilt, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan + delta_angle, tilt, focal_length])
+            x_delta_pan2, y_delta_pan2 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_tilt1, y_delta_tilt1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt - delta_angle, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan, tilt-delta_angle, focal_length])
+            x_delta_tilt1, y_delta_tilt1 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_tilt2, y_delta_tilt2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt + delta_angle, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan, tilt + delta_angle, focal_length])
+            x_delta_tilt2, y_delta_tilt2 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_f1, y_delta_f1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length - delta_f, pan, tilt, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan, tilt, focal_length-delta_f])
+            x_delta_f1, y_delta_f1 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_f2, y_delta_f2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length + delta_f, pan, tilt, rays[i][0], rays[i][1])
+            self.sequence.camera.set_ptz([pan, tilt, focal_length + delta_f])
+            x_delta_f2, y_delta_f2 = self.sequence.camera.project_ray(rays[i])
 
-            x_delta_theta1, y_delta_theta1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0] - delta_angle, rays[i][1])
-
-            x_delta_theta2, y_delta_theta2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0] + delta_angle, rays[i][1])
-
-            x_delta_phi1, y_delta_phi1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0], rays[i][1] - delta_angle)
-            x_delta_phi2, y_delta_phi2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0], rays[i][1] + delta_angle)
+            self.sequence.camera.set_ptz([pan, tilt, focal_length])
+            x_delta_theta1, y_delta_theta1 = self.sequence.camera.project_ray([rays[i,0]-delta_angle, rays[i,1]])
+            x_delta_theta2, y_delta_theta2 = self.sequence.camera.project_ray([rays[i,0]+delta_angle, rays[i,1]])
+            x_delta_phi1, y_delta_phi1 = self.sequence.camera.project_ray([rays[i,0], rays[i,1]-delta_angle])
+            x_delta_phi2, y_delta_phi2 = self.sequence.camera.project_ray([rays[i,0], rays[i,1]+delta_angle])
 
             jacobi_h[2 * i][0] = (x_delta_pan2 - x_delta_pan1) / (2 * delta_angle)
             jacobi_h[2 * i][1] = (x_delta_tilt2 - x_delta_tilt1) / (2 * delta_angle)
@@ -118,9 +111,6 @@ class PtzSlam:
 
                     jacobi_h[2 * i + 1][3 + 2 * j] = (y_delta_theta2 - y_delta_theta1) / (2 * delta_angle)
                     jacobi_h[2 * i + 1][3 + 2 * j + 1] = (y_delta_phi2 - y_delta_phi1) / (2 * delta_angle)
-                else:
-                    jacobi_h[2 * i][3 + 2 * j] = jacobi_h[2 * i][3 + 2 * j + 1] = \
-                        jacobi_h[2 * i + 1][3 + 2 * j] = jacobi_h[2 * i + 1][3 + 2 * j + 1] = 0
 
         return jacobi_h
 
@@ -143,9 +133,8 @@ class PtzSlam:
             remove_player_feature(begin_frame_kp, self.sequence.get_bounding_box_mask(index))]
 
         """use key points in first frame to get init rays"""
-        init_rays = TransFunction.get_rays_from_observation(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], begin_frame_kp, self.sequence.u,
-            self.sequence.v)
+        self.sequence.camera.set_ptz(self.camera_pose)
+        init_rays = self.sequence.camera.back_project_to_rays(begin_frame_kp)
 
         """initialize rays"""
         self.ray_global = np.ndarray([0, 2])
@@ -180,9 +169,14 @@ class PtzSlam:
 
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
         # @todo what is inner_point_index?
-        predict_points, inner_point_index = TransFunction.get_observation_from_rays(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
-            self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
+
+        self.sequence.camera.set_ptz(self.camera_pose)
+
+        predict_points, inner_point_index = self.sequence.camera.project_rays(
+            self.ray_global, self.sequence.height, self.sequence.width)
+        # predict_points, inner_point_index = TransFunction.get_observation_from_rays(
+        #     self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
+        #     self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
 
         # compute y_k
         overlap1, overlap2 = get_overlap_index(next_index, inner_point_index)
@@ -289,9 +283,10 @@ class PtzSlam:
         :param i: frame index
         :return: previous keypoints and indexes
         """
-        points_update, index_update = TransFunction.get_observation_from_rays(
-            self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
-            self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
+        self.sequence.camera.set_ptz(self.camera_pose)
+
+        points_update, index_update = self.sequence.camera.project_rays(
+            self.ray_global, self.sequence.height, self.sequence.width)
 
         img_new = self.sequence.get_image_gray(i, 1)
 
@@ -319,9 +314,9 @@ class PtzSlam:
 
         """if existing new points"""
         if new_frame_kp is not None:
-            new_rays = TransFunction.get_rays_from_observation(
-                self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], new_frame_kp, self.sequence.u,
-                self.sequence.v)
+            self.sequence.camera.set_ptz(self.camera_pose)
+
+            new_rays = self.sequence.camera.back_project_to_rays(new_frame_kp)
             now_point_num = len(self.ray_global)
 
             """add to global ray and covariance matrix"""
@@ -338,6 +333,59 @@ class PtzSlam:
 
         return points_update.astype(np.float32), index_update
 
+    def tracking(self, previous_frame_kp, previous_index, pre_img, next_img, lost_cnt, i):
+        matched_index, ransac_next_kp = optical_flow_matching(pre_img, next_img, previous_frame_kp)
+
+        ransac_index = previous_index[matched_index]
+        ransac_previous_kp = previous_frame_kp[matched_index]
+
+        matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
+
+        """compute inlier percentage as the measurement for tracking quality"""
+        # matched_percentage[i] =
+        if len(next_index) / len(previous_frame_kp) * 100 < 80:
+            lost_cnt += 1
+        else:
+            lost_cnt = 0
+        print("fraction: ", len(next_index) / len(previous_frame_kp))
+
+        """
+        ===============================
+        1. predict step
+        ===============================
+        """
+        """update camera pose with constant speed model"""
+        # self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
+
+        """update p_global"""
+        q_k = 5 * np.diag([0.001, 0.001, 1])
+        self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
+
+        """
+        ===============================
+        2. update step
+        ===============================
+        """
+
+        self.ekf_update(i, matched_kp, next_index)
+
+        """
+        ===============================
+        3. delete outliers
+        ===============================
+        """
+        self.delete_outliers(ransac_mask)
+
+        """
+        ===============================
+        4.  add new features & update previous frame
+        ===============================
+        """
+
+        previous_frame_kp, previous_index = self.add_new_points(i)
+
+        return previous_frame_kp, previous_index, lost_cnt
+
     def main_algorithm(self, first, step_length):
         """
         This is main function for SLAM system.
@@ -346,27 +394,28 @@ class PtzSlam:
         :param step_length: step length between consecutive frames
         """
 
-        self.camera_pose = np.array(
-            [self.sequence.ground_truth_pan[first], self.sequence.ground_truth_tilt[first], self.sequence.ground_truth_f[first]])
+        self.camera_pose = self.sequence.get_ptz(0)
         previous_frame_kp, previous_index = self.init_system(first)
 
         lost_cnt = 0
         lost_frame_threshold = 3
-        matched_percentage = np.zeros([self.sequence_length])
+        matched_percentage = np.zeros([self.sequence.anno_size])
         percentage_threshold = 80
 
         # @ idealy 'sift' should can be set from a parameter
         # or we develop a system that uses 'sift' only
         keyframe_map = Map('sift')
         im = self.sequence.get_image(first, 1)
-        first_keyframe = KeyFrame(im, first, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
-                                  self.sequence.v, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
+        first_keyframe = KeyFrame(im, first, self.sequence.camera.camera_center,
+                                  self.sequence.camera.base_rotation, self.sequence.camera.principal_point[0],
+                                  self.sequence.camera.principal_point[1],
+                                  self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
 
         keyframe_map.add_first_keyframe(first_keyframe)
 
         start = time.time()
 
-        for i in range(first + step_length, self.sequence_length, step_length):
+        for i in range(first + step_length, self.sequence.anno_size, step_length):
 
             print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.ray_global))
 
@@ -378,55 +427,9 @@ class PtzSlam:
             pre_img = self.sequence.get_image_gray(i - step_length, 1)
             next_img = self.sequence.get_image_gray(i, 1)
 
-            matched_index, ransac_next_kp = optical_flow_matching(pre_img, next_img, previous_frame_kp)
 
-            ransac_index = previous_index[matched_index]
-            ransac_previous_kp = previous_frame_kp[matched_index]
-
-            matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
-
-            """compute inlier percentage as the measurement for tracking quality"""
-            matched_percentage[i] = len(next_index) / len(previous_frame_kp) * 100
-            if matched_percentage[i] < 80:
-                lost_cnt += 1
-            else:
-                lost_cnt = 0
-            print("fraction: ", len(next_index) / len(previous_frame_kp))
-
-            """
-            ===============================
-            1. predict step
-            ===============================
-            """
-            """update camera pose with constant speed model"""
-            # self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
-
-            """update p_global"""
-            q_k = 5 * np.diag([0.001, 0.001, 1])
-            self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
-
-            """
-            ===============================
-            2. update step
-            ===============================
-            """
-
-            self.ekf_update(i, matched_kp, next_index)
-
-            """
-            ===============================
-            3. delete outliers
-            ===============================
-            """
-            self.delete_outliers(ransac_mask)
-
-            """
-            ===============================
-            4.  add new features & update previous frame
-            ===============================
-            """
-
-            previous_frame_kp, previous_index = self.add_new_points(i)
+            previous_frame_kp, previous_index, lost_cnt = \
+                self.tracking(previous_frame_kp, previous_index, pre_img, next_img, lost_cnt, i)
 
             """this part is for BA and relocalization"""
             # if matched_percentage[i] > percentage_threshold:
