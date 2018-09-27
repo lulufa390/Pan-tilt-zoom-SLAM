@@ -4,12 +4,11 @@ Main part of our system. Ray landmarks based PTZ SLAM.
 Created by Luke, 2018.9
 """
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import scipy.io as sio
 import random
 import cv2 as cv
-#import statistics
 import scipy.signal as sig
 import time
 from sklearn.preprocessing import normalize
@@ -25,36 +24,8 @@ from key_frame import KeyFrame
 from util import *
 
 
-def add_gauss(points, var):
-    """
-    @ move this function to another file? what is the number 1279, 719 for?
-    add gauss to points.
-    :param points: array [N, 2]
-    :param var: variance for Gauss distribution
-    :return: array [N, 2] with noise
-    """
-    noise_points = np.zeros_like(points)
-    for i in range(len(points)):
-        noise_points[i, 0] = points[i, 0] + random.gauss(0, var)
-        noise_points[i, 1] = points[i, 1] + random.gauss(0, var)
-
-        if noise_points[i, 0] > 1279:
-            noise_points[i, 0] = 1279
-
-        if noise_points[i, 0] < 0:
-            noise_points[i, 0] = 0
-
-        if noise_points[i, 1] > 719:
-            noise_points[i, 1] = 719
-
-        if noise_points[i, 1] < 0:
-            noise_points[i, 1] = 0
-
-    return noise_points
-
-
 class PtzSlam:
-    def __init__(self, annotation_path, bounding_box_path, image_path):
+    def __init__(self, annotation_path, image_path, ground_truth_path, bounding_box_path):
         """
         :param annotation_path: path for annotation file
         :param bounding_box_path: path for player bounding box mat file
@@ -62,11 +33,10 @@ class PtzSlam:
         """
 
         """synthesized court does not need bounding box"""
-        self.sequence = SequenceManager(annotation_path, image_path, bounding_box_path)
-        # self.sequence = SequenceManager(annotation_path, image_path)
+        self.sequence = SequenceManager(annotation_path, image_path, ground_truth_path, bounding_box_path)
+        # self.sequence = SequenceManager(annotation_path, image_path, ground_truth_path)
 
         self.sequence_length = self.sequence.anno_size
-        # self.sequence_length = 333
 
         """parameters to be updated"""
         self.camera_pose = np.ndarray([3])
@@ -76,35 +46,22 @@ class PtzSlam:
         self.ray_global = np.ndarray([0, 2])
         self.p_global = np.zeros([3, 3])
 
-        """set the ground truth camera pose for whole sequence"""
-        self.ground_truth_pan = np.ndarray([self.sequence.anno_size])
-        self.ground_truth_tilt = np.ndarray([self.sequence.anno_size])
-        self.ground_truth_f = np.ndarray([self.sequence.anno_size])
-        for i in range(self.sequence.anno_size):
-            self.ground_truth_pan[i], self.ground_truth_tilt[i], self.ground_truth_f[i] \
-                = self.sequence.get_ptz(i)
-
-        """filter ground truth camera pose. Only for synthesized court"""
-        # self.ground_truth_pan = sig.savgol_filter(self.ground_truth_pan, 181, 1)
-        # self.ground_truth_tilt = sig.savgol_filter(self.ground_truth_tilt, 181, 1)
-        # self.ground_truth_f = sig.savgol_filter(self.ground_truth_f, 181, 1)
-
         """camera pose sequence"""
         self.predict_pan = np.zeros([self.sequence_length])
         self.predict_tilt = np.zeros([self.sequence_length])
         self.predict_f = np.zeros([self.sequence_length])
 
-    def compute_new_jacobi(self, camera_pan, camera_tilt, foc, rays):
+    def compute_H(self, pan, tilt, focal_length, rays):
         """
-        @this function is very important, please add related math
-        @ the purpose of the function.
-        @ how is the result related to the variables in EKF
-        compute jacobi matrix
-        :param camera_pan:
-        :param camera_tilt:
-        :param foc: focal length
-        :param rays: [RayNumber * 2]
-        :return: [2 * RayNumber, 3 + 2 * RayNumber]
+        This function computes the jacobian matrix H for h(x).
+        h(x) is the function from predicted state(camera pose and ray landmarks) to predicted observations.
+        H helps to compute Kalman gain for the EKF
+
+        :param pan: pan angle of predicted camera pose
+        :param tilt: tilt angle of predicted camera pose
+        :param focal_length: focal length of predicted camera pose
+        :param rays: predicted ray landmarks, [RayNumber * 2]
+        :return: Jacobian matrix H, [2 * RayNumber, 3 + 2 * RayNumber]
         """
         ray_num = len(rays)
 
@@ -116,33 +73,33 @@ class PtzSlam:
         """use approximate method to compute partial derivative."""
         for i in range(ray_num):
             x_delta_pan1, y_delta_pan1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan - delta_angle, camera_tilt, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan - delta_angle, tilt, rays[i][0], rays[i][1])
 
             x_delta_pan2, y_delta_pan2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan + delta_angle, camera_tilt, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan + delta_angle, tilt, rays[i][0], rays[i][1])
 
             x_delta_tilt1, y_delta_tilt1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt - delta_angle, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt - delta_angle, rays[i][0], rays[i][1])
 
             x_delta_tilt2, y_delta_tilt2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt + delta_angle, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt + delta_angle, rays[i][0], rays[i][1])
 
             x_delta_f1, y_delta_f1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc - delta_f, camera_pan, camera_tilt, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length - delta_f, pan, tilt, rays[i][0], rays[i][1])
 
             x_delta_f2, y_delta_f2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc + delta_f, camera_pan, camera_tilt, rays[i][0], rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length + delta_f, pan, tilt, rays[i][0], rays[i][1])
 
             x_delta_theta1, y_delta_theta1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt, rays[i][0] - delta_angle, rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0] - delta_angle, rays[i][1])
 
             x_delta_theta2, y_delta_theta2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt, rays[i][0] + delta_angle, rays[i][1])
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0] + delta_angle, rays[i][1])
 
             x_delta_phi1, y_delta_phi1 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt, rays[i][0], rays[i][1] - delta_angle)
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0], rays[i][1] - delta_angle)
             x_delta_phi2, y_delta_phi2 = TransFunction.from_pan_tilt_to_2d(
-                self.sequence.u, self.sequence.v, foc, camera_pan, camera_tilt, rays[i][0], rays[i][1] + delta_angle)
+                self.sequence.u, self.sequence.v, focal_length, pan, tilt, rays[i][0], rays[i][1] + delta_angle)
 
             jacobi_h[2 * i][0] = (x_delta_pan2 - x_delta_pan1) / (2 * delta_angle)
             jacobi_h[2 * i][1] = (x_delta_tilt2 - x_delta_tilt1) / (2 * delta_angle)
@@ -153,7 +110,8 @@ class PtzSlam:
             jacobi_h[2 * i + 1][2] = (y_delta_f2 - y_delta_f1) / (2 * delta_f)
 
             for j in range(ray_num):
-                # @todo why it is special when j == i
+                """only j == i, the element of H is not zero.
+                the partial derivative of one 2D point to a different landmark is always zero."""
                 if j == i:
                     jacobi_h[2 * i][3 + 2 * j] = (x_delta_theta2 - x_delta_theta1) / (2 * delta_angle)
                     jacobi_h[2 * i][3 + 2 * j + 1] = (x_delta_phi2 - x_delta_phi1) / (2 * delta_angle)
@@ -168,18 +126,17 @@ class PtzSlam:
 
     def init_system(self, index):
         """
-        @todo: the purpose of the function
+        This function initializes tracking component.
+        It is called: 1. At the first frame. 2. after relocalization
         :param index: begin frame index
         :return: [N, 2] array keypoints, [N] array index in global ray
         """
 
         """first frame to initialize global_rays"""
-        begin_frame = self.sequence.get_image_gray(index, 0)
+        begin_frame = self.sequence.get_image_gray(index, 1)
 
-        begin_frame_kp = detect_sift(begin_frame, 50)
+        begin_frame_kp = detect_sift(begin_frame, 500)
         # begin_frame_kp = detect_orb(begin_frame, 300)
-
-        # begin_frame_kp = add_gauss(begin_frame_kp)
 
         """remove keypoints on players"""
         begin_frame_kp = begin_frame_kp[
@@ -197,7 +154,7 @@ class PtzSlam:
         self.ray_global = np.row_stack([self.ray_global, init_rays])
 
         """initialize global p using global rays"""
-        #@ not every sure about the 0.001 and 1
+        # @ not every sure about the 0.001 and 1
         self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
         self.p_global[2][2] = 1
 
@@ -212,6 +169,8 @@ class PtzSlam:
 
     def ekf_update(self, i, matched_kp, next_index):
         """
+        This function update global rays and covariance matrix.
+
         @This function is important. Please add Math and add note for variables
         @ for example: y_k, dimension, y_k is xxxx in the equation xxx
         :param i: index for frame
@@ -250,9 +209,9 @@ class PtzSlam:
 
         # compute jacobi
         # is this the H_k in the EKF wikipedia?
-        jacobi = self.compute_new_jacobi(camera_pan=self.camera_pose[0], camera_tilt=self.camera_pose[1],
-                                         foc=self.camera_pose[2],
-                                         rays=self.ray_global[matched_inner_point_index.astype(int)])
+        jacobi = self.compute_H(pan=self.camera_pose[0], tilt=self.camera_pose[1],
+                                focal_length=self.camera_pose[2],
+                                rays=self.ray_global[matched_inner_point_index.astype(int)])
         # get Kalman gain
         r_k = 2 * np.eye(2 * len(matched_inner_point_index))
         s_k = np.dot(np.dot(jacobi, p), jacobi.T) + r_k
@@ -261,23 +220,23 @@ class PtzSlam:
 
         k_mul_y = np.dot(k_k, y_k)
 
-        # output result for updating camera: before
-        print("before update camera:\n")
-        self.output_camera_error(i)
+        ground_truth = np.array(
+            [self.sequence.ground_truth_pan[i], self.sequence.ground_truth_tilt[i], self.sequence.ground_truth_f[i]])
+        pan, tilt, f = self.camera_pose - ground_truth
+        print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
 
         # update camera pose
         self.camera_pose += k_mul_y[0:3]
 
-        self.predict_pan[i], self.predict_tilt[i], self.predict_f[i] = self.camera_pose
+        ground_truth = np.array(
+            [self.sequence.ground_truth_pan[i], self.sequence.ground_truth_tilt[i], self.sequence.ground_truth_f[i]])
+        pan, tilt, f = self.camera_pose - ground_truth
+        print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
 
-        # output result for updating camera: after
-        print("after update camera:\n")
-        self.output_camera_error(i)
+        self.predict_pan[i], self.predict_tilt[i], self.predict_f[i] = self.camera_pose
 
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
-
-        # print("speed", self.delta_pan, self.delta_tilt, self.delta_zoom)
 
         # update global rays
         for j in range(len(matched_inner_point_index)):
@@ -334,7 +293,7 @@ class PtzSlam:
             self.camera_pose[0], self.camera_pose[1], self.camera_pose[2], self.ray_global,
             self.sequence.u, self.sequence.v, self.sequence.height, self.sequence.width)
 
-        img_new = self.sequence.get_image_gray(i, 0)
+        img_new = self.sequence.get_image_gray(i, 1)
 
         """set the mask"""
         mask = np.ones(img_new.shape, np.uint8)
@@ -346,10 +305,9 @@ class PtzSlam:
             right_bound = int(min(self.sequence.width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        all_new_frame_kp = detect_sift(img_new, 50)
+        all_new_frame_kp = detect_sift(img_new, 500)
         # all_new_frame_kp = detect_orb(img_new, 300)
 
-        # all_new_frame_kp = add_gauss(all_new_frame_kp)
         all_new_frame_kp = all_new_frame_kp[
             remove_player_feature(all_new_frame_kp, self.sequence.get_bounding_box_mask(i))]
 
@@ -389,10 +347,8 @@ class PtzSlam:
         """
 
         self.camera_pose = np.array(
-            [self.ground_truth_pan[first], self.ground_truth_tilt[first], self.ground_truth_f[first]])
-        # self.camera_pose = self.sequence.get_ptz(first)
+            [self.sequence.ground_truth_pan[first], self.sequence.ground_truth_tilt[first], self.sequence.ground_truth_f[first]])
         previous_frame_kp, previous_index = self.init_system(first)
-
 
         lost_cnt = 0
         lost_frame_threshold = 3
@@ -402,7 +358,7 @@ class PtzSlam:
         # @ idealy 'sift' should can be set from a parameter
         # or we develop a system that uses 'sift' only
         keyframe_map = Map('sift')
-        im = self.sequence.get_image(first, 0)
+        im = self.sequence.get_image(first, 1)
         first_keyframe = KeyFrame(im, first, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
                                   self.sequence.v, self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
 
@@ -419,8 +375,8 @@ class PtzSlam:
             0. feature matching step
             ===============================
             """
-            pre_img = self.sequence.get_image_gray(i - step_length, 0)
-            next_img = self.sequence.get_image_gray(i, 0)
+            pre_img = self.sequence.get_image_gray(i - step_length, 1)
+            next_img = self.sequence.get_image_gray(i, 1)
 
             matched_index, ransac_next_kp = optical_flow_matching(pre_img, next_img, previous_frame_kp)
 
@@ -428,8 +384,6 @@ class PtzSlam:
             ransac_previous_kp = previous_frame_kp[matched_index]
 
             matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
-
-            # matched_kp = add_gauss(matched_kp)
 
             """compute inlier percentage as the measurement for tracking quality"""
             matched_percentage[i] = len(next_index) / len(previous_frame_kp) * 100
@@ -471,181 +425,51 @@ class PtzSlam:
             4.  add new features & update previous frame
             ===============================
             """
-            # @todo do not understand this part, what is the purpose for this function?
+
             previous_frame_kp, previous_index = self.add_new_points(i)
 
             """this part is for BA and relocalization"""
-
-            if matched_percentage[i] > percentage_threshold:
-                # origin set to (10, 25)
-                if keyframe_map.good_new_keyframe(self.camera_pose, 10, 25):
-                    # if keyframe_map.good_new_keyframe(self.camera_pose, 10, 15):
-                    print("this is keyframe:", i)
-                    new_keyframe = KeyFrame(self.sequence.get_image(i, 0),
-                                            i, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
-                                            self.sequence.v, self.camera_pose[0], self.camera_pose[1],
-                                            self.camera_pose[2])
-                    keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
-
-            elif lost_cnt > lost_frame_threshold:
-                if len(keyframe_map.keyframe_list) > 1:
-                    self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 0),
-                                                             self.camera_pose)
-                    previous_frame_kp, previous_index = self.init_system(i)
-                    lost_cnt = 0
-
-        # print("100 tracking time:", end-start)
-
-    def output_camera_error(self, now_index):
-        """
-        @todo move this function to util.py
-        output the error of camera pose compared to ground truth
-        :param now_index: frame index
-        """
-        ground_truth = np.array(
-            [self.ground_truth_pan[now_index], self.ground_truth_tilt[now_index], self.ground_truth_f[now_index]])
-        pan, tilt, f = self.camera_pose - ground_truth
-        print("%.3f %.3f, %.1f" % (pan, tilt, f), "\n")
-
-    def draw_camera_plot(self):
-        """
-        @ modify as move this fuction to visualize.py
-        @ or we need a new file vis_util.py
-        draw plot for ground truth and estimated camera pose.
-        """
-        plt.figure("pan percentage error")
-        x = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x, (self.predict_pan - self.ground_truth_pan) / self.ground_truth_pan * 100, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("error %")
-        plt.legend(loc="best")
-
-        plt.figure("tilt percentage error")
-        x = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x, (self.predict_tilt - self.ground_truth_tilt) / self.ground_truth_tilt * 100, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("error %")
-        plt.legend(loc="best")
-
-        plt.figure("f percentage error")
-        x = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
-        plt.plot(x, (self.predict_f - self.ground_truth_f) / self.ground_truth_f * 100, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("error %")
-        plt.legend(loc="best")
-
-        """absolute value"""
-        plt.figure("pan")
-        x = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x, self.ground_truth_pan, 'r', label='ground truth')
-        plt.plot(x, self.predict_pan, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("pan angle")
-        plt.legend(loc="best")
-
-        plt.figure("tilt")
-        x = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x, self.ground_truth_tilt, 'r', label='ground truth')
-        plt.plot(x, self.predict_tilt, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("tilt angle")
-        plt.legend(loc="best")
-
-        plt.figure("f")
-        x = np.array([i for i in range(self.sequence_length)])
-        plt.plot(x, self.ground_truth_f, 'r', label='ground truth')
-        plt.plot(x, self.predict_f, 'b', label='predict')
-        plt.xlabel("frame")
-        plt.ylabel("f")
-        plt.legend(loc="best")
-
-        """this part is for soccer specifically
-        because soccer annotations are less than images"""
-        # plt.figure("pan")
-        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        # x2 = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x1, self.ground_truth_pan[:self.sequence_length // 6], 'r', label='ground truth')
-        # plt.plot(x2, self.predict_pan, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("pan angle")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("tilt")
-        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        # x2 = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x1, self.ground_truth_tilt[:self.sequence_length // 6], 'r', label='ground truth')
-        # plt.plot(x2, self.predict_tilt, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("tilt angle")
-        # plt.legend(loc="best")
-        #
-        # plt.figure("f")
-        # x1 = np.array([6 * i for i in range(self.sequence_length // 6)])
-        # x2 = np.array([i for i in range(self.sequence_length)])
-        # plt.plot(x1, self.ground_truth_f[:self.sequence_length // 6], 'r', label='ground truth')
-        # plt.plot(x2, self.predict_f, 'b', label='predict')
-        # plt.xlabel("frame")
-        # plt.ylabel("f")
-        # plt.legend(loc="best")
-
-        plt.show()
-
-    def save_camera_to_mat(self):
-        """
-        @ move this function to util.py
-        save ground truth and estimated camera pose into .mat file.
-        :return:
-        """
-        camera_pose = dict()
-
-        camera_pose['ground_truth_pan'] = self.ground_truth_pan
-        camera_pose['ground_truth_tilt'] = self.ground_truth_tilt
-        camera_pose['ground_truth_f'] = self.ground_truth_f
-
-        camera_pose['predict_pan'] = self.predict_pan
-        camera_pose['predict_tilt'] = self.predict_tilt
-        camera_pose['predict_f'] = self.predict_f
-
-        sio.savemat('camera_pose.mat', mdict=camera_pose)
-
-    def load_camera_mat(self, path):
-        """
-        @ move this function to util.py
-        load ground truth and estimated camera pose
-        :param path: .mat file path
-        """
-        camera_pos = sio.loadmat(path)
-        self.predict_pan = camera_pos['predict_pan'].squeeze()
-        self.predict_tilt = camera_pos['predict_tilt'].squeeze()
-        self.predict_f = camera_pos['predict_f'].squeeze()
-
-        self.ground_truth_pan = camera_pos['ground_truth_pan'].squeeze()
-        self.ground_truth_tilt = camera_pos['ground_truth_tilt'].squeeze()
-        self.ground_truth_f = camera_pos['ground_truth_f'].squeeze()
-
+            # if matched_percentage[i] > percentage_threshold:
+            #     # origin set to (10, 25)
+            #     if keyframe_map.good_new_keyframe(self.camera_pose, 10, 25):
+            #         # if keyframe_map.good_new_keyframe(self.camera_pose, 10, 15):
+            #         print("this is keyframe:", i)
+            #         new_keyframe = KeyFrame(self.sequence.get_image(i, 0),
+            #                                 i, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
+            #                                 self.sequence.v, self.camera_pose[0], self.camera_pose[1],
+            #                                 self.camera_pose[2])
+            #         keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
+            #
+            # elif lost_cnt > lost_frame_threshold:
+            #     if len(keyframe_map.keyframe_list) > 1:
+            #         self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 0),
+            #                                                  self.camera_pose)
+            #         previous_frame_kp, previous_index = self.init_system(i)
+            #         lost_cnt = 0
 
 if __name__ == "__main__":
     """this for soccer"""
-    # slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
-    #                "./objects_soccer.mat",
-    #                "./seq3_blur")
+    slam = PtzSlam("./two_point_calib_dataset/highlights/seq3_anno.mat",
+                   "./seq3_blur",
+                   "./soccer3_ground_truth.mat",
+                   "./objects_soccer.mat")
 
     """this for basketball"""
-    #slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
-    #               "./objects_basketball.mat",
-    #               "./basketball/basketball/images/")
+    # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
+    #                "./basketball/basketball/images/",
+    #                "./basketball_ground_truth.mat",
+    #                "./objects_basketball.mat")
 
-    slam = PtzSlam("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
-                   "./objects_basketball.mat",
-                   "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/")
+    # slam = PtzSlam("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
+    #                "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/",
+    #                "./objects_basketball.mat")
 
     """this for synthesized basketball court"""
     # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
     #                "./objects_basketball.mat",
     #                "./basketball/basketball/synthesize_images/")
 
-    slam.main_algorithm(first=0, step_length=5)
+    slam.main_algorithm(first=0, step_length=1)
 
-    slam.draw_camera_plot()
-    slam.save_camera_to_mat()
+    draw_camera_plot(slam.sequence.ground_truth_pan, slam.sequence.ground_truth_tilt, slam.sequence.ground_truth_f,
+                     slam.predict_pan, slam.predict_tilt, slam.predict_f)
