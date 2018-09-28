@@ -32,34 +32,29 @@ class PtzSlam:
         :param image_path: path for image folder
         """
 
-        """parameters to be updated"""
-        # self.camera_pose = np.ndarray([3])
-        self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
-
-        """global rays and covariance matrix"""
+        # global rays and covariance matrix
         self.ray_global = np.ndarray([0, 2])
         self.p_global = np.zeros([3, 3])
 
-        """camera pose sequence"""
-        # self.predict_pan = []
-        # self.predict_tilt = []
-        # self.predict_f = []
-
-        # save the image, keypoints and keypoints index in ray_global of previous frame
+        # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
         self.previous_frame_kp = None
         self.previous_index = None
 
-        # Map
+        # map
         self.keyframe_map = Map('sift')
 
+        # a camera list for whole sequence.
         self.camera = []
+
+        # speed of camera
+        self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
     def compute_H(self, pan, tilt, focal_length, rays):
         """
         This function computes the jacobian matrix H for h(x).
         h(x) is the function from predicted state(camera pose and ray landmarks) to predicted observations.
-        H helps to compute Kalman gain for the EKF
+        H helps to compute Kalman gain for the EKF.
 
         :param pan: pan angle of predicted camera pose
         :param tilt: tilt angle of predicted camera pose
@@ -130,80 +125,64 @@ class PtzSlam:
         :return: [N, 2] array keypoints, [N] array index in global ray
         """
 
-        """first frame to initialize global_rays"""
-
         first_img_kp = detect_sift(first_img, 500)
         # first_img_kp = detect_orb(first_img, 300)
 
-        """remove keypoints on players"""
+        # remove keypoints on players if bounding box mask is provided
         if first_bounding_box is not None:
             first_img_kp = first_img_kp[
                 remove_player_feature(first_img_kp, first_bounding_box)]
 
-        """use key points in first frame to get init rays"""
+        # use key points in first frame to get init rays
         init_rays = first_camera.back_project_to_rays(first_img_kp)
 
-        """initialize rays"""
+        # initialize rays
         self.ray_global = np.ndarray([0, 2])
-
-        """add rays in frame 1 to global rays"""
         self.ray_global = np.row_stack([self.ray_global, init_rays])
 
-        """initialize global p using global rays"""
-        # @ not every sure about the 0.001 and 1
+        # initialize global p using global rays
         self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
         self.p_global[2][2] = 1
 
-        """q_k: covariance matrix of noise for state(camera pose)"""
-
+        # the previous frame information
         self.previous_img = first_img
         self.previous_frame_kp = first_img_kp
         self.previous_index = np.array([i for i in range(len(self.ray_global))])
 
+        # append the first camera to camera list
         self.camera.append(first_camera)
 
-        # self.predict_pan.append(first_camera.pan)
-        # self.predict_tilt.append(first_camera.tilt)
-        # self.predict_f.append(first_camera.focal_length)
-
-    def ekf_update(self, matched_kp, next_index, height, width):
+    def ekf_update(self, observed_keypoints, observed_keypoint_index, height, width):
         """
         This function update global rays and covariance matrix.
-
         @This function is important. Please add Math and add note for variables
         @ for example: y_k, dimension, y_k is xxxx in the equation xxx
         :param i: index for frame
-        :param matched_kp: matched keypoint in that frame
-        :param next_index: matched keypoint index in global ray
+        :param observed_keypoints: matched keypoint in that frame
+        :param observed_keypoint_index: matched keypoint index in global ray
         """
 
         # get 2d points, rays and indexes in all landmarks with predicted camera pose
-        # @todo what is inner_point_index?
-
-        predict_points, inner_point_index = self.camera[-1].project_rays(
+        predict_keypoints, predict_keypoint_index = self.camera[-1].project_rays(
             self.ray_global, height, width)
 
-
         # compute y_k
-        overlap1, overlap2 = get_overlap_index(next_index, inner_point_index)
-        y_k = matched_kp[overlap1] - predict_points[overlap2]
+        overlap1, overlap2 = get_overlap_index(observed_keypoint_index, predict_keypoint_index)
+        y_k = observed_keypoints[overlap1] - predict_keypoints[overlap2]
         y_k = y_k.flatten()
 
-        matched_inner_point_index = next_index[overlap1]
+        matched_inner_point_index = observed_keypoint_index[overlap1]
 
-        # what is p_index?
+        # p_index is the index of rows(or cols) in p which need to be update (part of p matrix!)
+        # for example, p_index = [0,1,2(pose), 3,4(ray 1), 7,8(ray 3)] means get the first and third ray.
         p_index = np.array([0, 1, 2])
         for j in range(len(matched_inner_point_index)):
             p_index = np.append(p_index, np.array([2 * matched_inner_point_index[j] + 3,
                                                    2 * matched_inner_point_index[j] + 4]))
         p_index = p_index.astype(np.int32)
-
-        # print(p_index)
-
         p = self.p_global[p_index][:, p_index]
 
         # compute jacobi
-        # is this the H_k in the EKF wikipedia?
         jacobi = self.compute_H(pan=self.camera[-1].pan, tilt=self.camera[-1].tilt,
                                 focal_length=self.camera[-1].focal_length,
                                 rays=self.ray_global[matched_inner_point_index.astype(int)])
@@ -223,11 +202,11 @@ class PtzSlam:
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
-        # update global rays
+        # update global rays: overwrite updated ray to ray_global
         for j in range(len(matched_inner_point_index)):
             self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
 
-        # update global p
+        # update global p: overwrite updated p to the p_global
         update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
         self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
         for j in range(len(matched_inner_point_index)):
@@ -242,17 +221,16 @@ class PtzSlam:
     def delete_outliers(self, ransac_mask):
         """
         remove_rays
-        @ is it remove outliers in the global ray?
-        @ for example, a ray that is located in the player body?
         delete ransac outliers from global ray
         The ray is initialized by keypoint detection in the first frame.
         In the next frame, some of the keypoints are corrected matched as inliers,
         others are outliers. The outlier is associated with a ray, that ray will be removed
         Note the ray is different from the ray in the Map().
+
         :param ransac_mask: 0 for ourliers, 1 for inliers
         """
 
-        # delete global ray
+        # delete ray_global
         delete_index = np.ndarray([0])
         for j in range(len(ransac_mask)):
             if ransac_mask[j] == 0:
@@ -260,7 +238,7 @@ class PtzSlam:
 
         self.ray_global = np.delete(self.ray_global, delete_index, axis=0)
 
-        # delete covariance matrix
+        # delete p_global
         p_delete_index = np.ndarray([0])
         for i in range(len(delete_index)):
             p_delete_index = np.append(p_delete_index, np.array([2 * delete_index[i] + 3,
@@ -290,7 +268,6 @@ class PtzSlam:
 
         points_update, index_update = self.camera[-1].project_rays(
             self.ray_global, height, width)
-
 
         """set the mask"""
         mask = np.ones(img_new.shape[0:2], np.uint8)
@@ -356,7 +333,6 @@ class PtzSlam:
         ===============================
         """
         """update camera pose with constant speed model"""
-        # self.camera_pose += [self.delta_pan, self.delta_tilt, self.delta_zoom]
         self.camera.append(self.camera[-1])
 
         """update p_global"""
@@ -389,8 +365,6 @@ class PtzSlam:
 
         self.previous_img = next_img
         self.previous_frame_kp, self.previous_index = self.add_new_points(next_img, height, width, bounding_box)
-
-        # return previous_frame_kp, previous_index
 
     # def main_algorithm(self, first, step_length):
     #     """
@@ -452,28 +426,20 @@ class PtzSlam:
 
 
 if __name__ == "__main__":
+    """this is for soccer"""
     sequence = SequenceManager("./two_point_calib_dataset/highlights/seq3_anno.mat",
                                "./seq3_blur",
                                "./soccer3_ground_truth.mat",
                                "./objects_soccer.mat")
 
-    """this for soccer"""
-    slam = PtzSlam()
-
     """this for basketball"""
-    # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
+    # sequence = SequenceManager("./basketball/basketball/basketball_anno.mat",
     #                "./basketball/basketball/images/",
     #                "./basketball_ground_truth.mat",
     #                "./objects_basketball.mat")
 
-    # slam = PtzSlam("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
-    #                "/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/",
-    #                "./objects_basketball.mat")
+    slam = PtzSlam()
 
-    """this for synthesized basketball court"""
-    # slam = PtzSlam("./basketball/basketball/basketball_anno.mat",
-    #                "./objects_basketball.mat",
-    #                "./basketball/basketball/synthesize_images/")
     first_img = sequence.get_image_gray(index=0, dataset_type=1)
     first_camera = sequence.get_camera(0)
     first_bounding_box = sequence.get_bounding_box_mask(0)
@@ -485,13 +451,8 @@ if __name__ == "__main__":
         bounding_box = sequence.get_bounding_box_mask(i)
         slam.tracking(img, bounding_box)
 
-        print("=====The ", i, " iteration=====" )
+        print("=====The ", i, " iteration=====")
 
         print("%f" % (slam.camera[i].pan - sequence.ground_truth_pan[i]))
         print("%f" % (slam.camera[i].tilt - sequence.ground_truth_tilt[i]))
         print("%f" % (slam.camera[i].focal_length - sequence.ground_truth_f[i]))
-
-    # slam.main_algorithm(first=0, step_length=1)
-    #
-    # draw_camera_plot(slam.sequence.ground_truth_pan, slam.sequence.ground_truth_tilt, slam.sequence.ground_truth_f,
-    #                  slam.predict_pan, slam.predict_tilt, slam.predict_f)
