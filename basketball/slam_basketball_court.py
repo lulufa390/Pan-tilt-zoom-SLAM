@@ -38,7 +38,7 @@ class PtzSlam:
 
         # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
-        self.previous_frame_kp = None
+        self.previous_keypoints = None
         self.previous_index = None
 
         # map
@@ -131,7 +131,7 @@ class PtzSlam:
         # remove keypoints on players if bounding box mask is provided
         if first_bounding_box is not None:
             first_img_kp = first_img_kp[
-                remove_player_feature(first_img_kp, first_bounding_box)]
+                reserved_keypoints_index(first_img_kp, first_bounding_box)]
 
         # use key points in first frame to get init rays
         init_rays = first_camera.back_project_to_rays(first_img_kp)
@@ -146,7 +146,7 @@ class PtzSlam:
 
         # the previous frame information
         self.previous_img = first_img
-        self.previous_frame_kp = first_img_kp
+        self.previous_keypoints = first_img_kp
         self.previous_index = np.array([i for i in range(len(self.ray_global))])
 
         # append the first camera to camera list
@@ -218,7 +218,7 @@ class PtzSlam:
                     3 + 2 * int(matched_inner_point_index[j]) + 1, 3 + 2 * int(matched_inner_point_index[k]) + 1] = \
                     update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
 
-    def delete_outliers(self, ransac_mask):
+    def remove_rays(self, ransac_mask):
         """
         remove_rays
         delete ransac outliers from global ray
@@ -247,85 +247,79 @@ class PtzSlam:
         self.p_global = np.delete(self.p_global, p_delete_index, axis=0)
         self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
 
-    def add_new_points(self, img_new, height, width, bounding_box):
+    def add_rays(self, img_new, bounding_box):
         """
-        add_rays
-        @ is it add new rays (landmarks)?
-        @ there are some names that are similar
-        @ point: generally means 2D image point (or keypoint)
-        @ 3D point:
-        @ landmark: can be 3D point or 2-dimenstional ray
-
-
         Detect new keypoints in the current frame and add associated rays.
         In each frame, a number of keypoints are detected. These keypoints will
         be associated with new rays (given the camera pose). These new rays are
         added to the global ray to maintain the number of visible rays in the image.
         Otherwise, the number of rays will drop.
-        :param i: frame index
-        :return: previous keypoints and indexes
+        :param img_new: current image
+
+        :param bounding_box:
+        :return:
         """
 
-        points_update, index_update = self.camera[-1].project_rays(
+        # get height width of image
+        height, width = img_new.shape[0:2]
+
+        # project global_ray to image. Get existing keypoints
+        keypoints, keypoints_index = self.camera[-1].project_rays(
             self.ray_global, height, width)
 
-        """set the mask"""
+        # mask to remove keypoints near existing keypoints.
         mask = np.ones(img_new.shape[0:2], np.uint8)
-        for j in range(len(points_update)):
-            x, y = points_update[j]
+
+        for j in range(len(keypoints)):
+            x, y = keypoints[j]
             up_bound = int(max(0, y - 50))
             low_bound = int(min(height, y + 50))
             left_bound = int(max(0, x - 50))
             right_bound = int(min(width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        all_new_frame_kp = detect_sift(img_new, 500)
-        # all_new_frame_kp = detect_orb(img_new, 300)
+        new_keypoints = detect_sift(img_new, 500)
+        # new_keypoints = detect_orb(img_new, 300)
 
+        # remove keypoints in player bounding boxes
         if bounding_box is not None:
-            all_new_frame_kp = all_new_frame_kp[
-                remove_player_feature(all_new_frame_kp, bounding_box)]
+            new_keypoints = new_keypoints[reserved_keypoints_index(new_keypoints, bounding_box)]
 
-        new_frame_kp = np.ndarray([0, 2])
-        """use mask to remove feature points near existing points"""
-        for j in range(len(all_new_frame_kp)):
-            if mask[int(all_new_frame_kp[j, 1]), int(all_new_frame_kp[j, 0])] == 1:
-                new_frame_kp = np.concatenate([new_frame_kp, (all_new_frame_kp[j]).reshape([1, 2])], axis=0)
+        # remove keypoints near existing keypoints
+        new_keypoints = new_keypoints[reserved_keypoints_index(new_keypoints, mask)]
 
         """if existing new points"""
-        if new_frame_kp is not None:
-            new_rays = self.camera[-1].back_project_to_rays(new_frame_kp)
-            now_point_num = len(self.ray_global)
+        if new_keypoints is not None:
+            new_rays = self.camera[-1].back_project_to_rays(new_keypoints)
 
-            """add to global ray and covariance matrix"""
+            # add new ray to ray_global, and add new rows and cols to p_global
             for j in range(len(new_rays)):
                 self.ray_global = np.row_stack([self.ray_global, new_rays[j]])
                 self.p_global = np.row_stack([self.p_global, np.zeros([2, self.p_global.shape[1]])])
                 self.p_global = np.column_stack([self.p_global, np.zeros([self.p_global.shape[0], 2])])
                 self.p_global[self.p_global.shape[0] - 2, self.p_global.shape[1] - 2] = 0.01
                 self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
+                keypoints_index = np.append(keypoints_index, len(self.ray_global) - 1)
 
-                index_update = np.concatenate([index_update, [now_point_num + j]], axis=0)
+            keypoints = np.concatenate([keypoints, new_keypoints], axis=0)
 
-            points_update = np.concatenate([points_update, new_frame_kp], axis=0)
-
-        return points_update.astype(np.float32), index_update
+        return keypoints, keypoints_index
 
     def tracking(self, next_img, bounding_box=None):
 
-        matched_index, ransac_next_kp = optical_flow_matching(self.previous_img, next_img, self.previous_frame_kp)
+        matched_index, ransac_next_kp = optical_flow_matching(self.previous_img, next_img, self.previous_keypoints)
 
         ransac_index = self.previous_index[matched_index]
-        ransac_previous_kp = self.previous_frame_kp[matched_index]
+        ransac_previous_kp = self.previous_keypoints[matched_index]
 
         matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
 
         """compute inlier percentage as the measurement for tracking quality"""
-        # if len(next_index) / len(previous_frame_kp) * 100 < 80:
+        # if len(next_index) / len(previous_keypoints) * 100 < 80:
         #     lost_cnt += 1
         # else:
         #     lost_cnt = 0
-        # print("fraction: ", len(next_index) / len(previous_frame_kp))
+        # print("fraction: ", len(next_index) / len(previous_keypoints))
 
         """
         ===============================
@@ -355,7 +349,7 @@ class PtzSlam:
         3. delete outliers
         ===============================
         """
-        self.delete_outliers(ransac_mask)
+        self.remove_rays(ransac_mask)
 
         """
         ===============================
@@ -364,7 +358,7 @@ class PtzSlam:
         """
 
         self.previous_img = next_img
-        self.previous_frame_kp, self.previous_index = self.add_new_points(next_img, height, width, bounding_box)
+        self.previous_keypoints, self.previous_index = self.add_rays(next_img, bounding_box)
 
     # def main_algorithm(self, first, step_length):
     #     """
@@ -402,8 +396,8 @@ class PtzSlam:
     #         pre_img = self.sequence.get_image_gray(i - step_length, 1)
     #         next_img = self.sequence.get_image_gray(i, 1)
     #
-    #         previous_frame_kp, previous_index, lost_cnt = \
-    #             self.tracking(previous_frame_kp, previous_index, pre_img, next_img, lost_cnt, i)
+    #         previous_keypoints, previous_index, lost_cnt = \
+    #             self.tracking(previous_keypoints, previous_index, pre_img, next_img, lost_cnt, i)
     #
     #         """this part is for BA and relocalization"""
     #         # if matched_percentage[i] > percentage_threshold:
@@ -421,7 +415,7 @@ class PtzSlam:
     #         #     if len(keyframe_map.keyframe_list) > 1:
     #         #         self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 0),
     #         #                                                  self.camera_pose)
-    #         #         previous_frame_kp, previous_index = self.init_system(i)
+    #         #         previous_keypoints, previous_index = self.init_system(i)
     #         #         lost_cnt = 0
 
 
