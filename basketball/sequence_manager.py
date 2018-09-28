@@ -8,8 +8,11 @@ Created by Luke, 2018.9
 import numpy as np
 import cv2 as cv
 import scipy.io as sio
+import copy
 from util import *
 from image_process import *
+from ptz_camera import PTZCamera
+from transformation import TransFunction
 
 
 class SequenceManager:
@@ -26,23 +29,27 @@ class SequenceManager:
         cv.Rodrigues(meta[0][0]["base_rotation"][0], self.base_rotation)
         self.c = meta[0][0]["cc"][0]
 
+        self.camera = PTZCamera((self.u, self.v), self.c, self.base_rotation)
+
+        # image folder path
         self.image_path = image_path
 
+        # ground truth
         self.ground_truth_pan, self.ground_truth_tilt, self.ground_truth_f = load_camera_pose(ground_truth_path)
+        self.length = len(self.ground_truth_pan)
 
-        self.anno_size = len(self.ground_truth_pan)
-
+        # bounding boxes
         self.bounding_box = []
         if bounding_box_path:
             self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
 
-    def get_camera_center(self):
-        # interface for camera center
-        return self.c
-
-    def get_base_rotation(self):
-        # interface for camera base rotation
-        return self.base_rotation
+    # def get_camera_center(self):
+    #     # interface for camera center
+    #     return self.c
+    #
+    # def get_base_rotation(self):
+    #     # interface for camera base rotation
+    #     return self.base_rotation
 
     def get_image_gray(self, index, dataset_type=0):
         """
@@ -111,6 +118,11 @@ class SequenceManager:
     def get_ptz(self, index):
         return self.ground_truth_pan[index], self.ground_truth_tilt[index], self.ground_truth_f[index]
 
+    def get_camera(self, index):
+        camera = copy.deepcopy(self.camera)
+        camera.set_ptz(self.get_ptz(index))
+        return camera
+
 
 def ut_camera_center_and_base_rotation():
     input = SequenceManager("/Users/jimmy/Desktop/ptz_slam_dataset/basketball/basketball_anno.mat",
@@ -129,7 +141,7 @@ def vis_keypoints():
     # obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
     #                       "./objects_basketball.mat")
 
-    obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./seq3_blur/",
+    obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./seq3_blur/", "./soccer3_ground_truth.mat",
                           "./objects_soccer.mat")
 
     img = obj.get_image(192, 1)
@@ -185,18 +197,9 @@ def vis_keypoints():
     cv.waitKey(0)
 
 
-
-if __name__ == '__main__':
-    # ut_camera_center_and_base_rotation()
-
-    vis_keypoints()
-
-    # obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
-    #                       "./objects_basketball.mat")
-
-    obj = SequenceManager("./two_point_calib_dataset/highlights/seq3_anno.mat","./seq3_blur",
-                   "./objects_soccer.mat")
-
+def generate_ground_truth():
+    obj = SequenceManager("./two_point_calib_dataset/highlights/seq3_anno.mat", "./seq3_blur",
+                          "./objects_soccer.mat")
 
     pan = np.ndarray([1000])
     tilt = np.ndarray([1000])
@@ -210,12 +213,11 @@ if __name__ == '__main__':
         delta_tilt = (now_tilt - pre_tilt) / 6
         delta_f = (now_f - pre_f) / 6
 
-        pan[(i-1)*6], tilt[(i-1)*6], f[(i-1)*6] = pre_pan, pre_tilt, pre_f
-        pan[(i - 1) * 6 + 1], tilt[(i - 1) * 6 + 1], f[(i - 1) * 6 + 1] = pre_pan + delta_pan, pre_tilt + delta_tilt, pre_f + delta_f
+        pan[(i - 1) * 6], tilt[(i - 1) * 6], f[(i - 1) * 6] = pre_pan, pre_tilt, pre_f
+        pan[(i - 1) * 6 + 1], tilt[(i - 1) * 6 + 1], f[
+            (i - 1) * 6 + 1] = pre_pan + delta_pan, pre_tilt + delta_tilt, pre_f + delta_f
         pan[(i - 1) * 6 + 2], tilt[(i - 1) * 6 + 2], f[
-            (i - 1) * 6 + 2] = pre_pan + 2*delta_pan, pre_tilt + 2*delta_tilt, pre_f + 2*delta_f
-
-
+            (i - 1) * 6 + 2] = pre_pan + 2 * delta_pan, pre_tilt + 2 * delta_tilt, pre_f + 2 * delta_f
 
         pan[(i - 1) * 6 + 3], tilt[(i - 1) * 6 + 3], f[
             (i - 1) * 6 + 3] = pre_pan + 3 * delta_pan, pre_tilt + 3 * delta_tilt, pre_f + 3 * delta_f
@@ -224,11 +226,30 @@ if __name__ == '__main__':
         pan[(i - 1) * 6 + 5], tilt[(i - 1) * 6 + 5], f[
             (i - 1) * 6 + 5] = pre_pan + 5 * delta_pan, pre_tilt + 5 * delta_tilt, pre_f + 5 * delta_f
 
-
         pre_pan, pre_tilt, pre_f = now_pan, now_tilt, now_f
         print(i)
 
     save_camera_pose(pan[0:330], tilt[0:330], f[0:330], ".", "soccer3_ground_truth.mat")
 
-    # cv.imshow("test", obj.get_bounding_box_mask(100))
-    # cv.waitKey(0)
+
+def ut_ptz_camera():
+    obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
+                          "./basketball_ground_truth.mat", "./objects_basketball.mat")
+
+    print(obj.camera.project_3Dpoint([0, 0, 0]))
+
+    print(TransFunction.from_3d_to_2d(obj.camera.principal_point[0], obj.camera.principal_point[1],
+                                      obj.camera.focal_length, obj.camera.pan, obj.camera.tilt,
+                                      obj.camera.camera_center, obj.camera.base_rotation, [0, 0, 0]))
+
+    print(obj.camera.project_ray([5, 1]))
+
+    print(TransFunction.from_pan_tilt_to_2d(obj.camera.principal_point[0], obj.camera.principal_point[1],
+                                            obj.camera.focal_length, obj.camera.pan, obj.camera.tilt, 5, 1))
+
+    print(obj.camera.back_project_to_3D_point(-1726.9998, 1295.25688))
+
+
+if __name__ == '__main__':
+    ut_ptz_camera()
+    pass
