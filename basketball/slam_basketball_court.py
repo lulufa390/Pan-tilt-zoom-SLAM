@@ -33,8 +33,8 @@ class PtzSlam:
         """
 
         # global rays and covariance matrix
-        self.ray_global = np.ndarray([0, 2])
-        self.p_global = np.zeros([3, 3])
+        self.ray_global = np.ndarray([0, 2])  # rename as rays
+        self.p_global = np.zeros([3, 3])      # rename as cov for covariance matrix
 
         # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
@@ -217,6 +217,86 @@ class PtzSlam:
                 self.p_global[
                     3 + 2 * int(matched_inner_point_index[j]) + 1, 3 + 2 * int(matched_inner_point_index[k]) + 1] = \
                     update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
+
+    def ekf_update_new_version(self, observed_keypoints, observed_keypoint_index, height, width):
+        """
+        This function update global rays and covariance matrix.
+        @This function is important. Please add Math and add note for variables
+        @ for example: y_k, dimension, y_k is xxxx in the equation xxx
+        :param observed_keypoints: matched keypoint in that frame
+        :param observed_keypoint_index: matched keypoint index in global ray
+        :param height: image height
+        :param width: image width
+        """
+
+        # step 1: get 2d points and indexes in all landmarks with predicted camera pose
+        predicted_camera = self.camera[-1]
+        predict_keypoints, predict_keypoint_index = predicted_camera.project_rays(
+            self.ray_global, height, width)
+
+        # step 2: an intersection of observed keypoints and predicted keypoints
+        # compute y_k: residual
+        overlap1, overlap2 = get_overlap_index(observed_keypoint_index, predict_keypoint_index)
+        y_k = observed_keypoints[overlap1] - predict_keypoints[overlap2]
+        y_k = y_k.flatten() # to one dimension
+
+        # index of inlier (frame-to-frame marching) rays that from previous frame to current frame
+        matched_ray_index = observed_keypoint_index[overlap1]
+
+        # p_index is the index of rows(or cols) in p which need to be update (part of p matrix!)
+        # for example, p_index = [0,1,2(pose), 3,4(ray 1), 7,8(ray 3)] means get the first and third ray.
+        # step 3: extract camera pose index, and ray index in the covariance matrix
+        num_ray = len(matched_ray_index)
+        pose_index = np.array([0, 1, 2])
+        ray_index = np.zeros(num_ray*2)
+        for j in range(num_ray):
+            ray_index[2*j+0], ray_index[2*j+1] = 2 * matched_ray_index[j] + 3 + 0, 2 * matched_ray_index[j] + 3 + 1
+        pose_ray_index = np.concatenate((pose_index, ray_index), axis=0)
+        pose_ray_index = pose_ray_index.astype(np.int32)
+        predicted_cov = self.p_global[pose_ray_index][:, pose_ray_index] #@todo, :, operator, P_k_{k-1}
+        assert predicted_cov.shape[0] == pose_ray_index.shape[0] and predicted_cov.shape[1] == pose_ray_index.shape[0]
+
+        # compute jacobi
+        updated_ray = self.ray_global[matched_ray_index.astype(int)]
+        jacobi = self.compute_H(pan=predicted_camera.pan,
+                                tilt=predicted_camera.tilt,
+                                focal_length=predicted_camera.focal_length,
+                                rays=updated_ray)
+        # get Kalman gain
+        r_k = 2 * np.eye(2 * num_ray)  #todo 2 is a constant value
+        s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
+
+        k_k = np.dot(np.dot(predicted_cov, jacobi.T), np.linalg.inv(s_k))
+
+        # updated state estimate. The difference between the predicted states and the final states
+        k_mul_y = np.dot(k_k, y_k)
+
+        # update camera pose
+        cur_camera = predicted_camera
+        cur_camera.pan += k_mul_y[0]
+        cur_camera.tilt += k_mul_y[1]
+        cur_camera.focal_length += k_mul_y[2]
+
+        self.camera[-1] = cur_camera
+
+        # update speed model
+        self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
+
+        # update global rays: overwrite updated ray to ray_global
+        for j in range(num_ray):
+            self.ray_global[int(matched_ray_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 3 +2]
+
+        # update global p: overwrite updated p to the p_global
+        update_p = np.dot(np.eye(3 + 2 * num_ray) - np.dot(k_k, jacobi), updated_cov)
+        self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
+        for j in range(num_ray):
+            row1 = 3 + 2 * int(matched_ray_index[j])
+            row2 = row1 + 1
+            for k in range(num_ray):
+                col1 = 3 + 2 * int(matched_ray_index[k])
+                col2 = col1 + 1
+                self.p_global[row1, col1] = update_p[3 + 2 * j, 3 + 2 * k]
+                self.p_global[row2, col2] = update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
 
     def remove_rays(self, ransac_mask):
         """
