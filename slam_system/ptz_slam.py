@@ -4,13 +4,11 @@ Main part of our system. Ray landmarks based PTZ SLAM.
 Created by Luke, 2018.9
 """
 
-import numpy as np
 import copy
 from image_process import *
 from sequence_manager import SequenceManager
 from scene_map import Map
 from util import *
-
 
 class PtzSlam:
     def __init__(self):
@@ -118,7 +116,7 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 500)
+        first_img_kp = detect_sift(img, 100)
         # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
@@ -289,7 +287,7 @@ class PtzSlam:
             right_bound = int(min(width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        new_keypoints = detect_sift(img_new, 500)
+        new_keypoints = detect_sift(img_new, 100)
         # new_keypoints = detect_orb(img_new, 300)
 
         # remove keypoints in player bounding boxes
