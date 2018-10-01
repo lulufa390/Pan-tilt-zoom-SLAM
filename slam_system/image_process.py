@@ -398,13 +398,16 @@ def run_ransac(points1, points2, index):
     #     return [], [], []
     inner_kp = np.ndarray([0, 2])
     inner_index = np.ndarray([0])
+    outlier_index = np.ndarray([0])
 
     for j in range(len(points1)):
         if ransac_mask[j] == 1:
             inner_kp = np.row_stack([inner_kp, points2[j]])
             inner_index = np.append(inner_index, index[j])
+        else:
+            outlier_index = np.append(outlier_index, index[j])
 
-    return inner_kp, inner_index, ransac_mask
+    return inner_kp, inner_index, outlier_index
 
 
 def build_matching_graph(images, image_match_mask=[], feature_method='sift', verbose=False):

@@ -5,22 +5,10 @@ Created by Luke, 2018.9
 """
 
 import numpy as np
-import scipy.io as sio
-import random
-import cv2 as cv
-import scipy.signal as sig
-import time
 import copy
-from sklearn.preprocessing import normalize
-from math import *
-from transformation import TransFunction
-from scipy.optimize import least_squares
 from image_process import *
 from sequence_manager import SequenceManager
-from relocalization import relocalization_camera
 from scene_map import Map
-from bundle_adjustment import bundle_adjustment
-from key_frame import KeyFrame
 from util import *
 
 
@@ -53,7 +41,7 @@ class PtzSlam:
         self.velocity = np.zeros((3, 1))
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
-    def compute_H(self, pan, tilt, focal_length, rays):
+    def compute_h_jacobian(self, pan, tilt, focal_length, rays):
         """
         This function computes the jacobian matrix H for h(x).
         h(x) is the function from predicted state(camera pose and ray landmarks) to predicted observations.
@@ -120,9 +108,9 @@ class PtzSlam:
 
         return jacobi_h
 
-    def init_system(self, first_img, first_camera, first_bounding_box=None):
+    def init_system(self, img, camera, bounding_box=None):
         """
-        @todo many 'first' like first_img, first_camera is redundant
+        @todo many 'first' like img, camera is redundant
         just use, image, camera
         This function initializes tracking component.
         It is called: 1. At the first frame. 2. after relocalization
@@ -131,18 +119,18 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(first_img, 500)
-        # first_img_kp = detect_orb(first_img, 300)
+        first_img_kp = detect_sift(img, 500)
+        # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
         # @bug global name 'reserved_keypoints_index' is not defined
-        if first_bounding_box is not None:
+        if bounding_box is not None:
             first_img_kp = first_img_kp[
-                reserved_keypoints_index(first_img_kp, first_bounding_box)]
+                reserved_keypoints_index(first_img_kp, bounding_box)]
 
         # step 2: back-project keypoint locations to rays by a known camera pose
         # use key points in first frame to get init rays
-        init_rays = first_camera.back_project_to_rays(first_img_kp)
+        init_rays = camera.back_project_to_rays(first_img_kp)
 
         # initialize rays
         self.rays = np.ndarray([0, 2])
@@ -155,12 +143,12 @@ class PtzSlam:
         self.state_cov[2][2] = 1  # covariance for focal length
 
         # the previous frame information
-        self.previous_img = first_img
+        self.previous_img = img
         self.previous_keypoints = first_img_kp
         self.previous_index = np.array([i for i in range(len(self.rays))])
 
         # append the first camera to camera list
-        self.cameras.append(first_camera)
+        self.cameras.append(camera)
 
     def ekf_update(self, observed_keypoints, observed_keypoint_index, height, width):
         """
@@ -203,7 +191,7 @@ class PtzSlam:
 
         # compute jacobi
         updated_ray = self.rays[matched_ray_index.astype(int)]
-        jacobi = self.compute_H(pan=predicted_camera.pan,
+        jacobi = self.compute_h_jacobian(pan=predicted_camera.pan,
                                 tilt=predicted_camera.tilt,
                                 focal_length=predicted_camera.focal_length,
                                 rays=updated_ray)
@@ -337,7 +325,14 @@ class PtzSlam:
         ransac_index = self.previous_index[matched_index]
         ransac_previous_kp = self.previous_keypoints[matched_index]
 
-        matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
+        inlier_index = homography_ransac(ransac_previous_kp, ransac_next_kp, reprojection_threshold=0.5)
+
+        matched_kp = ransac_next_kp[inlier_index]
+        next_index = ransac_index[inlier_index]
+
+        outliers = np.delete(ransac_index, inlier_index, axis=0)
+
+        # matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
 
         """compute inlier percentage as the measurement for tracking quality"""
         # if len(next_index) / len(previous_keypoints) * 100 < 80:
@@ -376,7 +371,7 @@ class PtzSlam:
         ===============================
         """
         # @todo bug? as ransac_mask is a local index but rays are global?
-        self.remove_rays(ransac_mask)
+        self.remove_rays(outliers)
 
         """
         ===============================

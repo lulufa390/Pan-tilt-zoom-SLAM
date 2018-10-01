@@ -8,14 +8,7 @@ Create by Luke, 2018.9
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as sio
-import random
-import cv2 as cv
-import statistics
-import scipy.signal as sig
-from sklearn.preprocessing import normalize
-from math import *
 from transformation import TransFunction
-from scipy.optimize import least_squares
 from image_process import *
 from sequence_manager import SequenceManager
 from image_generator import ImageGenerator

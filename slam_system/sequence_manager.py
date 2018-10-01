@@ -24,12 +24,12 @@ class SequenceManager:
         seq = sio.loadmat(annotation_path)
         annotation = seq["annotation"]
         meta = seq['meta']
-        self.u, self.v = annotation[0][0]['camera'][0][0:2]
-        self.base_rotation = np.zeros([3, 3])
-        cv.Rodrigues(meta[0][0]["base_rotation"][0], self.base_rotation)
-        self.c = meta[0][0]["cc"][0]
+        u, v = annotation[0][0]['camera'][0][0:2]
+        base_rotation = np.zeros([3, 3])
+        cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
+        c = meta[0][0]["cc"][0]
 
-        self.camera = PTZCamera((self.u, self.v), self.c, self.base_rotation)
+        self.camera = PTZCamera((u, v), c, base_rotation)
 
         # image folder path
         self.image_path = image_path
@@ -42,14 +42,6 @@ class SequenceManager:
         self.bounding_box = []
         if bounding_box_path:
             self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
-
-    # def get_camera_center(self):
-    #     # interface for camera center
-    #     return self.c
-    #
-    # def get_base_rotation(self):
-    #     # interface for camera base rotation
-    #     return self.base_rotation
 
     def get_image_gray(self, index, dataset_type=0):
         """
