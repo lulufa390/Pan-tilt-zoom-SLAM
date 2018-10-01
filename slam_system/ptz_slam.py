@@ -33,22 +33,20 @@ class PtzSlam:
         """
 
         # global rays and covariance matrix
-        self.rays = np.ndarray([0, 2])  # @todo  rename as rays
-        self.state_cov = np.zeros([3, 3])      # @todo rename as state_cov for state covariance matrix
+        self.rays = np.ndarray([0, 2])
+        self.state_cov = np.zeros([3, 3])
 
         # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
         self.previous_keypoints = None
-        self.previous_ray_index = None  #@todo rename it to make it clear
+        self.previous_ray_index = None  # @todo rename it to make it clear
 
-        # @todo add previous_camera
-        self.prev_camera = None   # do not use camera[-1], or use it as fewer as possible. as it is not clear
+        self.current_camera = None  # do not use cameras[-1], or use it as fewer as possible. as it is not clear
 
         # map
         self.keyframe_map = Map('sift')
 
         # a camera list for whole sequence.
-        # @todo rename its as cameras, it is only used to store the result
         self.cameras = []
 
         # speed of camera, for pan, tilt and focal length
@@ -74,7 +72,7 @@ class PtzSlam:
 
         jacobi_h = np.zeros([2 * ray_num, 3 + 2 * ray_num])
 
-        camera = copy.deepcopy(self.camera[0])
+        camera = copy.deepcopy(self.cameras[0])
 
         """use approximate method to compute partial derivative."""
         for i in range(ray_num):
@@ -147,22 +145,22 @@ class PtzSlam:
         init_rays = first_camera.back_project_to_rays(first_img_kp)
 
         # initialize rays
-        self.ray_global = np.ndarray([0, 2])
-        self.ray_global = np.row_stack([self.ray_global, init_rays])
+        self.rays = np.ndarray([0, 2])
+        self.rays = np.row_stack([self.rays, init_rays])
 
         # step 3: initialize convariance matrix of states
         # some parameters are manually selected
         # @todo, note 0.001 and 1 are two parameters
-        self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
-        self.p_global[2][2] = 1  # covariance for focal length
+        self.state_cov = 0.001 * np.eye(3 + 2 * len(self.rays))
+        self.state_cov[2][2] = 1  # covariance for focal length
 
         # the previous frame information
         self.previous_img = first_img
         self.previous_keypoints = first_img_kp
-        self.previous_index = np.array([i for i in range(len(self.ray_global))])
+        self.previous_index = np.array([i for i in range(len(self.rays))])
 
         # append the first camera to camera list
-        self.camera.append(first_camera)
+        self.cameras.append(first_camera)
 
     def ekf_update(self, observed_keypoints, observed_keypoint_index, height, width):
         """
@@ -176,15 +174,15 @@ class PtzSlam:
         """
 
         # step 1: get 2d points and indexes in all landmarks with predicted camera pose
-        predicted_camera = self.camera[-1]
+        predicted_camera = self.current_camera
         predict_keypoints, predict_keypoint_index = predicted_camera.project_rays(
-            self.ray_global, height, width)
+            self.rays, height, width)
 
         # step 2: an intersection of observed keypoints and predicted keypoints
         # compute y_k: residual
         overlap1, overlap2 = get_overlap_index(observed_keypoint_index, predict_keypoint_index)
         y_k = observed_keypoints[overlap1] - predict_keypoints[overlap2]
-        y_k = y_k.flatten() # to one dimension
+        y_k = y_k.flatten()  # to one dimension
 
         # index of inlier (frame-to-frame marching) rays that from previous frame to current frame
         matched_ray_index = observed_keypoint_index[overlap1]
@@ -194,22 +192,23 @@ class PtzSlam:
         # step 3: extract camera pose index, and ray index in the covariance matrix
         num_ray = len(matched_ray_index)
         pose_index = np.array([0, 1, 2])
-        ray_index = np.zeros(num_ray*2)
+        ray_index = np.zeros(num_ray * 2)
         for j in range(num_ray):
-            ray_index[2*j+0], ray_index[2*j+1] = 2 * matched_ray_index[j] + 3 + 0, 2 * matched_ray_index[j] + 3 + 1
+            ray_index[2 * j + 0], ray_index[2 * j + 1] = 2 * matched_ray_index[j] + 3 + 0, 2 * matched_ray_index[
+                j] + 3 + 1
         pose_ray_index = np.concatenate((pose_index, ray_index), axis=0)
         pose_ray_index = pose_ray_index.astype(np.int32)
-        predicted_cov = self.p_global[pose_ray_index][:, pose_ray_index] #@todo, :, operator, P_k_{k-1}
+        predicted_cov = self.state_cov[pose_ray_index][:, pose_ray_index]  # @todo, :, operator, P_k_{k-1}
         assert predicted_cov.shape[0] == pose_ray_index.shape[0] and predicted_cov.shape[1] == pose_ray_index.shape[0]
 
         # compute jacobi
-        updated_ray = self.ray_global[matched_ray_index.astype(int)]
+        updated_ray = self.rays[matched_ray_index.astype(int)]
         jacobi = self.compute_H(pan=predicted_camera.pan,
                                 tilt=predicted_camera.tilt,
                                 focal_length=predicted_camera.focal_length,
                                 rays=updated_ray)
         # get Kalman gain
-        r_k = 2 * np.eye(2 * num_ray)  #todo 2 is a constant value
+        r_k = 2 * np.eye(2 * num_ray)  # todo 2 is a constant value
         s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
 
         k_k = np.dot(np.dot(predicted_cov, jacobi.T), np.linalg.inv(s_k))
@@ -223,26 +222,26 @@ class PtzSlam:
         cur_camera.tilt += k_mul_y[1]
         cur_camera.focal_length += k_mul_y[2]
 
-        self.camera[-1] = cur_camera # redundant code as it is a reference
+        self.current_camera = cur_camera  # redundant code as it is a reference
 
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
 
         # update global rays: overwrite updated ray to ray_global
         for j in range(num_ray):
-            self.ray_global[int(matched_ray_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 3 +2]
+            self.rays[int(matched_ray_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 3 + 2]
 
         # update global p: overwrite updated p to the p_global
         update_p = np.dot(np.eye(3 + 2 * num_ray) - np.dot(k_k, jacobi), predicted_cov)
-        self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
+        self.state_cov[0:3, 0:3] = update_p[0:3, 0:3]
         for j in range(num_ray):
             row1 = 3 + 2 * int(matched_ray_index[j])
             row2 = row1 + 1
             for k in range(num_ray):
                 col1 = 3 + 2 * int(matched_ray_index[k])
                 col2 = col1 + 1
-                self.p_global[row1, col1] = update_p[3 + 2 * j, 3 + 2 * k]
-                self.p_global[row2, col2] = update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
+                self.state_cov[row1, col1] = update_p[3 + 2 * j, 3 + 2 * k]
+                self.state_cov[row2, col2] = update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
 
     def remove_rays(self, ransac_mask):
         """
@@ -262,7 +261,7 @@ class PtzSlam:
             if ransac_mask[j] == 0:
                 delete_index = np.append(delete_index, j)
 
-        self.ray_global = np.delete(self.ray_global, delete_index, axis=0)
+        self.rays = np.delete(self.rays, delete_index, axis=0)
 
         # delete p_global
         p_delete_index = np.ndarray([0])
@@ -270,8 +269,8 @@ class PtzSlam:
             p_delete_index = np.append(p_delete_index, np.array([2 * delete_index[i] + 3,
                                                                  2 * delete_index[i] + 4]))
 
-        self.p_global = np.delete(self.p_global, p_delete_index, axis=0)
-        self.p_global = np.delete(self.p_global, p_delete_index, axis=1)
+        self.state_cov = np.delete(self.state_cov, p_delete_index, axis=0)
+        self.state_cov = np.delete(self.state_cov, p_delete_index, axis=1)
 
     def add_rays(self, img_new, bounding_box):
         """
@@ -290,8 +289,8 @@ class PtzSlam:
         height, width = img_new.shape[0:2]
 
         # project global_ray to image. Get existing keypoints
-        keypoints, keypoints_index = self.camera[-1].project_rays(
-            self.ray_global, height, width)
+        keypoints, keypoints_index = self.current_camera.project_rays(
+            self.rays, height, width)
 
         # mask to remove keypoints near existing keypoints.
         mask = np.ones(img_new.shape[0:2], np.uint8)
@@ -316,16 +315,16 @@ class PtzSlam:
 
         """if existing new points"""
         if new_keypoints is not None:
-            new_rays = self.camera[-1].back_project_to_rays(new_keypoints)
+            new_rays = self.current_camera.back_project_to_rays(new_keypoints)
 
             # add new ray to ray_global, and add new rows and cols to p_global
             for j in range(len(new_rays)):
-                self.ray_global = np.row_stack([self.ray_global, new_rays[j]])
-                self.p_global = np.row_stack([self.p_global, np.zeros([2, self.p_global.shape[1]])])
-                self.p_global = np.column_stack([self.p_global, np.zeros([self.p_global.shape[0], 2])])
-                self.p_global[self.p_global.shape[0] - 2, self.p_global.shape[1] - 2] = 0.01
-                self.p_global[self.p_global.shape[0] - 1, self.p_global.shape[1] - 1] = 0.01
-                keypoints_index = np.append(keypoints_index, len(self.ray_global) - 1)
+                self.rays = np.row_stack([self.rays, new_rays[j]])
+                self.state_cov = np.row_stack([self.state_cov, np.zeros([2, self.state_cov.shape[1]])])
+                self.state_cov = np.column_stack([self.state_cov, np.zeros([self.state_cov.shape[0], 2])])
+                self.state_cov[self.state_cov.shape[0] - 2, self.state_cov.shape[1] - 2] = 0.01
+                self.state_cov[self.state_cov.shape[0] - 1, self.state_cov.shape[1] - 1] = 0.01
+                keypoints_index = np.append(keypoints_index, len(self.rays) - 1)
 
             keypoints = np.concatenate([keypoints, new_keypoints], axis=0)
 
@@ -353,11 +352,12 @@ class PtzSlam:
         ===============================
         """
         """update camera pose with constant speed model"""
-        self.camera.append(self.camera[-1])
+        self.current_camera = self.cameras[-1]
+        self.cameras.append(self.current_camera)
 
         """update p_global"""
         q_k = 5 * np.diag([0.001, 0.001, 1])
-        self.p_global[0:3, 0:3] = self.p_global[0:3, 0:3] + q_k
+        self.state_cov[0:3, 0:3] = self.state_cov[0:3, 0:3] + q_k
 
         """
         ===============================
@@ -367,7 +367,6 @@ class PtzSlam:
 
         height = next_img.shape[0]
         width = next_img.shape[1]
-
 
         self.ekf_update(matched_kp, next_index, height, width)
 
@@ -414,7 +413,7 @@ class PtzSlam:
     #     keyframe_map.add_first_keyframe(first_keyframe)
     #
     #     for i in range(first + step_length, self.sequence.anno_size, step_length):
-    #         print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.ray_global))
+    #         print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.rays))
     #
     #         """
     #         ===============================
@@ -449,17 +448,17 @@ class PtzSlam:
 
 if __name__ == "__main__":
     """this is for soccer"""
-    dataset_dir = '/Users/jimmy/Desktop/ptz_slam_dataset/'
-    sequence = SequenceManager(dataset_dir + "/highlights/seq3_anno.mat",
-                               dataset_dir + "/highlights/seq3_blur",
-                               "../mat_data/soccer3_ground_truth.mat",
-                               "../mat_data/objects_soccer.mat")
+
+    sequence = SequenceManager("../../dataset/soccer/seq3_anno.mat",
+                               "../../dataset/soccer/images",
+                               "../../dataset/soccer/soccer3_ground_truth.mat",
+                               "../../dataset/soccer/objects_soccer.mat")
 
     """this for basketball"""
-    # sequence = SequenceManager("./basketball/basketball/basketball_anno.mat",
-    #                "./basketball/basketball/images/",
-    #                "./basketball_ground_truth.mat",
-    #                "./objects_basketball.mat")
+    # sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
+    #                            "../../dataset/basketball/images",
+    #                            "../../dataset/basketball/basketball_ground_truth.mat",
+    #                            "../../dataset/basketball/objects_basketball.mat")
 
     slam = PtzSlam()
 
@@ -476,6 +475,6 @@ if __name__ == "__main__":
 
         print("=====The ", i, " iteration=====")
 
-        print("%f" % (slam.camera[i].pan - sequence.ground_truth_pan[i]))
-        print("%f" % (slam.camera[i].tilt - sequence.ground_truth_tilt[i]))
-        print("%f" % (slam.camera[i].focal_length - sequence.ground_truth_f[i]))
+        print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
+        print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
+        print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
