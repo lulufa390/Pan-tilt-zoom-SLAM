@@ -33,21 +33,26 @@ class PtzSlam:
         """
 
         # global rays and covariance matrix
-        self.ray_global = np.ndarray([0, 2])  # rename as rays
-        self.p_global = np.zeros([3, 3])      # rename as cov for covariance matrix
+        self.rays = np.ndarray([0, 2])  # @todo  rename as rays
+        self.state_cov = np.zeros([3, 3])      # @todo rename as state_cov for state covariance matrix
 
         # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
         self.previous_keypoints = None
-        self.previous_index = None
+        self.previous_ray_index = None  #@todo rename it to make it clear
+
+        # @todo add previous_camera
+        self.prev_camera = None   # do not use camera[-1], or use it as fewer as possible. as it is not clear
 
         # map
         self.keyframe_map = Map('sift')
 
         # a camera list for whole sequence.
-        self.camera = []
+        # @todo rename its as cameras, it is only used to store the result
+        self.cameras = []
 
-        # speed of camera
+        # speed of camera, for pan, tilt and focal length
+        self.velocity = np.zeros((3, 1))
         self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
 
     def compute_H(self, pan, tilt, focal_length, rays):
@@ -119,20 +124,25 @@ class PtzSlam:
 
     def init_system(self, first_img, first_camera, first_bounding_box=None):
         """
+        @todo many 'first' like first_img, first_camera is redundant
+        just use, image, camera
         This function initializes tracking component.
         It is called: 1. At the first frame. 2. after relocalization
         :param index: begin frame index
         :return: [N, 2] array keypoints, [N] array index in global ray
         """
 
+        # step 1: detect keypoints from image
         first_img_kp = detect_sift(first_img, 500)
         # first_img_kp = detect_orb(first_img, 300)
 
         # remove keypoints on players if bounding box mask is provided
+        # @bug global name 'reserved_keypoints_index' is not defined
         if first_bounding_box is not None:
             first_img_kp = first_img_kp[
                 reserved_keypoints_index(first_img_kp, first_bounding_box)]
 
+        # step 2: back-project keypoint locations to rays by a known camera pose
         # use key points in first frame to get init rays
         init_rays = first_camera.back_project_to_rays(first_img_kp)
 
@@ -140,9 +150,11 @@ class PtzSlam:
         self.ray_global = np.ndarray([0, 2])
         self.ray_global = np.row_stack([self.ray_global, init_rays])
 
-        # initialize global p using global rays
+        # step 3: initialize convariance matrix of states
+        # some parameters are manually selected
+        # @todo, note 0.001 and 1 are two parameters
         self.p_global = 0.001 * np.eye(3 + 2 * len(self.ray_global))
-        self.p_global[2][2] = 1
+        self.p_global[2][2] = 1  # covariance for focal length
 
         # the previous frame information
         self.previous_img = first_img
@@ -364,6 +376,7 @@ class PtzSlam:
         3. delete outliers
         ===============================
         """
+        # @todo bug? as ransac_mask is a local index but rays are global?
         self.remove_rays(ransac_mask)
 
         """
@@ -436,10 +449,11 @@ class PtzSlam:
 
 if __name__ == "__main__":
     """this is for soccer"""
-    sequence = SequenceManager("./two_point_calib_dataset/highlights/seq3_anno.mat",
-                               "./seq3_blur",
-                               "./soccer3_ground_truth.mat",
-                               "./objects_soccer.mat")
+    dataset_dir = '/Users/jimmy/Desktop/ptz_slam_dataset/'
+    sequence = SequenceManager(dataset_dir + "/highlights/seq3_anno.mat",
+                               dataset_dir + "/highlights/seq3_blur",
+                               "../mat_data/soccer3_ground_truth.mat",
+                               "../mat_data/objects_soccer.mat")
 
     """this for basketball"""
     # sequence = SequenceManager("./basketball/basketball/basketball_anno.mat",
