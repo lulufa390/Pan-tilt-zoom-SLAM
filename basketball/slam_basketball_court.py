@@ -157,72 +157,6 @@ class PtzSlam:
         This function update global rays and covariance matrix.
         @This function is important. Please add Math and add note for variables
         @ for example: y_k, dimension, y_k is xxxx in the equation xxx
-        :param i: index for frame
-        :param observed_keypoints: matched keypoint in that frame
-        :param observed_keypoint_index: matched keypoint index in global ray
-        """
-
-        # get 2d points, rays and indexes in all landmarks with predicted camera pose
-        predict_keypoints, predict_keypoint_index = self.camera[-1].project_rays(
-            self.ray_global, height, width)
-
-        # compute y_k
-        overlap1, overlap2 = get_overlap_index(observed_keypoint_index, predict_keypoint_index)
-        y_k = observed_keypoints[overlap1] - predict_keypoints[overlap2]
-        y_k = y_k.flatten()
-
-        matched_inner_point_index = observed_keypoint_index[overlap1]
-
-        # p_index is the index of rows(or cols) in p which need to be update (part of p matrix!)
-        # for example, p_index = [0,1,2(pose), 3,4(ray 1), 7,8(ray 3)] means get the first and third ray.
-        p_index = np.array([0, 1, 2])
-        for j in range(len(matched_inner_point_index)):
-            p_index = np.append(p_index, np.array([2 * matched_inner_point_index[j] + 3,
-                                                   2 * matched_inner_point_index[j] + 4]))
-        p_index = p_index.astype(np.int32)
-        p = self.p_global[p_index][:, p_index]
-
-        # compute jacobi
-        jacobi = self.compute_H(pan=self.camera[-1].pan, tilt=self.camera[-1].tilt,
-                                focal_length=self.camera[-1].focal_length,
-                                rays=self.ray_global[matched_inner_point_index.astype(int)])
-        # get Kalman gain
-        r_k = 2 * np.eye(2 * len(matched_inner_point_index))
-        s_k = np.dot(np.dot(jacobi, p), jacobi.T) + r_k
-
-        k_k = np.dot(np.dot(p, jacobi.T), np.linalg.inv(s_k))
-
-        k_mul_y = np.dot(k_k, y_k)
-
-        # update camera pose
-        self.camera[-1].pan += k_mul_y[0]
-        self.camera[-1].tilt += k_mul_y[1]
-        self.camera[-1].focal_length += k_mul_y[2]
-
-        # update speed model
-        self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
-
-        # update global rays: overwrite updated ray to ray_global
-        for j in range(len(matched_inner_point_index)):
-            self.ray_global[int(matched_inner_point_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 5]
-
-        # update global p: overwrite updated p to the p_global
-        update_p = np.dot(np.eye(3 + 2 * len(matched_inner_point_index)) - np.dot(k_k, jacobi), p)
-        self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
-        for j in range(len(matched_inner_point_index)):
-            for k in range(len(matched_inner_point_index)):
-                self.p_global[
-                    3 + 2 * int(matched_inner_point_index[j]), 3 + 2 * int(matched_inner_point_index[k])] = \
-                    update_p[3 + 2 * j, 3 + 2 * k]
-                self.p_global[
-                    3 + 2 * int(matched_inner_point_index[j]) + 1, 3 + 2 * int(matched_inner_point_index[k]) + 1] = \
-                    update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
-
-    def ekf_update_new_version(self, observed_keypoints, observed_keypoint_index, height, width):
-        """
-        This function update global rays and covariance matrix.
-        @This function is important. Please add Math and add note for variables
-        @ for example: y_k, dimension, y_k is xxxx in the equation xxx
         :param observed_keypoints: matched keypoint in that frame
         :param observed_keypoint_index: matched keypoint index in global ray
         :param height: image height
@@ -277,7 +211,7 @@ class PtzSlam:
         cur_camera.tilt += k_mul_y[1]
         cur_camera.focal_length += k_mul_y[2]
 
-        self.camera[-1] = cur_camera
+        self.camera[-1] = cur_camera # redundant code as it is a reference
 
         # update speed model
         self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
@@ -287,7 +221,7 @@ class PtzSlam:
             self.ray_global[int(matched_ray_index[j])][0:2] += k_mul_y[2 * j + 3: 2 * j + 3 +2]
 
         # update global p: overwrite updated p to the p_global
-        update_p = np.dot(np.eye(3 + 2 * num_ray) - np.dot(k_k, jacobi), updated_cov)
+        update_p = np.dot(np.eye(3 + 2 * num_ray) - np.dot(k_k, jacobi), predicted_cov)
         self.p_global[0:3, 0:3] = update_p[0:3, 0:3]
         for j in range(num_ray):
             row1 = 3 + 2 * int(matched_ray_index[j])
@@ -421,6 +355,7 @@ class PtzSlam:
 
         height = next_img.shape[0]
         width = next_img.shape[1]
+
 
         self.ekf_update(matched_kp, next_index, height, width)
 
