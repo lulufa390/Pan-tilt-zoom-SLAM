@@ -230,13 +230,13 @@ def ut_ptz_camera():
 
     print(obj.camera.project_3Dpoint([0, 0, 0]))
 
-    print(TransFunction.from_3d_to_2d(obj.camera.principal_point[0], obj.camera.principal_point[1],
+    print(TransFunction.from_3dpoint_to_image(obj.camera.principal_point[0], obj.camera.principal_point[1],
                                       obj.camera.focal_length, obj.camera.pan, obj.camera.tilt,
                                       obj.camera.camera_center, obj.camera.base_rotation, [0, 0, 0]))
 
     print(obj.camera.project_ray([5, 1]))
 
-    print(TransFunction.from_pan_tilt_to_2d(obj.camera.principal_point[0], obj.camera.principal_point[1],
+    print(TransFunction.from_ray_to_image(obj.camera.principal_point[0], obj.camera.principal_point[1],
                                             obj.camera.focal_length, obj.camera.pan, obj.camera.tilt, 5, 1))
 
     print(obj.camera.back_project_to_3D_point(-1726.9998, 1295.25688))

@@ -31,7 +31,7 @@ def _compute_residual(pose, rays, points, u, v):
     residual = np.ndarray([2 * len(rays)])
 
     for i in range(len(rays)):
-        reproject_x, reproject_y = TransFunction.from_pan_tilt_to_2d(u, v, pose[2], pose[0], pose[1], rays[i, 0],
+        reproject_x, reproject_y = TransFunction.from_ray_to_image(u, v, pose[2], pose[0], pose[1], rays[i, 0],
                                                                      rays[i, 1])
         residual[2 * i] = reproject_x - points[i, 0]
         residual[2 * i + 1] = reproject_y - points[i, 1]
@@ -68,7 +68,7 @@ def _recompute_matching_ray(keyframe, img, feature_method):
     rays = np.ndarray([len(index2), 2])
 
     for i in range(len(index2)):
-        rays[i, 0], rays[i, 1] = TransFunction.from_2d_to_pan_tilt(keyframe.u, keyframe.v, keyframe.f,
+        rays[i, 0], rays[i, 1] = TransFunction.from_image_to_ray(keyframe.u, keyframe.v, keyframe.f,
                                                                    keyframe.pan, keyframe.tilt, pt2[i, 0], pt2[i, 1])
 
     return pt1, rays
@@ -158,9 +158,10 @@ def relocalization_camera(map, img, pose):
 
 def ut_relocalization():
     """unit test for relocalization"""
-    obj = SequenceManager("./basketball/basketball/basketball_anno.mat",
-                          "./basketball/basketball/images",
-                          "./objects_basketball.mat")
+    obj = SequenceManager("../../dataset/basketball/basketball_anno.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/basketball_ground_truth.mat",
+                               "../../dataset/basketball/objects_basketball.mat")
     img1 = 0
     img2 = 390
 
@@ -173,18 +174,20 @@ def ut_relocalization():
     mask1 = obj.get_bounding_box_mask(img1)
     mask2 = obj.get_bounding_box_mask(img2)
 
-    keyframe1 = KeyFrame(gray1, img1, obj.c, obj.base_rotation,
-                         obj.u, obj.v, pose1[0], pose1[1], pose1[2])
-    keyframe2 = KeyFrame(gray2, img2, obj.c, obj.base_rotation,
-                         obj.u, obj.v, pose2[0], pose2[1], pose2[2])
+    camera = obj.get_camera(0)
+
+    keyframe1 = KeyFrame(gray1, img1, camera.camera_center, camera.base_rotation,
+                         camera.principal_point[0], camera.principal_point[1], pose1[0], pose1[1], pose1[2])
+    keyframe2 = KeyFrame(gray2, img2, camera.camera_center, camera.base_rotation,
+                         camera.principal_point[0], camera.principal_point[1], pose2[0], pose2[1], pose2[2])
 
     kp1, des1 = detect_compute_sift(gray1, 100)
-    after_removed_index1 = remove_player_feature(kp1, mask1)
+    after_removed_index1 = keypoints_masking(kp1, mask1)
     kp1 = list(np.array(kp1)[after_removed_index1])
     des1 = des1[after_removed_index1]
 
     kp2, des2 = detect_compute_sift(gray2, 100)
-    after_removed_index2 = remove_player_feature(kp2, mask2)
+    after_removed_index2 = keypoints_masking(kp2, mask2)
     kp2 = list(np.array(kp2)[after_removed_index2])
     des2 = des2[after_removed_index2]
 
@@ -204,7 +207,7 @@ def ut_relocalization():
 
     """first frame"""
     for i in range(len(kp1)):
-        theta, phi = TransFunction.from_2d_to_pan_tilt(
+        theta, phi = TransFunction.from_image_to_ray(
             obj.u, obj.v, pose1[2], pose1[0], pose1[1], kp1[i].pt[0], kp1[i].pt[1])
 
         map.global_ray.append(np.array([theta, phi]))
@@ -219,7 +222,7 @@ def ut_relocalization():
     kp2_outlier_index = list(set([i for i in range(len(des2))]) - set(index2))
 
     for i in range(len(kp2_outlier_index)):
-        theta, phi = TransFunction.from_2d_to_pan_tilt(
+        theta, phi = TransFunction.from_image_to_ray(
             obj.u, obj.v, pose2[2], pose2[0], pose2[1], kp2[kp2_outlier_index[i]].pt[0],
             kp2[kp2_outlier_index[i]].pt[1])
         map.global_ray.append(np.array([theta, phi]))

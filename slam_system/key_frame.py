@@ -4,8 +4,6 @@ Key frame class.
 Created by Luke, 2018.9
 """
 
-
-import numpy as np
 import scipy.io as sio
 
 

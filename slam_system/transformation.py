@@ -5,27 +5,22 @@
 
 3. The type of variables is mostly np.float64(default), but it does not have much influence if you use np.float32.
 
+There are four names in transfunction:
+ray: ray landmark in tripod coordinate.
+image (point on image): 2d point on image.
+3dpoint: 3d point in world coordinate.
+relative 3dpoint: 3d point in camera coordinate.
+
 Created by Luke, 2018.9
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
-import scipy.io as sio
-import random
-import cv2 as cv
-from sklearn.preprocessing import normalize
 from math import *
-from mpl_toolkits.mplot3d import Axes3D
 
-# @todo this class is actually the projection and back-projection in 3D vision
-# for example: from_3d_to_2d() is projection and from from_2d_to_3d() is back-projection
-# we cane put these function into two classes Camera and PTZCamera
-# Camera: is the general perspective camera
-# PTZCamera: is pan-tilt-zoom camera
-# if we use base_rotation, the general camera becomes pan-tilt-zoom camera
+
 class TransFunction:
     @staticmethod
-    def from_3d_to_2d(u, v, f, p, t, c, base_r, pos):
+    def from_3dpoint_to_image(u, v, f, p, t, c, base_r, pos):
         """
         project 3d point in world coordinate to image
         :param u: camera parameter u
@@ -60,7 +55,7 @@ class TransFunction:
         return position[0] / position[2], position[1] / position[2]
 
     @staticmethod
-    def from_2d_to_3d(u, v, f, p, t, c, base_r, point2d):
+    def from_image_to_3dpoint(u, v, f, p, t, c, base_r, point2d):
         """
         this function backproject image to 3d world coordinate
         z can be set to different value
@@ -102,7 +97,7 @@ class TransFunction:
         return p
 
     @staticmethod
-    def from_pan_tilt_to_2d(u, v, f, c_p, c_t, p, t):
+    def from_ray_to_image(u, v, f, c_p, c_t, p, t):
         """
         project ray to image
         :param u: camera parameter u
@@ -119,8 +114,8 @@ class TransFunction:
         camera_pan = radians(c_p)
         camera_tilt = radians(c_t)
 
-        #@todo how to get these equations?
-        #@todo add these equations in the document
+        # @todo how to get these equations?
+        # @todo add these equations in the document
         relative_pan = atan((tan(pan) * cos(camera_pan) - sin(camera_pan)) /
                             (tan(pan) * sin(camera_pan) * cos(camera_tilt) +
                              tan(tilt) * sqrt(tan(pan) * tan(pan) + 1) *
@@ -140,7 +135,7 @@ class TransFunction:
         return x, y
 
     @staticmethod
-    def from_2d_to_pan_tilt(u, v, f, c_p, c_t, x, y):
+    def from_image_to_ray(u, v, f, c_p, c_t, x, y):
         """
         from image to ray
         :param u: camera parameter u
@@ -180,7 +175,7 @@ class TransFunction:
         return degrees(theta), degrees(phi)
 
     @staticmethod
-    def compute_rays(proj_center, pos, base_r):
+    def from_3dpoint_to_ray(proj_center, pos, base_r):
         """
         from 3d point (world coordinate) to ray
         :param proj_center: projection center: array [3]
@@ -196,7 +191,7 @@ class TransFunction:
         return degrees(theta), degrees(phi)
 
     @staticmethod
-    def from_ray_to_relative_3d(t, p):
+    def from_ray_to_relative_3dpoint(t, p):
         """
         from ray to 3d camera coordinate
         :param t: ray theta angle
@@ -210,7 +205,7 @@ class TransFunction:
         return np.array([x, y, 1])
 
     @staticmethod
-    def from_relative_3d_to_2d(u, v, f, p, t, pos):
+    def from_relative_3dpoint_to_image(u, v, f, p, t, pos):
         """
         from 3d camera coordinate to image (The function of K*Q_tilt*Q_pan)
         :param u: camera parameter u
@@ -241,7 +236,7 @@ class TransFunction:
         return position[0] / position[2], position[1] / position[2]
 
     @staticmethod
-    def from_3d_to_relative_3d(c, base_r, pos):
+    def from_3dpoint_to_relative_3dpoint(c, base_r, pos):
         """
         from 3d world coordinate to camera coordinate (The function of S[I|-C])
         :param c: projection center: array [3]
@@ -253,7 +248,7 @@ class TransFunction:
         return position / position[2]
 
     @staticmethod
-    def get_observation_from_rays(pan, tilt, f, rays, u, v, height=0, width=0):
+    def from_rays_to_image(pan, tilt, f, rays, u, v, height=0, width=0):
         """
         from a number of points to corresponding rays im image.
         :param pan: camera pan
@@ -283,7 +278,7 @@ class TransFunction:
         return points, index
 
     @staticmethod
-    def get_rays_from_observation(pan, tilt, f, points, u, v):
+    def from_image_to_rays(pan, tilt, f, points, u, v):
         """
         get a list of rays from 2d points and camera pose
         :param pan:
@@ -303,7 +298,7 @@ class TransFunction:
     """below is function for general slam"""
 
     @staticmethod
-    def get_observation_from_3ds(pan, tilt, f, rays, u, v, center, rotation, height=0, width=0):
+    def from_3dpoints_to_image(pan, tilt, f, rays, u, v, center, rotation, height=0, width=0):
         """
         from a number of points to corresponding rays im image.
         :param pan: camera pan
@@ -321,19 +316,19 @@ class TransFunction:
 
         if height != 0 and width != 0:
             for j in range(len(rays)):
-                tmp = TransFunction.from_3d_to_2d(u, v, f, pan, tilt, center, rotation, rays[j])
+                tmp = TransFunction.from_3dpoint_to_image(u, v, f, pan, tilt, center, rotation, rays[j])
                 if 0 < tmp[0] < width and 0 < tmp[1] < height:
                     points = np.row_stack([points, np.asarray(tmp)])
                     index = np.concatenate([index, [j]], axis=0)
         else:
             for j in range(len(rays)):
-                tmp = TransFunction.from_3d_to_2d(u, v, f, pan, tilt, center, rotation, rays[j])
+                tmp = TransFunction.from_3dpoint_to_image(u, v, f, pan, tilt, center, rotation, rays[j])
                 points = np.row_stack([points, np.asarray(tmp)])
 
         return points, index
 
     @staticmethod
-    def get_3ds_from_observation(pan, tilt, f, points, u, v, center, rotation):
+    def from_image_to_3d_points(pan, tilt, f, points, u, v, center, rotation):
         """
         get a list of rays from 2d points and camera pose
         :param pan:

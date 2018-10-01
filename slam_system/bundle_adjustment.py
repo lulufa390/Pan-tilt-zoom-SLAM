@@ -9,7 +9,6 @@ return: optimized_landmarks, keyframes
 Created by Jimmy, 2018.9
 """
 
-import scipy.io as sio
 import cv2 as cv
 import numpy as np
 import math
@@ -76,9 +75,9 @@ def _compute_residual(x, n_pose, n_landmark, n_residual, keypoints, src_pt_index
                     landmark_start_index + idx3 * 2 + 1]  # estimated landmark pan, tilt
                 x1, y1 = keypoints[i][idx1][0], keypoints[i][idx1][1]  # observation
                 x2, y2 = keypoints[j][idx2][0], keypoints[j][idx2][1]
-                proj_x1, proj_y1 = TransFunction.from_pan_tilt_to_2d(u, v, fl1, pan1, tilt1, pan,
+                proj_x1, proj_y1 = TransFunction.from_ray_to_image(u, v, fl1, pan1, tilt1, pan,
                                                                      tilt)  # projection by pose and landmark
-                proj_x2, proj_y2 = TransFunction.from_pan_tilt_to_2d(u, v, fl2, pan2, tilt2, pan, tilt)
+                proj_x2, proj_y2 = TransFunction.from_ray_to_image(u, v, fl2, pan2, tilt2, pan, tilt)
 
                 # point in camera i
                 dx = proj_x1 - x1
@@ -191,7 +190,7 @@ def bundle_adjustment(images, image_indices, feature_method, initial_ptzs, cente
                 x2, y2 = points[j][idx2][0], points[j][idx2][1]
 
                 # @tod landmark initialization. may overwrite the previously inializaed landmarks
-                landmark = TransFunction.from_2d_to_pan_tilt(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
+                landmark = TransFunction.from_image_to_ray(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
                 x0[landmark_start_index + idx3 * 2: landmark_start_index + idx3 * 2 + 2] = landmark
     n_pose = N
 
@@ -348,7 +347,7 @@ def ut_build_adjustment_from_image_sequence():
 
                 x1 += random.gauss(0, 1)
                 y1 += random.gauss(0, 1)
-                landmark = TransFunction.from_2d_to_pan_tilt(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
+                landmark = TransFunction.from_image_to_ray(u, v, ptz1[2], ptz1[0], ptz1[1], x1, y1)
                 x0[landmark_start_index + idx3 * 2: landmark_start_index + idx3 * 2 + 2] = landmark
     n_pose = N
 

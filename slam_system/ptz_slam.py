@@ -297,11 +297,10 @@ class PtzSlam:
             masked_index = keypoints_masking(new_keypoints, bounding_box)
             new_keypoints = new_keypoints[masked_index]
 
-
         # remove keypoints near existing keypoints
         new_keypoints = new_keypoints[keypoints_masking(new_keypoints, mask)]
 
-        """if existing new points"""
+        # check if exist new keypoints after masking.
         if new_keypoints is not None:
             new_rays = self.current_camera.back_project_to_rays(new_keypoints)
 
