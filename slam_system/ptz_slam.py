@@ -27,9 +27,10 @@ class PtzSlam:
         # the information for previous frame: image matrix, keypoints and keypoints global index.
         self.previous_img = None
         self.previous_keypoints = None
-        self.previous_ray_index = None  # @todo rename it to make it clear
+        self.previous_keypoints_index = None
 
-        self.current_camera = None  # do not use cameras[-1], or use it as fewer as possible. as it is not clear
+        # camera object for current frame
+        self.current_camera = None
 
         # map
         self.keyframe_map = Map('sift')
@@ -38,8 +39,7 @@ class PtzSlam:
         self.cameras = []
 
         # speed of camera, for pan, tilt and focal length
-        self.velocity = np.zeros((3, 1))
-        self.delta_pan, self.delta_tilt, self.delta_zoom = [0, 0, 0]
+        self.velocity = np.zeros(3)
 
     def compute_h_jacobian(self, pan, tilt, focal_length, rays):
         """
@@ -110,12 +110,11 @@ class PtzSlam:
 
     def init_system(self, img, camera, bounding_box=None):
         """
-        @todo many 'first' like img, camera is redundant
-        just use, image, camera
         This function initializes tracking component.
         It is called: 1. At the first frame. 2. after relocalization
-        :param index: begin frame index
-        :return: [N, 2] array keypoints, [N] array index in global ray
+        :param img: image to initialize system.
+        :param camera:  first camera pose to initialize system.
+        :param bounding_box: first bounding box matrix (optional).
         """
 
         # step 1: detect keypoints from image
@@ -123,10 +122,9 @@ class PtzSlam:
         # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
-        # @bug global name 'reserved_keypoints_index' is not defined
         if bounding_box is not None:
-            first_img_kp = first_img_kp[
-                reserved_keypoints_index(first_img_kp, bounding_box)]
+            masked_index = keypoints_masking(first_img_kp, bounding_box)
+            first_img_kp = first_img_kp[masked_index]
 
         # step 2: back-project keypoint locations to rays by a known camera pose
         # use key points in first frame to get init rays
@@ -145,7 +143,7 @@ class PtzSlam:
         # the previous frame information
         self.previous_img = img
         self.previous_keypoints = first_img_kp
-        self.previous_index = np.array([i for i in range(len(self.rays))])
+        self.previous_keypoints_index = np.array([i for i in range(len(self.rays))])
 
         # append the first camera to camera list
         self.cameras.append(camera)
@@ -186,15 +184,15 @@ class PtzSlam:
                 j] + 3 + 1
         pose_ray_index = np.concatenate((pose_index, ray_index), axis=0)
         pose_ray_index = pose_ray_index.astype(np.int32)
-        predicted_cov = self.state_cov[pose_ray_index][:, pose_ray_index]  # @todo, :, operator, P_k_{k-1}
+        predicted_cov = self.state_cov[pose_ray_index][:, pose_ray_index]
         assert predicted_cov.shape[0] == pose_ray_index.shape[0] and predicted_cov.shape[1] == pose_ray_index.shape[0]
 
         # compute jacobi
         updated_ray = self.rays[matched_ray_index.astype(int)]
         jacobi = self.compute_h_jacobian(pan=predicted_camera.pan,
-                                tilt=predicted_camera.tilt,
-                                focal_length=predicted_camera.focal_length,
-                                rays=updated_ray)
+                                         tilt=predicted_camera.tilt,
+                                         focal_length=predicted_camera.focal_length,
+                                         rays=updated_ray)
         # get Kalman gain
         r_k = 2 * np.eye(2 * num_ray)  # todo 2 is a constant value
         s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
@@ -213,7 +211,7 @@ class PtzSlam:
         self.current_camera = cur_camera  # redundant code as it is a reference
 
         # update speed model
-        self.delta_pan, self.delta_tilt, self.delta_zoom = k_mul_y[0:3]
+        self.velocity = k_mul_y[0: 3]
 
         # update global rays: overwrite updated ray to ray_global
         for j in range(num_ray):
@@ -253,9 +251,9 @@ class PtzSlam:
 
         # delete p_global
         p_delete_index = np.ndarray([0])
-        for i in range(len(delete_index)):
-            p_delete_index = np.append(p_delete_index, np.array([2 * delete_index[i] + 3,
-                                                                 2 * delete_index[i] + 4]))
+        for j in range(len(delete_index)):
+            p_delete_index = np.append(p_delete_index, np.array([2 * delete_index[j] + 3,
+                                                                 2 * delete_index[j] + 4]))
 
         self.state_cov = np.delete(self.state_cov, p_delete_index, axis=0)
         self.state_cov = np.delete(self.state_cov, p_delete_index, axis=1)
@@ -296,10 +294,12 @@ class PtzSlam:
 
         # remove keypoints in player bounding boxes
         if bounding_box is not None:
-            new_keypoints = new_keypoints[reserved_keypoints_index(new_keypoints, bounding_box)]
+            masked_index = keypoints_masking(new_keypoints, bounding_box)
+            new_keypoints = new_keypoints[masked_index]
+
 
         # remove keypoints near existing keypoints
-        new_keypoints = new_keypoints[reserved_keypoints_index(new_keypoints, mask)]
+        new_keypoints = new_keypoints[keypoints_masking(new_keypoints, mask)]
 
         """if existing new points"""
         if new_keypoints is not None:
@@ -319,38 +319,49 @@ class PtzSlam:
         return keypoints, keypoints_index
 
     def tracking(self, next_img, bounding_box=None):
+        """
+        This is function for tracking using sparse optical flow matching.
+        :param next_img: image for next tracking frame
+        :param bounding_box: bounding box matrix (optional)
+        """
 
-        matched_index, ransac_next_kp = optical_flow_matching(self.previous_img, next_img, self.previous_keypoints)
+        # optical flow matching
+        local_matched_index, current_keypoints = optical_flow_matching(self.previous_img, next_img,
+                                                                       self.previous_keypoints)
 
-        ransac_index = self.previous_index[matched_index]
-        ransac_previous_kp = self.previous_keypoints[matched_index]
+        # current_keypoints_index is matched keypoints indexes in corresponding rays.
+        current_keypoints_index = self.previous_keypoints_index[local_matched_index]
 
-        inlier_index = homography_ransac(ransac_previous_kp, ransac_next_kp, reprojection_threshold=0.5)
+        # previous_matched_keypoints is matched keypoints in previous frame.
+        previous_matched_keypoints = self.previous_keypoints[local_matched_index]
 
-        matched_kp = ransac_next_kp[inlier_index]
-        next_index = ransac_index[inlier_index]
+        # run RANSAC
+        local_inlier_index = homography_ransac(previous_matched_keypoints, current_keypoints,
+                                               reprojection_threshold=0.5)
 
-        outliers = np.delete(ransac_index, inlier_index, axis=0)
+        inlier_keypoints = current_keypoints[local_inlier_index]
+        inlier_index = current_keypoints_index[local_inlier_index]
 
-        # matched_kp, next_index, ransac_mask = run_ransac(ransac_previous_kp, ransac_next_kp, ransac_index)
+        outlier_index = np.delete(current_keypoints_index, local_inlier_index, axis=0)
 
         """compute inlier percentage as the measurement for tracking quality"""
-        # if len(next_index) / len(previous_keypoints) * 100 < 80:
+        # if len(inlier_index) / len(previous_keypoints) * 100 < 80:
         #     lost_cnt += 1
         # else:
         #     lost_cnt = 0
-        # print("fraction: ", len(next_index) / len(previous_keypoints))
+        # print("fraction: ", len(inlier_index) / len(previous_keypoints))
 
         """
         ===============================
         1. predict step
         ===============================
         """
-        """update camera pose with constant speed model"""
+
+        # update camera pose with constant speed model
         self.current_camera = self.cameras[-1]
         self.cameras.append(self.current_camera)
 
-        """update p_global"""
+        # update p_global
         q_k = 5 * np.diag([0.001, 0.001, 1])
         self.state_cov[0:3, 0:3] = self.state_cov[0:3, 0:3] + q_k
 
@@ -363,15 +374,15 @@ class PtzSlam:
         height = next_img.shape[0]
         width = next_img.shape[1]
 
-        self.ekf_update(matched_kp, next_index, height, width)
+        self.ekf_update(inlier_keypoints, inlier_index, height, width)
 
         """
         ===============================
-        3. delete outliers
+        3. delete outlier_index
         ===============================
         """
-        # @todo bug? as ransac_mask is a local index but rays are global?
-        self.remove_rays(outliers)
+
+        self.remove_rays(outlier_index)
 
         """
         ===============================
@@ -380,7 +391,7 @@ class PtzSlam:
         """
 
         self.previous_img = next_img
-        self.previous_keypoints, self.previous_index = self.add_rays(next_img, bounding_box)
+        self.previous_keypoints, self.previous_keypoints_index = self.add_rays(next_img, bounding_box)
 
     # def main_algorithm(self, first, step_length):
     #     """
@@ -443,7 +454,6 @@ class PtzSlam:
 
 if __name__ == "__main__":
     """this is for soccer"""
-
     sequence = SequenceManager("../../dataset/soccer/seq3_anno.mat",
                                "../../dataset/soccer/images",
                                "../../dataset/soccer/soccer3_ground_truth.mat",

@@ -129,7 +129,7 @@ def detect_compute_latch(im, nfeatures=1500, verbose=False):
     return kp_latch, des_latch
 
 
-def reserved_keypoints_index(kp, mask):
+def keypoints_masking(kp, mask):
     """
     use bounding box to remove keypoints on players
     :param kp: list [N] of keypoints object (need use .pt to access point location)
