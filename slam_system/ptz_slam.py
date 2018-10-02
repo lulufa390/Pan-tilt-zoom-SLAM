@@ -9,6 +9,9 @@ from image_process import *
 from sequence_manager import SequenceManager
 from scene_map import Map
 from util import *
+from key_frame import KeyFrame
+from relocalization import relocalization_camera
+
 
 class PtzSlam:
     def __init__(self):
@@ -38,6 +41,15 @@ class PtzSlam:
 
         # speed of camera, for pan, tilt and focal length
         self.velocity = np.zeros(3)
+
+        # state: whether current frame is new keyframe.
+        self.new_keyframe = False
+
+        # state: whether current frame is lost.
+        self.tracking_lost = False
+
+        # count for bad tracking frame number. If larger than a threshold, the frame is lost.
+        self.bad_tracking_cnt = 0
 
     def compute_h_jacobian(self, pan, tilt, focal_length, rays):
         """
@@ -116,7 +128,7 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 100)
+        first_img_kp = detect_sift(img, 50)
         # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
@@ -227,7 +239,7 @@ class PtzSlam:
                 self.state_cov[row1, col1] = update_p[3 + 2 * j, 3 + 2 * k]
                 self.state_cov[row2, col2] = update_p[3 + 2 * j + 1, 3 + 2 * k + 1]
 
-    def remove_rays(self, ransac_mask):
+    def remove_rays(self, index):
         """
         remove_rays
         delete ransac outliers from global ray
@@ -236,13 +248,13 @@ class PtzSlam:
         others are outliers. The outlier is associated with a ray, that ray will be removed
         Note the ray is different from the ray in the Map().
 
-        :param ransac_mask: 0 for ourliers, 1 for inliers
+        :param index: index in rays to be removed
         """
 
         # delete ray_global
         delete_index = np.ndarray([0])
-        for j in range(len(ransac_mask)):
-            if ransac_mask[j] == 0:
+        for j in range(len(index)):
+            if index[j] == 0:
                 delete_index = np.append(delete_index, j)
 
         self.rays = np.delete(self.rays, delete_index, axis=0)
@@ -256,28 +268,27 @@ class PtzSlam:
         self.state_cov = np.delete(self.state_cov, p_delete_index, axis=0)
         self.state_cov = np.delete(self.state_cov, p_delete_index, axis=1)
 
-    def add_rays(self, img_new, bounding_box):
+    def add_rays(self, img, bounding_box):
         """
         Detect new keypoints in the current frame and add associated rays.
         In each frame, a number of keypoints are detected. These keypoints will
         be associated with new rays (given the camera pose). These new rays are
         added to the global ray to maintain the number of visible rays in the image.
         Otherwise, the number of rays will drop.
-        :param img_new: current image
-
-        :param bounding_box:
-        :return:
+        :param img: current image
+        :param bounding_box: matrix same size as img. 0 is on players, 1 is out of players.
+        :return: keypoints and corresponding global indexes
         """
 
         # get height width of image
-        height, width = img_new.shape[0:2]
+        height, width = img.shape[0:2]
 
         # project global_ray to image. Get existing keypoints
         keypoints, keypoints_index = self.current_camera.project_rays(
             self.rays, height, width)
 
         # mask to remove keypoints near existing keypoints.
-        mask = np.ones(img_new.shape[0:2], np.uint8)
+        mask = np.ones(img.shape[0:2], np.uint8)
 
         for j in range(len(keypoints)):
             x, y = keypoints[j]
@@ -287,8 +298,8 @@ class PtzSlam:
             right_bound = int(min(width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        new_keypoints = detect_sift(img_new, 100)
-        # new_keypoints = detect_orb(img_new, 300)
+        new_keypoints = detect_sift(img, 50)
+        # new_keypoints = detect_orb(img, 300)
 
         # remove keypoints in player bounding boxes
         if bounding_box is not None:
@@ -315,39 +326,23 @@ class PtzSlam:
 
         return keypoints, keypoints_index
 
-    def tracking(self, next_img, bounding_box=None):
+    def tracking(self, next_img, bad_tracking_percentage, bounding_box=None):
         """
         This is function for tracking using sparse optical flow matching.
         :param next_img: image for next tracking frame
         :param bounding_box: bounding box matrix (optional)
         """
 
-        # optical flow matching
-        local_matched_index, current_keypoints = optical_flow_matching(self.previous_img, next_img,
-                                                                       self.previous_keypoints)
+        inlier_keypoints, inlier_index, outlier_index = matching_and_ransac(
+            self.previous_img, next_img, self.previous_keypoints, self.previous_keypoints_index)
 
-        # current_keypoints_index is matched keypoints indexes in corresponding rays.
-        current_keypoints_index = self.previous_keypoints_index[local_matched_index]
+        # compute inlier percentage as the measurement for tracking quality
+        tracking_percentage = len(inlier_index) / len(self.previous_keypoints) * 100
+        if tracking_percentage < bad_tracking_percentage:
+            self.bad_tracking_cnt += 1
 
-        # previous_matched_keypoints is matched keypoints in previous frame.
-        previous_matched_keypoints = self.previous_keypoints[local_matched_index]
-
-        # run RANSAC
-        local_inlier_index = homography_ransac(previous_matched_keypoints, current_keypoints,
-                                               reprojection_threshold=0.5)
-
-        inlier_keypoints = current_keypoints[local_inlier_index]
-        inlier_index = current_keypoints_index[local_inlier_index]
-
-        outlier_index = np.delete(current_keypoints_index, local_inlier_index, axis=0)
-
-        """compute inlier percentage as the measurement for tracking quality"""
-        # if len(inlier_index) / len(previous_keypoints) * 100 < 80:
-        #     lost_cnt += 1
-        # else:
-        #     lost_cnt = 0
-        # print("fraction: ", len(inlier_index) / len(previous_keypoints))
-
+        if self.bad_tracking_cnt > 3:
+            self.tracking_lost = True
         """
         ===============================
         1. predict step
@@ -356,7 +351,8 @@ class PtzSlam:
 
         # update camera pose with constant speed model
         self.current_camera = self.cameras[-1]
-        self.cameras.append(self.current_camera)
+        if not self.tracking_lost:
+            self.cameras.append(self.current_camera)
 
         # update p_global
         q_k = 5 * np.diag([0.001, 0.001, 1])
@@ -368,8 +364,7 @@ class PtzSlam:
         ===============================
         """
 
-        height = next_img.shape[0]
-        width = next_img.shape[1]
+        height, width = next_img.shape[0:2]
 
         self.ekf_update(inlier_keypoints, inlier_index, height, width)
 
@@ -390,90 +385,91 @@ class PtzSlam:
         self.previous_img = next_img
         self.previous_keypoints, self.previous_keypoints_index = self.add_rays(next_img, bounding_box)
 
-    # def main_algorithm(self, first, step_length):
-    #     """
-    #     This is main function for SLAM system.
-    #     Run this function to begin tracking and mapping
-    #     :param first: the start frame index
-    #     :param step_length: step length between consecutive frames
-    #     """
-    #
-    #     # lost_cnt = 0
-    #     # lost_frame_threshold = 3
-    #     # matched_percentage = np.zeros([self.sequence.anno_size])
-    #     # percentage_threshold = 80
-    #
-    #     # @ idealy 'sift' should can be set from a parameter
-    #     # or we develop a system that uses 'sift' only
-    #
-    #     # This part adds the first frame to key_frame map
-    #     im = self.sequence.get_image(first, 1)
-    #     first_keyframe = KeyFrame(im, first, self.sequence.camera.camera_center,
-    #                               self.sequence.camera.base_rotation, self.sequence.camera.principal_point[0],
-    #                               self.sequence.camera.principal_point[1],
-    #                               self.camera_pose[0], self.camera_pose[1], self.camera_pose[2])
-    #
-    #     keyframe_map.add_first_keyframe(first_keyframe)
-    #
-    #     for i in range(first + step_length, self.sequence.anno_size, step_length):
-    #         print("=====The ", i, " iteration=====Total %d global rays\n" % len(self.rays))
-    #
-    #         """
-    #         ===============================
-    #         0. feature matching step
-    #         ===============================
-    #         """
-    #         pre_img = self.sequence.get_image_gray(i - step_length, 1)
-    #         next_img = self.sequence.get_image_gray(i, 1)
-    #
-    #         previous_keypoints, previous_index, lost_cnt = \
-    #             self.tracking(previous_keypoints, previous_index, pre_img, next_img, lost_cnt, i)
-    #
-    #         """this part is for BA and relocalization"""
-    #         # if matched_percentage[i] > percentage_threshold:
-    #         #     # origin set to (10, 25)
-    #         #     if keyframe_map.good_new_keyframe(self.camera_pose, 10, 25):
-    #         #         # if keyframe_map.good_new_keyframe(self.camera_pose, 10, 15):
-    #         #         print("this is keyframe:", i)
-    #         #         new_keyframe = KeyFrame(self.sequence.get_image(i, 0),
-    #         #                                 i, self.sequence.c, self.sequence.base_rotation, self.sequence.u,
-    #         #                                 self.sequence.v, self.camera_pose[0], self.camera_pose[1],
-    #         #                                 self.camera_pose[2])
-    #         #         keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
-    #         #
-    #         # elif lost_cnt > lost_frame_threshold:
-    #         #     if len(keyframe_map.keyframe_list) > 1:
-    #         #         self.camera_pose = relocalization_camera(keyframe_map, self.sequence.get_image(i, 0),
-    #         #                                                  self.camera_pose)
-    #         #         previous_keypoints, previous_index = self.init_system(i)
-    #         #         lost_cnt = 0
+        if tracking_percentage > bad_tracking_percentage:
+            # basketball set to (10, 25), soccer maybe (10, 15)
+            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 25):
+                self.new_keyframe = True
+
+    def relocalize(self, img, camera):
+        """
+        :param img: image to relocalize
+        :param camera: lost camera to relocaize
+        :return: camera after relocalize
+        """
+
+        if len(self.keyframe_map.keyframe_list) > 1:
+            lost_pose = camera.pan, camera.tilt, camera.focal_length
+            relocalize_pose = relocalization_camera(self.keyframe_map, img, lost_pose)
+            camera.set_ptz(relocalize_pose)
+        else:
+            print("Warning: Not enough keyframes for relocalization.")
+
+        self.bad_tracking_cnt = 0
+        self.tracking_lost = False
+
+        return camera
+
+    def add_keyframe(self, img, camera, frame_index):
+        """
+        add new key frame.
+        @todo now have not changed the KeyFrame's parameter to camera object.
+        @todo Many places need to be changed if this change.
+        :param img: image
+        :param camera: camera object for key frame
+        :param frame_index: frame index in sequence
+        """
+        c = camera.camera_center
+        r = camera.base_rotation
+        u = camera.principal_point[0]
+        v = camera.principal_point[1]
+        pan = camera.pan
+        tilt = camera.tilt
+        focal_length = camera.focal_length
+
+        new_keyframe = KeyFrame(img, frame_index, c, r, u, v, pan, tilt, focal_length)
+
+        if frame_index == 0:
+            self.keyframe_map.add_first_keyframe(new_keyframe, verbose=True)
+        else:
+            self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
+            self.new_keyframe = False
 
 
 if __name__ == "__main__":
     """this is for soccer"""
-    sequence = SequenceManager("../../dataset/soccer/seq3_anno.mat",
-                               "../../dataset/soccer/images",
-                               "../../dataset/soccer/soccer3_ground_truth.mat",
-                               "../../dataset/soccer/objects_soccer.mat")
+    # sequence = SequenceManager("../../dataset/soccer/seq3_anno.mat",
+    #                            "../../dataset/soccer/images",
+    #                            "../../dataset/soccer/soccer3_ground_truth.mat",
+    #                            "../../dataset/soccer/objects_soccer.mat")
 
     """this for basketball"""
-    # sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
-    #                            "../../dataset/basketball/images",
-    #                            "../../dataset/basketball/basketball_ground_truth.mat",
-    #                            "../../dataset/basketball/objects_basketball.mat")
+    sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/basketball_ground_truth.mat",
+                               "../../dataset/basketball/objects_basketball.mat")
 
     slam = PtzSlam()
 
-    first_img = sequence.get_image_gray(index=0, dataset_type=1)
+    first_img = sequence.get_image_gray(index=0, dataset_type=0)
     first_camera = sequence.get_camera(0)
     first_bounding_box = sequence.get_bounding_box_mask(0)
 
     slam.init_system(first_img, first_camera, first_bounding_box)
+    slam.add_keyframe(first_img, first_camera, 0)
 
     for i in range(1, sequence.length):
-        img = sequence.get_image_gray(index=i, dataset_type=1)
+        img = sequence.get_image_gray(index=i, dataset_type=0)
         bounding_box = sequence.get_bounding_box_mask(i)
-        slam.tracking(img, bounding_box)
+        slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
+
+        if slam.tracking_lost:
+            relocalized_camera = slam.relocalize(img, slam.current_camera)
+            slam.init_system(img, relocalized_camera, bounding_box)
+
+            print("do relocalization!")
+        elif slam.new_keyframe:
+            slam.add_keyframe(img, slam.current_camera, i)
+            print("add keyframe!")
 
         print("=====The ", i, " iteration=====")
 

@@ -29,6 +29,9 @@ class PTZCamera:
         self.tilt = 0.0
         self.focal_length = 2000
 
+    def get_ptz(self):
+        return np.array([self.pan, self.tilt, self.focal_length])
+
     def set_ptz(self, ptz):
         """
         Set pan, tilt, focal length for camera.

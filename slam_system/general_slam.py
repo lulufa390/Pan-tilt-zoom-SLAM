@@ -11,7 +11,7 @@ import scipy.io as sio
 from transformation import TransFunction
 from image_process import *
 from sequence_manager import SequenceManager
-from image_generator import ImageGenerator
+from .generator/image_generator import ImageGenerator
 from util import *
 
 

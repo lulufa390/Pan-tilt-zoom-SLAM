@@ -386,16 +386,15 @@ def good_homography(h):
 
 def run_ransac(points1, points2, index):
     """
-    :param points1: N x 2 array, float32 or float64
-    :param points2:
-    :param index:
-    :return:
+    Old version of RANSAC. Use homography_ransac instead.
+    :param points1: points set 1 [n, 2]
+    :param points2: points set 2 [n, 2]
+    :param index: global ray index [n]
+    :return: ransac inner keypoints [n, 2], inliers global index, outliers global indexes.
     """
     ransac_mask = np.ndarray([len(points1)])
     homo, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
                                           ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
-    # if good_homography(homo) == False:
-    #     return [], [], []
     inner_kp = np.ndarray([0, 2])
     inner_index = np.ndarray([0])
     outlier_index = np.ndarray([0])
@@ -408,6 +407,35 @@ def run_ransac(points1, points2, index):
             outlier_index = np.append(outlier_index, index[j])
 
     return inner_kp, inner_index, outlier_index
+
+
+def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index):
+    """
+    matching with sparse optical flow and run ransac.
+    :param img1: image 1
+    :param img2: image 2
+    :param img1_keypoints: keypoints in image 1 [n, 2]
+    :param img1_keypoints_index: keypoints corresponding global indexes
+    :return: inliers in current frame, inliers global indexes, outliers global indexes
+    """
+    local_matched_index, current_keypoints = optical_flow_matching(img1, img2, img1_keypoints)
+
+    # current_keypoints_index is matched keypoints indexes in corresponding rays.
+    current_keypoints_index = img1_keypoints_index[local_matched_index]
+
+    # previous_matched_keypoints is matched keypoints in previous frame.
+    previous_matched_keypoints = img1_keypoints[local_matched_index]
+
+    # run RANSAC
+    local_inlier_index = homography_ransac(previous_matched_keypoints, current_keypoints,
+                                           reprojection_threshold=0.5)
+
+    inlier_keypoints = current_keypoints[local_inlier_index]
+    inlier_index = current_keypoints_index[local_inlier_index]
+
+    outlier_index = np.delete(current_keypoints_index, local_inlier_index, axis=0)
+
+    return inlier_keypoints, inlier_index, outlier_index
 
 
 def build_matching_graph(images, image_match_mask=[], feature_method='sift', verbose=False):
