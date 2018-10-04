@@ -48,7 +48,7 @@ class PtzSlam:
         # state: whether current frame is lost.
         self.tracking_lost = False
 
-        # count for bad tracking frame number. If larger than a threshold, the frame is lost.
+        # count for bad tracking frame number. If larger than a threshold, we say this frame is lost.
         self.bad_tracking_cnt = 0
 
     def compute_h_jacobian(self, pan, tilt, focal_length, rays):
@@ -128,7 +128,7 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 50)
+        first_img_kp = detect_sift(img, 200)
         # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
@@ -298,7 +298,7 @@ class PtzSlam:
             right_bound = int(min(width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        new_keypoints = detect_sift(img, 50)
+        new_keypoints = detect_sift(img, 200)
         # new_keypoints = detect_orb(img, 300)
 
         # remove keypoints in player bounding boxes
@@ -387,7 +387,7 @@ class PtzSlam:
 
         if tracking_percentage > bad_tracking_percentage:
             # basketball set to (10, 25), soccer maybe (10, 15)
-            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 25):
+            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
                 self.new_keyframe = True
 
     def relocalize(self, img, camera):
@@ -442,15 +442,20 @@ if __name__ == "__main__":
     #                            "../../dataset/soccer/soccer3_ground_truth.mat",
     #                            "../../dataset/soccer/objects_soccer.mat")
 
+    sequence = SequenceManager("../../dataset/soccer1/seq1_anno.mat",
+                               "../../dataset/soccer1/seq1_161",
+                               "../../dataset/soccer1/soccer1_ground_truth.mat",
+                               "../../dataset/soccer1/soccer1_bounding_box.mat")
+
     """this for basketball"""
-    sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
-                               "../../dataset/basketball/images",
-                               "../../dataset/basketball/basketball_ground_truth.mat",
-                               "../../dataset/basketball/objects_basketball.mat")
+    # sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
+    #                            "../../dataset/basketball/images",
+    #                            "../../dataset/basketball/basketball_ground_truth.mat",
+    #                            "../../dataset/basketball/objects_basketball.mat")
 
     slam = PtzSlam()
 
-    first_img = sequence.get_image_gray(index=0, dataset_type=0)
+    first_img = sequence.get_image_gray(index=0, dataset_type=1)
     first_camera = sequence.get_camera(0)
     first_bounding_box = sequence.get_bounding_box_mask(0)
 
@@ -458,7 +463,7 @@ if __name__ == "__main__":
     slam.add_keyframe(first_img, first_camera, 0)
 
     for i in range(1, sequence.length):
-        img = sequence.get_image_gray(index=i, dataset_type=0)
+        img = sequence.get_image_gray(index=i, dataset_type=1)
         bounding_box = sequence.get_bounding_box_mask(i)
         slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
 

@@ -584,7 +584,7 @@ def build_matching_graph(images, image_match_mask=[], feature_method='sift', ver
             for idx1 in src_idx:
                 landmark_index[i][j].append(landmark_index_map[i][idx1])
 
-    # change formate of keypoints
+    # change format of keypoints
     def keypoint_to_matrix(key_points):
         N = len(key_points)
         key_points_mat = np.zeros((N, 2))
