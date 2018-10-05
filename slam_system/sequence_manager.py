@@ -13,6 +13,7 @@ from util import *
 from image_process import *
 from ptz_camera import PTZCamera
 from transformation import TransFunction
+import scipy.signal as sig
 
 
 class SequenceManager:
@@ -224,37 +225,24 @@ def generate_ground_truth():
     #
     # save_camera_pose(pan[0:330], tilt[0:330], f[0:330], ".", "soccer3_ground_truth.mat")
 
-    seq = sio.loadmat("../../../venv/two_point_calib_dataset/highlights/seq2_anno.mat")
+    seq = sio.loadmat("../../../to_delete/venv/basketball/basketball/basketball_anno.mat")
     annotation = seq["annotation"]
 
-    pan = np.ndarray([1000])
-    tilt = np.ndarray([1000])
-    f = np.ndarray([1000])
+    pan = np.ndarray([3600])
+    tilt = np.ndarray([3600])
+    f = np.ndarray([3600])
 
-    pre_pan, pre_tilt, pre_f = annotation[0][0]['ptz'].squeeze()
-    for i in range(1, 24):
-        now_pan, now_tilt, now_f = annotation[0][i]['ptz'].squeeze()
+    # pre_pan, pre_tilt, pre_f = annotation[0][0]['ptz'].squeeze()
 
-        delta_pan = (now_pan - pre_pan) / 5
-        delta_tilt = (now_tilt - pre_tilt) / 5
-        delta_f = (now_f - pre_f) / 5
-
-        pan[(i - 1) * 5], tilt[(i - 1) * 5], f[(i - 1) * 5] = pre_pan, pre_tilt, pre_f
-        pan[(i - 1) * 5 + 1], tilt[(i - 1) * 5 + 1], f[
-            (i - 1) * 5 + 1] = pre_pan + delta_pan, pre_tilt + delta_tilt, pre_f + delta_f
-        pan[(i - 1) * 5 + 2], tilt[(i - 1) * 5 + 2], f[
-            (i - 1) * 5 + 2] = pre_pan + 2 * delta_pan, pre_tilt + 2 * delta_tilt, pre_f + 2 * delta_f
-        pan[(i - 1) * 5 + 3], tilt[(i - 1) * 5 + 3], f[
-            (i - 1) * 5 + 3] = pre_pan + 3 * delta_pan, pre_tilt + 3 * delta_tilt, pre_f + 3 * delta_f
-        pan[(i - 1) * 5 + 4], tilt[(i - 1) * 5 + 4], f[
-            (i - 1) * 5 + 4] = pre_pan + 4 * delta_pan, pre_tilt + 4 * delta_tilt, pre_f + 4 * delta_f
-
-        pre_pan, pre_tilt, pre_f = now_pan, now_tilt, now_f
+    for i in range(0, 3600):
+        pan[i], tilt[i], f[i] = annotation[0][i]['ptz'].squeeze()
         print(i)
 
-    pan[115], tilt[115], f[115] = annotation[0][23]['ptz'].squeeze()
+    pan = sig.savgol_filter(pan, 181, 1)
+    tilt = sig.savgol_filter(tilt, 181, 1)
+    f = sig.savgol_filter(f, 181, 1)
 
-    save_camera_pose(pan[0:116], tilt[0:116], f[0:116], ".", "soccer2_ground_truth.mat")
+    save_camera_pose(pan, tilt, f, ".", "synthesize_ground_truth.mat")
 
 
 
