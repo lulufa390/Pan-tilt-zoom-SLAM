@@ -8,6 +8,8 @@ import math
 import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
+import cv2 as cv
+from image_process import *
 
 
 def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
@@ -21,13 +23,12 @@ def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
     """
     # overlap angle (in degree) between two cameras
 
-    w = im_width/2
-    delta_angle = math.atan(w/fl_1) * 180.0/math.pi
+    w = im_width / 2
+    delta_angle = math.atan(w / fl_1) * 180.0 / math.pi
     pan1_min = pan_1 - delta_angle
     pan1_max = pan_1 + delta_angle
 
-
-    delta_angle = math.atan(w/fl_2) * 180.0/math.pi
+    delta_angle = math.atan(w / fl_2) * 180.0 / math.pi
     pan2_min = pan_2 - delta_angle
     pan2_max = pan_2 + delta_angle
 
@@ -175,3 +176,47 @@ def load_camera_pose(path):
     f = camera_pos['f'].squeeze()
 
     return pan, tilt, f
+
+
+def video_capture(file_path, save_path, begin_time, rate, length):
+    """
+    function to capture video into images.
+    :param file_path: video path
+    :param save_path: image folder
+    :param begin_time: begin time slice
+    :param rate: rate for video
+    :param length: length in frame number
+    """
+    video = cv.VideoCapture(file_path)
+
+    for i in range(0, length):
+        print(i)
+        video.set(cv.CAP_PROP_POS_MSEC, begin_time + i / rate * 1000)
+        _, img = video.read()
+
+        # img = blur_sub_image(img, 61, 32, 564, 46)
+        # img = blur_sub_image(img, 1100, 30, 85, 76)
+
+        # img = blur_sub_image(img, 227, 55, 130, 100)
+        img = blur_sub_image(img, 208, 31, 171, 100)
+
+        # cv.imshow("test", img)
+
+        cv.imwrite(save_path + "/" + str(i + 1) + ".jpg", img)
+
+        # cv.waitKey(0)
+
+
+if __name__ == '__main__':
+    # video_capture(
+    # "/hdd/luke/hockey_data/USA 2-3 Canada - Men's Ice Hockey Gold Medal Match _ Vancouver 2010 Winter Olympics.mp4",
+    #               "/hdd/luke/hockey_data/Olympic_2010/images/", 4072000, 25, 625)
+
+    # video_capture(
+    #     "/hdd/luke/hockey_data/Chicago Blackhawks VS Toronto Maple Leafs 15-01-2016  FULL.mp4",
+    #     "/hdd/luke/hockey_data/Chicago_Toronto/images/", 1112500, 30, 1800)
+
+    video_capture(
+        "/hdd/luke/hockey_data/Ice Hockey - Sweden 0 - 3 Canada - Men's Full Gold M"
+        "edal Match _ Sochi 2014 Winter Olympics.mp4",
+        "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)

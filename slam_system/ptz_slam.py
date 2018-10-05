@@ -442,20 +442,20 @@ if __name__ == "__main__":
     #                            "../../dataset/soccer/soccer3_ground_truth.mat",
     #                            "../../dataset/soccer/objects_soccer.mat")
 
-    sequence = SequenceManager("../../dataset/soccer1/seq1_anno.mat",
-                               "../../dataset/soccer1/seq1_161",
-                               "../../dataset/soccer1/soccer1_ground_truth.mat",
-                               "../../dataset/soccer1/soccer1_bounding_box.mat")
+    # sequence = SequenceManager("../../dataset/soccer1/seq1_anno.mat",
+    #                            "../../dataset/soccer1/seq1_161",
+    #                            "../../dataset/soccer1/soccer1_ground_truth.mat",
+    #                            "../../dataset/soccer1/soccer1_bounding_box.mat")
 
     """this for basketball"""
-    # sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
-    #                            "../../dataset/basketball/images",
-    #                            "../../dataset/basketball/basketball_ground_truth.mat",
-    #                            "../../dataset/basketball/objects_basketball.mat")
+    sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/basketball_ground_truth.mat",
+                               "../../dataset/basketball/bounding_box.mat")
 
     slam = PtzSlam()
 
-    first_img = sequence.get_image_gray(index=0, dataset_type=1)
+    first_img = sequence.get_image_gray(index=0, dataset_type=0)
     first_camera = sequence.get_camera(0)
     first_bounding_box = sequence.get_bounding_box_mask(0)
 
@@ -463,7 +463,7 @@ if __name__ == "__main__":
     slam.add_keyframe(first_img, first_camera, 0)
 
     for i in range(1, sequence.length):
-        img = sequence.get_image_gray(index=i, dataset_type=1)
+        img = sequence.get_image_gray(index=i, dataset_type=0)
         bounding_box = sequence.get_bounding_box_mask(i)
         slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
 
