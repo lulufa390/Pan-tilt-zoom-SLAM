@@ -10,6 +10,9 @@ import scipy.misc as misc
 
 
 class BasketballCourt:
+    """
+    Generate basketball court template (lines and circles)
+    """
     def __init__(self):
         self.width = 94  # foot
         self.height = 50

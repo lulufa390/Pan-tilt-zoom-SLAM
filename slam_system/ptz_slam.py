@@ -434,25 +434,46 @@ class PtzSlam:
             self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
             self.new_keyframe = False
 
+def ut_soccer():
+    sequence = SequenceManager("../../dataset/soccer/seq1/seq1_anno.mat",
+                               "../../dataset/soccer/seq1/seq1_161",
+                               "../../dataset/soccer/seq1/soccer1_ground_truth.mat",
+                               "../../dataset/soccer/seq1/soccer1_bounding_box.mat")
+    slam = PtzSlam()
 
-if __name__ == "__main__":
-    """this is for soccer"""
-    # sequence = SequenceManager("../../dataset/soccer/seq3_anno.mat",
-    #                            "../../dataset/soccer/images",
-    #                            "../../dataset/soccer/soccer3_ground_truth.mat",
-    #                            "../../dataset/soccer/objects_soccer.mat")
+    first_img = sequence.get_image_gray(index=0, dataset_type=1)
+    first_camera = sequence.get_camera(0)
+    first_bounding_box = sequence.get_bounding_box_mask(0)
 
-    # sequence = SequenceManager("../../dataset/soccer1/seq1_anno.mat",
-    #                            "../../dataset/soccer1/seq1_161",
-    #                            "../../dataset/soccer1/soccer1_ground_truth.mat",
-    #                            "../../dataset/soccer1/soccer1_bounding_box.mat")
+    slam.init_system(first_img, first_camera, first_bounding_box)
+    slam.add_keyframe(first_img, first_camera, 0)
 
+    for i in range(1, sequence.length):
+        img = sequence.get_image_gray(index=i, dataset_type=1)
+        bounding_box = sequence.get_bounding_box_mask(i)
+        slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
+
+        if slam.tracking_lost:
+            relocalized_camera = slam.relocalize(img, slam.current_camera)
+            slam.init_system(img, relocalized_camera, bounding_box)
+
+            print("do relocalization!")
+        elif slam.new_keyframe:
+            slam.add_keyframe(img, slam.current_camera, i)
+            print("add keyframe!")
+
+        print("=====The ", i, " iteration=====")
+
+        print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
+        print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
+        print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
+
+def ut_basketball():
     """this for basketball"""
-    sequence = SequenceManager("../../dataset/basketball/basketball_anno.mat",
-                               "../../dataset/basketball/images",
-                               "../../dataset/basketball/basketball_ground_truth.mat",
-                               "../../dataset/basketball/bounding_box.mat")
-
+    sequence = SequenceManager("../../dataset/basketball/seq1/ground_truth.mat",
+                               "../../dataset/basketball/seq1/images",
+                               "../../dataset/basketball/seq1/ground_truth.mat",
+                               "../../dataset/basketball/player_bounding_box.mat")
     slam = PtzSlam()
 
     first_img = sequence.get_image_gray(index=0, dataset_type=0)
@@ -481,3 +502,8 @@ if __name__ == "__main__":
         print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
         print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
         print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
+
+
+if __name__ == "__main__":
+    ut_basketball()
+
