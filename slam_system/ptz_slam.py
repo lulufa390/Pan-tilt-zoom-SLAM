@@ -473,7 +473,7 @@ def ut_basketball():
     sequence = SequenceManager("../../dataset/basketball/seq1/ground_truth.mat",
                                "../../dataset/basketball/seq1/images",
                                "../../dataset/basketball/seq1/ground_truth.mat",
-                               "../../dataset/basketball/player_bounding_box.mat")
+                               "../../dataset/basketball/seq1/player_bounding_box.mat")
     slam = PtzSlam()
 
     first_img = sequence.get_image_gray(index=0, dataset_type=0)

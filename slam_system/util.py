@@ -171,11 +171,10 @@ def load_camera_pose(path):
     :return: 3 arrays (pan, tilt, zoom) each of size [n]. (n is length of sequence)
     """
     camera_pos = sio.loadmat(path)
-    pan = camera_pos['pan'].squeeze()
-    tilt = camera_pos['tilt'].squeeze()
-    f = camera_pos['f'].squeeze()
+    ptz = camera_pos['ptz']
+    pan, tilt, focal_length = ptz[:,0], ptz[:,1], ptz[:, 2]
 
-    return pan, tilt, f
+    return pan, tilt, focal_length
 
 
 def video_capture(file_path, save_path, begin_time, rate, length):
