@@ -444,9 +444,10 @@ def ut_edge_point():
 
 
 if __name__ == "__main__":
-    ut_edge_point()
+    #ut_edge_point()
     #ut_template2D()
     #draw_template()
+    ut_wireframe()
 
 
 
