@@ -41,6 +41,16 @@ class PTZCamera:
             self.displacement = displacement
         self.projection_matrix = np.zeros((3, 4))
 
+    def _compute_camera_matrix(self):
+        """
+        compute camera matrix
+        :return:
+        """
+        K = np.array([[self.focal_length, 0, self.principal_point[0]],
+                      [0, self.focal_length, self.principal_point[1]],
+                      [0, 0, 1]])
+        return K
+
     def _compute_rotation_matrix(self):
         """
         rotation matrix from pan, tilt angles and the base rotation
@@ -49,17 +59,44 @@ class PTZCamera:
         pan = math.radians(self.pan)
         tilt = math.radians(self.tilt)
 
-        pan_rot = np.array([[1, 0, 0],
+        tilt_rot = np.array([[1, 0, 0],
                             [0, math.cos(tilt), math.sin(tilt)],
                             [0, -math.sin(tilt), math.cos(tilt)]])
-        tilt_rot = np.array([[math.cos(pan), 0, -math.sin(pan)],
+        pan_rot = np.array([[math.cos(pan), 0, -math.sin(pan)],
                              [0, 1, 0],
                              [math.sin(pan), 0, math.cos(pan)]])
         pan_tilt_rotation = np.dot(tilt_rot, pan_rot)
         rotation = np.dot(pan_tilt_rotation, self.base_rotation)
         return rotation
 
+    def _compute_pan_matrix(self):
+        """
+        rotation matrix from the pan angle
+        :return:
+        """
+
+        pan = math.radians(self.pan)
+        pan_rot = np.array([[math.cos(pan), 0, -math.sin(pan)],
+                            [0, 1, 0],
+                            [math.sin(pan), 0, math.cos(pan)]])
+        return pan_rot
+
+    def _compute_tilt_matrix(self):
+        """
+        rotation matrix from the tilt angle
+        :return:
+        """
+        tilt = math.radians(self.tilt)
+        tilt_rot = np.array([[1, 0, 0],
+                             [0, math.cos(tilt), math.sin(tilt)],
+                             [0, -math.sin(tilt), math.cos(tilt)]])
+        return tilt_rot
+
     def _compute_dispalcement(self):
+        """
+        displacement between the projetion center and the rotation center
+        :return:
+        """
         fl = self.focal_length
         wt = self.displacement
         return np.array([wt[0] + wt[3] * fl,
@@ -115,29 +152,6 @@ class PTZCamera:
         assert uvw[2] != 0.0
         return uvw[0]/uvw[2], uvw[1]/uvw[2]
 
-        """
-        pan = math.radians(self.pan)
-        tilt = math.radians(self.tilt)
-
-        k = np.array([[self.focal_length, 0, self.principal_point[0]],
-                      [0, self.focal_length, self.principal_point[1]],
-                      [0, 0, 1]])
-
-        rotation = np.dot(np.array([[1, 0, 0],
-                                    [0, cos(tilt), sin(tilt)],
-                                    [0, -sin(tilt), cos(tilt)]]),
-
-                          np.array([[cos(pan), 0, -sin(pan)],
-                                    [0, 1, 0],
-                                    [sin(pan), 0, cos(pan)]]))
-
-        rotation = np.dot(rotation, self.base_rotation)
-
-        position = np.dot(k, np.dot(rotation, p - self.camera_center))
-        """
-
-        return position[0] / position[2], position[1] / position[2]
-
     def project_3d_points(self, ps, height=0, width=0):
         """
         Project a array of 3d points to image.
@@ -146,6 +160,8 @@ class PTZCamera:
         :param width: width of image.
         :return: projected points in image range ([m, 2] array) and its index in ps
         """
+        print('project_3d_points deprecated')
+        assert 0
         points = np.ndarray([0, 2])
         index = np.ndarray([0])
 
@@ -170,26 +186,18 @@ class PTZCamera:
         """
         theta = math.radians(ray[0])
         phi = math.radians(ray[1])
-        pan = math.radians(self.pan)
-        tilt = math.radians(self.tilt)
 
-        k = np.array([[self.focal_length, 0, self.principal_point[0]],
-                      [0, self.focal_length, self.principal_point[1]],
-                      [0, 0, 1]])
+        K = self._compute_camera_matrix()
 
-        rotation = np.dot(np.array([[1, 0, 0],
-                                    [0, math.cos(tilt), math.sin(tilt)],
-                                    [0, -math.sin(tilt), math.cos(tilt)]]),
+        pan_tilt_rotation = np.dot(self._compute_tilt_matrix(), self._compute_pan_matrix())
+        disp = self._compute_dispalcement()
 
-                          np.array([[math.cos(pan), 0, -math.sin(pan)],
-                                    [0, 1, 0],
-                                    [math.sin(pan), 0, math.cos(pan)]]))
+        ray_p = np.array([math.tan(theta), -math.tan(phi) * math.sqrt(math.tan(theta) * math.tan(theta) + 1), 1])
 
-        p = np.array([math.tan(theta), -math.tan(phi) * math.sqrt(math.tan(theta) * math.tan(theta) + 1), 1])
+        img_p = np.dot(K, np.dot(pan_tilt_rotation, ray_p) + disp)
+        assert img_p[2] != 0.0
 
-        position = np.dot(k, np.dot(rotation, p))
-
-        return position[0] / position[2], position[1] / position[2]
+        return img_p[0] / img_p[2], img_p[1] / img_p[2]
 
     def project_rays(self, rays, height=0, width=0):
         """
@@ -217,6 +225,7 @@ class PTZCamera:
 
     def back_project_to_3d_point(self, x, y):
         """
+        Used for general camera (not for ray-based PTZ cameras)
         Back project image point to 3d point.
         The 3d points on the same ray are all corresponding to the image point.
         So you should set a dimension (z) to determine that 3d point.
@@ -275,20 +284,18 @@ class PTZCamera:
         pan = math.radians(self.pan)
         tilt = math.radians(self.tilt)
 
-        k = np.array([[self.focal_length, 0, self.principal_point[0]],
+        im_pos = np.array([x, y, 1])   # homogenerous coordinate
+        disp = self._compute_dispalcement()
+
+        K = np.array([[self.focal_length, 0, self.principal_point[0]],
                       [0, self.focal_length, self.principal_point[1]],
                       [0, 0, 1]])
+        invK = np.linalg.inv(K)
 
-        rotation = np.dot(np.array([[1, 0, 0],
-                                    [0, math.cos(tilt), math.sin(tilt)],
-                                    [0, -math.sin(tilt), math.cos(tilt)]]),
+        pan_tilt_R = np.dot(self._compute_tilt_matrix(), self._compute_pan_matrix())
+        pan_tilt_R_inv = np.linalg.inv(pan_tilt_R)
+        x3d, y3d, z3d = np.dot(pan_tilt_R_inv, np.dot(invK, im_pos) - disp)
 
-                          np.array([[math.cos(pan), 0, -math.sin(pan)],
-                                    [0, 1, 0],
-                                    [math.sin(pan), 0, math.cos(pan)]]))
-
-        inv_mat = np.linalg.inv(np.dot(k, rotation))
-        x3d, y3d, z3d = np.dot(inv_mat, np.array([x, y, 1]))
 
         theta = math.atan(x3d / z3d)
         phi = math.atan(-y3d / math.sqrt(x3d * x3d + z3d * z3d))

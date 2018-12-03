@@ -448,7 +448,7 @@ def ut_soccer():
     slam.init_system(first_img, first_camera, first_bounding_box)
     slam.add_keyframe(first_img, first_camera, 0)
 
-    for i in range(1, sequence.length):
+    for i in range(1, sequence.length, 5):
         img = sequence.get_image_gray(index=i, dataset_type=1)
         bounding_box = sequence.get_bounding_box_mask(i)
         slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
