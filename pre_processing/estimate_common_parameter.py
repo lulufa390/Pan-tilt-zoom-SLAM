@@ -6,6 +6,8 @@ from ctypes import cdll
 from ctypes import c_int
 lib = cdll.LoadLibrary('/Users/jimmy/Source/opencv_util/build/libcvx_opt_python.dylib')
 
+import sys
+sys.path.append('/Users/jimmy/Source/opencv_util/python_package')
 
 # prepare calibration data
 #model = sio.loadmat('./data/ice_hockey_edge_point_6_feet.mat')
@@ -52,7 +54,10 @@ opt_cameras = np.zeros((N, 9))
 opt_ptzs = np.zeros((N, 3))
 shared_parameters = np.zeros((12, 1))
 
+from cvx_opt import optimize_broadcast_cameras
+opt_cameras, opt_ptzs, shared_parameters = optimize_broadcast_cameras(model_pts, init_cameras, rod)
 
+"""
 lib.estimateCommonCameraCenterAndRotationAndDisplacment(ctypes.c_void_p(model_pts.ctypes.data),
                                                         c_int(rows),
                                                         ctypes.c_void_p(init_cameras.ctypes.data),
@@ -61,6 +66,7 @@ lib.estimateCommonCameraCenterAndRotationAndDisplacment(ctypes.c_void_p(model_pt
                                                         ctypes.c_void_p(opt_cameras.ctypes.data),
                                                         ctypes.c_void_p(opt_ptzs.ctypes.data),
                                                         ctypes.c_void_p(shared_parameters.ctypes.data),)
+"""
 
 #print(opt_cameras[0,:])
 #print(shared_parameters)

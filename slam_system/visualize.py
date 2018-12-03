@@ -112,24 +112,20 @@ def broadcast_ptz_camera_project_model(camera, model_points, model_line_segment,
     :param rgb_image: an RGB image
     :return: rgb image with overlaid line model
     """
-    from ctypes import cdll
-    from ctypes import c_int
-    from ctypes import c_void_p
-    #@todo hardcode library
-    lib = cdll.LoadLibrary('/Users/jimmy/Source/opencv_util/build/libcvx_opt_python.dylib')
+
     assert camera.shape[0] == 17
     assert model_points.shape[1] == 2
     assert model_line_segment.shape[1] == 2
     N = model_points.shape[0]
-    image_points = np.zeros((N, 2))
+
     points = np.zeros((N, 3))
     points[:,:-1] = model_points
 
-    lib.broadcastCameraProjection(c_void_p(camera.ctypes.data),
-                                  c_void_p(points.ctypes.data),
-                                  c_int(N),
-                                  c_void_p(image_points.ctypes.data))
-    print(image_points)
+    # import sys
+    # sys.path.append('/Users/jimmy/Source/opencv_util/python_package')
+    from cvx_opt import broadcast_camera_projection
+    image_points = broadcast_camera_projection(camera, points)
+
     import copy
     vis_image = copy.deepcopy(rgb_image)
     for i in range(len(model_line_segment)):
@@ -159,10 +155,6 @@ def ut_project_model():
     # model_points = points;
     # model_line_segment = line_segment_index + 1;
     # project_model(camera, model_points, model_line_segment, I);
-
-def ut_broadcast_ptz_camera_project_model():
-    pass
-
 
 
 def ut_Visualize():
