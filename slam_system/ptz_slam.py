@@ -12,6 +12,10 @@ from util import *
 from key_frame import KeyFrame
 from relocalization import relocalization_camera
 
+import scipy.io as sio
+import cv2 as cv
+from ptz_camera import PTZCamera
+
 
 class PtzSlam:
     def __init__(self):
@@ -434,6 +438,7 @@ class PtzSlam:
             self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
             self.new_keyframe = False
 
+
 def ut_soccer():
     sequence = SequenceManager("../../dataset/soccer/seq1/seq1_anno.mat",
                                "../../dataset/soccer/seq1/seq1_161",
@@ -467,6 +472,7 @@ def ut_soccer():
         print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
         print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
         print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
+
 
 def ut_basketball():
     """this for basketball"""
@@ -504,6 +510,39 @@ def ut_basketball():
         print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
 
 
-if __name__ == "__main__":
-    ut_basketball()
+def ut_hockey():
+    slam = PtzSlam()
+    sequence_length = 26
 
+    annotation = sio.loadmat("../../ice_hockey_1/olympic_2010_reference_frame.mat")
+
+    filename = annotation["images"]
+    ptzs = annotation["opt_ptzs"]
+    cameras = annotation["opt_cameras"]
+    shared_parameters = annotation["shared_parameters"]
+
+    first_img_color = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[0])
+    first_img_gray = cv.cvtColor(first_img_color, cv.COLOR_BGR2GRAY)
+
+    first_camera = PTZCamera(cameras[0, 0:2], shared_parameters[0:3, 0],
+                             shared_parameters[3:6, 0], shared_parameters[6:12, 0])
+    first_camera.set_ptz(ptzs[0])
+
+    slam.init_system(first_img_gray, first_camera)
+    slam.add_keyframe(first_img_gray, first_camera, 0)
+
+    for i in range(1, sequence_length):
+        next_img_color = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[i])
+        next_img_gray = cv.cvtColor(next_img_color, cv.COLOR_BGR2GRAY)
+
+        slam.tracking(next_img=next_img_gray, bad_tracking_percentage=80, bounding_box=None)
+
+        print("=====The ", i, " iteration=====")
+        print("%f" % (slam.cameras[i].pan - ptzs[i, 0]))
+        print("%f" % (slam.cameras[i].tilt - ptzs[i, 1]))
+        print("%f" % (slam.cameras[i].focal_length - ptzs[i, 2]))
+
+
+if __name__ == "__main__":
+    # ut_basketball()
+    ut_hockey()
