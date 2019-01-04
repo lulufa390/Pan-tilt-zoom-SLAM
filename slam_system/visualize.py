@@ -53,8 +53,111 @@ class Visualize:
             cv.line(img, (int(image_points[begin][0]), int(image_points[begin][1])),
                     (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 10)
 
+def project_model(camera, model_points, model_line_segment, rgb_image):
+    """
+    project a 2D field model to the image space
+    :param camera: 9 camera parameters, (u, v, focal_length, Rx, Rx, Rz, Cx, Cy, Cz)
+                    (Rx, Rx, Rz): is Rodrigues angle, (Cx, Cy, Cz) unit in meter
+    :param model_points: N x 2 matrix, model world coordinate in meter
+    :param model_line_segment: ine segment index, start from 0
+    :param rgb_image: an RGB image
+    :return:
+    % example:
+    % camera = [640.000000	 360.000000	 2986.943295	 1.367497	 -1.082443	 0.980122	 -16.431519	 14.086604	 5.580546];
+    % I = imread('00003600.jpg');
+    % load('soccer_field_model.mat');
+    % model_points = points;
+    % model_line_segment = line_segment_index + 1;
+    % project_model(camera, model_points, model_line_segment, I);
+    """
+    assert camera.shape[0] == 9
+    assert model_points.shape[1] == 2
+    assert model_line_segment.shape[1] == 2
+    u, v, f = camera[0:3]
+    K = np.eye(3, 3)
+    K[0][0] = f
+    K[0][2] = u
+    K[1][1] = f
+    K[1][2] = v
+    rod = camera[3:6]
+    rotation = np.zeros((3, 3))
+    cv.Rodrigues(rod, rotation)
+    cc = camera[6:9]
+    #print('rotation', rotation)
+    N = model_points.shape[0]
+    image_points = np.zeros((N, 2))
+    for i in range(N):
+        p = np.array([model_points[i][0], model_points[i][1], 0])
+        p = np.dot(K, np.dot(rotation, p - cc))
+        if p[2] != 0.0:
+            image_points[i][0] = p[0] / p[2]
+            image_points[i][1] = p[1] / p[2]
+    import  copy
+    vis_image = copy.deepcopy(rgb_image)
+    for i in range(len(model_line_segment)):
+        begin = int(model_line_segment[i][0])
+        end = int(model_line_segment[i][1])
+        cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
+                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
+    return vis_image
 
-if __name__ == '__main__':
+def broadcast_ptz_camera_project_model(camera, model_points, model_line_segment, rgb_image):
+    """
+    project a 2D field model to the image space
+    :param camera: 17 parameters
+    shared (camera center, rotation, lambda), principal point, pan-tilt-zoom,  12 + 2 + 3 = 17
+    camera center in meters
+    :param model_points: N x 2 matrix, model world coordinate in meter
+    :param model_line_segment: ine segment index, start from 0
+    :param rgb_image: an RGB image
+    :return: rgb image with overlaid line model
+    """
+
+    assert camera.shape[0] == 17
+    assert model_points.shape[1] == 2
+    assert model_line_segment.shape[1] == 2
+    N = model_points.shape[0]
+
+    points = np.zeros((N, 3))
+    points[:,:-1] = model_points
+
+    # import sys
+    # sys.path.append('/Users/jimmy/Source/opencv_util/python_package')
+    from cvx_opt import broadcast_camera_projection
+    image_points = broadcast_camera_projection(camera, points)
+
+    import copy
+    vis_image = copy.deepcopy(rgb_image)
+    for i in range(len(model_line_segment)):
+        begin = int(model_line_segment[i][0])
+        end = int(model_line_segment[i][1])
+        cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
+                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
+    return vis_image
+
+
+def ut_project_model():
+    camera = np.array([640.000000, 360.000000, 2986.943295,
+                       1.367497, -1.082443, 0.980122,
+                       -16.431519, 14.086604, 5.580546])
+    image = cv.imread('/Users/jimmy/Desktop/00003600.jpg')
+    data = sio.loadmat('/Users/jimmy/Desktop/wwos_soccer_field_model.mat')
+
+    model_points = data['points']
+    model_line_segment = data['line_segment_index']
+    image = project_model(camera, model_points, model_line_segment, image)
+    cv.imshow('image', image)
+    cv.waitKey(0)
+
+
+    # I = imread('00003600.jpg');
+    # load('soccer_field_model.mat');
+    # model_points = points;
+    # model_line_segment = line_segment_index + 1;
+    # project_model(camera, model_points, model_line_segment, I);
+
+
+def ut_Visualize():
     visualize = Visualize("./basketball/basketball_model.mat",
                           "./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images")
 
@@ -75,3 +178,7 @@ if __name__ == '__main__':
         print(i)
         # cv.imshow("test", img)
         # cv.waitKey(0)
+
+
+if __name__ == '__main__':
+    ut_project_model()
