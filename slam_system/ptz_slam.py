@@ -537,6 +537,15 @@ def ut_hockey():
 
         slam.tracking(next_img=next_img_gray, bad_tracking_percentage=80, bounding_box=None)
 
+        if slam.tracking_lost:
+            relocalized_camera = slam.relocalize(next_img_gray, slam.current_camera)
+            slam.init_system(next_img_gray, relocalized_camera)
+
+            print("do relocalization!")
+        elif slam.new_keyframe:
+            slam.add_keyframe(next_img_gray, slam.current_camera, i)
+            print("add keyframe!")
+
         print("=====The ", i, " iteration=====")
         print("%f" % (slam.cameras[i].pan - ptzs[i, 0]))
         print("%f" % (slam.cameras[i].tilt - ptzs[i, 1]))

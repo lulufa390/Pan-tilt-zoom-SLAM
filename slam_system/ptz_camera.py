@@ -176,13 +176,13 @@ class PTZCamera:
 
         if height != 0 and width != 0:
             for j in range(len(ps)):
-                tmp = self.project_3Dpoint(ps[j])
+                tmp = self.project_3d_point(ps[j])
                 if 0 < tmp[0] < width and 0 < tmp[1] < height:
                     points = np.row_stack([points, np.asarray(tmp)])
                     index = np.concatenate([index, [j]], axis=0)
         else:
             for j in range(len(ps)):
-                tmp = self.project_3Dpoint(ps[j])
+                tmp = self.project_3d_point(ps[j])
                 points = np.row_stack([points, np.asarray(tmp)])
 
         return points, index
@@ -348,7 +348,18 @@ def ut_broadcast_camera_model():
 
         for j in range(len(points)):
             p = np.array([points[j][0], points[j][1], 0])
+
             image_points[j][0], image_points[j][1] = camera.project_3d_point(p)
+
+
+            # ray = np.ndarray(2)
+            # p = p - shared_parameters[0:3, 0]
+            # p = np.dot(camera.base_rotation, p)
+            # ray[0] = math.degrees(math.atan(p[0] / p[2]))
+            # ray[1] = math.degrees(math.atan(-p[1] / math.sqrt(p[0] * p[0] + p[2] * p[2])))
+            # image_points[j][0], image_points[j][1] = camera.project_ray(ray)
+
+            print(image_points[j])
 
         # draw lines
         for j in range(len(line_index)):
@@ -362,5 +373,24 @@ def ut_broadcast_camera_model():
         cv.waitKey(0)
 
 
+def ut_ray_project():
+    annotation = sio.loadmat("../../ice_hockey_1/olympic_2010_reference_frame.mat")
+    filename = annotation["images"]
+    ptzs = annotation["opt_ptzs"]
+    cameras = annotation["opt_cameras"]
+    shared_parameters = annotation["shared_parameters"]
+
+    camera = PTZCamera(cameras[0, 0:2], shared_parameters[0:3, 0],
+                       shared_parameters[3:6, 0], shared_parameters[6:12, 0])
+    # camera = PTZCamera(cameras[0, 0:2], shared_parameters[0:3, 0],
+    #                    shared_parameters[3:6, 0])
+
+    camera.set_ptz(ptzs[0])
+    print(camera.project_ray(np.array([10, 0])))
+
+    print(camera.back_project_to_ray(0, 320))
+
+
 if __name__ == '__main__':
     ut_broadcast_camera_model()
+    # ut_ray_project()
