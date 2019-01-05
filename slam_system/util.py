@@ -11,6 +11,28 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 from image_process import *
 
+def get_projection_matrix_with_camera(camera):
+    """
+    :param camera: len = 9 array(principle point, f, Rx, Ry, Rz, Cx, Cy, Cz)
+    :return: 3 * 4 projection matrix
+    """
+    k = np.array([[camera[2], 0, camera[0]],
+                  [0, camera[2], camera[1]],
+                  [0, 0, 1]])
+
+    rod = camera[3:6]
+    rotation = np.zeros((3, 3))
+    cv.Rodrigues(rod, rotation)
+
+    cc = np.eye(3, 4)
+    cc[0][3] = -camera[6]
+    cc[1][3] = -camera[7]
+    cc[2][3] = -camera[8]
+
+
+    project_mat = np.dot(k, np.dot(rotation, cc))
+    return project_mat
+
 
 def overlap_pan_angle(fl_1, pan_1, fl_2, pan_2, im_width):
     """
