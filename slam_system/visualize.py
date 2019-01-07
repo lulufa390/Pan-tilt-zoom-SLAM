@@ -101,7 +101,7 @@ def project_model(camera, model_points, model_line_segment, rgb_image):
                 (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
     return vis_image
 
-def broadcast_ptz_camera_project_model(camera, model_points, model_line_segment, rgb_image):
+def broadcast_ptz_camera_project_model(common_param, pp, ptz, model_points, model_line_segment, rgb_image):
     """
     project a 2D field model to the image space
     :param camera: 17 parameters
@@ -113,7 +113,9 @@ def broadcast_ptz_camera_project_model(camera, model_points, model_line_segment,
     :return: rgb image with overlaid line model
     """
 
-    assert camera.shape[0] == 17
+    assert common_param.shape[0] == 12 or common_param.shape[0] == 18
+    assert pp.shape[0] == 2
+    assert ptz.shape[0] == 3
     assert model_points.shape[1] == 2
     assert model_line_segment.shape[1] == 2
     N = model_points.shape[0]
@@ -123,8 +125,9 @@ def broadcast_ptz_camera_project_model(camera, model_points, model_line_segment,
 
     # import sys
     # sys.path.append('/Users/jimmy/Source/opencv_util/python_package')
+    # def broadcast_camera_projection(common_param, pp, ptz, points):
     from cvx_opt import broadcast_camera_projection
-    image_points = broadcast_camera_projection(camera, points)
+    image_points = broadcast_camera_projection(common_param, pp, ptz, points)
 
     import copy
     vis_image = copy.deepcopy(rgb_image)
