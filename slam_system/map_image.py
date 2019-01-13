@@ -57,6 +57,77 @@ def enlarge_image(img, vertical, horizontal):
     return enlarged_image
 
 
+def get_median_ptz(ptz_list):
+    """
+    :param ptz_list: pan-tilt-zoom angles of length N, list of arrays with shape = 3.
+    :return: a array of [pan, tilt, zoom]
+    """
+    pan_list = [angles[0] for angles in ptz_list]
+    tilt_list = [angles[1] for angles in ptz_list]
+    zoom_list = [angles[2] for angles in ptz_list]
+
+    median_pan = np.median(pan_list)
+    median_tilt = np.median(tilt_list)
+    median_zoom = np.median(zoom_list)
+    return np.array([median_pan, median_tilt, median_zoom])
+
+
+def blending_with_median(image_list, mask_list):
+    """
+    Blending the images to a panorama with median color value at each pixel.
+    :param image_list: a list of image to be combined.
+    :param mask_list: a list of mask to annotate each pixel is inside a image or not.
+    :return: blending result image.
+    """
+    assert len(image_list) == len(mask_list)
+    for i in range(len(image_list)):
+        assert image_list[i].shape == mask_list[i].shape
+
+    blending_result = np.zeros(image_list[0].shape, np.uint8)
+
+    for x in range(blending_result.shape[1]):
+        for y in range(blending_result.shape[0]):
+            for z in range(blending_result.shape[2]):
+                color_value_list = []
+
+                for i in range(len(mask_list)):
+                    if mask_list[i][y, x, z] == 1:
+                        color_value = image_list[i][y, x, z]
+                        color_value_list.append(color_value)
+
+                if len(color_value_list) > 0:
+                    blending_result[y, x, z] = np.median(color_value_list)
+
+                print(x, y, z)
+
+    return blending_result
+
+
+def blending_with_avg(image_list, mask_list):
+    """
+    Blending the images to a panorama with average color value at each pixel.
+    :param image_list: a list of image to be combined.
+    :param mask_list: a list of mask to annotate each pixel is inside a image or not.
+    :return: blending result image.
+    """
+    assert len(image_list) == len(mask_list)
+    for i in range(len(image_list)):
+        assert image_list[i].shape == mask_list[i].shape
+
+    sum_img = np.zeros(image_list[0].shape, np.uint16)
+    total_mask = np.zeros(mask_list[0].shape, np.float)
+
+    for i in range(len(image_list)):
+        sum_img += image_list[i]
+        total_mask += mask_list[i]
+
+    total_mask[total_mask == 0] = 1
+
+    panorama = (sum_img / total_mask).astype(np.uint8)
+
+    return panorama
+
+
 def generate_panoramic_image(standard_camera, img_list, ptz_list):
     """
     Generate panoramic image with a list of images and camera pose.
@@ -68,26 +139,18 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
 
     assert len(img_list) == len(ptz_list)
 
+    for image in img_list:
+        assert len(image.shape) == 3
+
+    vertical_border = 100
+    horizontal_border = 500
+
     # the pan tilt zoom angles that all images project to
-    # here it is set to be the average of all pans, tilts, zooms
-    standard_ptz = sum(ptz_list) / len(ptz_list)
-    # standard_ptz = ptz_list[2]
-
-    print(ptz_list)
-    print(standard_ptz)
-
-    border_vertical = 100
-    border_horizontal = 500
-
-    # enlarged image list to obligate enough space for homography transformation
-    enlarged_img_list = []
-    for img in img_list:
-        enlarged_img = enlarge_image(img, border_vertical, border_horizontal)
-        enlarged_img_list.append(enlarged_img)
+    # here it is set to be the median of all pans, tilts, zooms
+    standard_ptz = get_median_ptz(ptz_list)
 
     # mask = 0 if it's in the border, else mask = 1
     mask = np.ones(img_list[0].shape, np.uint8)
-    enlarged_mask = enlarge_image(mask, border_vertical, border_horizontal)
 
     # wrap each image in enlarged_img_list with homography matrix
     dst_img_list = []
@@ -95,51 +158,39 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
     # also wrap the mask
     wrap_mask_list = []
 
-    for i, img in enumerate(enlarged_img_list):
+    for i, img in enumerate(img_list):
         # homography matrix
         matrix = get_wrap_matrix(standard_camera, ptz_list[i], standard_ptz)
 
-        # print(matrix)
+        # transformation to right-down, to avoid being wrapped to axes' negative side
+        trans_matrix = np.identity(3)
+        trans_matrix[0, 2] = horizontal_border
+        trans_matrix[1, 2] = vertical_border
+        matrix = np.dot(trans_matrix, matrix)
+
+        # wrapped images shape, larger than origin images
+        dst_shape = (mask.shape[1] + horizontal_border * 2, mask.shape[0] + vertical_border * 2)
 
         # wrap origin image and mask
-        dst = cv.warpPerspective(img, matrix, (img.shape[1], img.shape[0]))
-
-        dst2 = cv.warpPerspective(img, matrix, (img.shape[1] + 500, img.shape[0] + 200))
-        cv.imshow("dst2", dst2)
-
-        mask = cv.warpPerspective(enlarged_mask, matrix, (enlarged_mask.shape[1], enlarged_mask.shape[0]))
+        dst = cv.warpPerspective(img, matrix, dst_shape)
+        wrap_mask = cv.warpPerspective(mask, matrix, dst_shape)
 
         dst_img_list.append(dst)
-        wrap_mask_list.append(mask)
+        wrap_mask_list.append(wrap_mask)
 
-    # blending strategy: the intersection area is the average of all origin images.
-    # so maintain a total_mask here as a count for number of images in the intersection area.
-    # todo: may have better blending strategy (considering the distance).
+    panorama = blending_with_avg(dst_img_list, wrap_mask_list)
 
-    sum_img = np.zeros(enlarged_img_list[0].shape, np.uint16)
-    total_mask = np.zeros(enlarged_img_list[0].shape, np.float)
-
-    for i in range(len(dst_img_list)):
-        # for wrap_mask in wrap_mask_list:
-        #     panoramic_img += np.uint8(dst_img_list[i] * (wrap_mask / total_mask))
-
-        sum_img += dst_img_list[i]
-        total_mask += wrap_mask_list[i]
-
-    total_mask[total_mask == 0] = 1
-
-    panorama = (sum_img / total_mask).astype(np.uint8)
     return panorama
 
 
-if __name__ == "__main__":
+def ut_basketball_map():
     seq = sio.loadmat("../../dataset/basketball/basketball_anno.mat")
 
     annotation = seq["annotation"]
     meta = seq["meta"]
 
     # the sequence to generate panorama
-    img_sequence = [0,100, 600, 650, 670, 700,720,750,780,900]
+    img_sequence = [0, 600, 650, 700, 800, 900]
 
     # shared parameters for ptz camera
     camera = PTZCamera(annotation[0][700]['camera'][0][0:2], meta[0][0]["cc"][0], meta[0][0]["base_rotation"][0])
@@ -160,3 +211,7 @@ if __name__ == "__main__":
 
     cv.imwrite("../../map/panorama.jpg", panorama)
     cv.waitKey(0)
+
+
+if __name__ == "__main__":
+    ut_basketball_map()
