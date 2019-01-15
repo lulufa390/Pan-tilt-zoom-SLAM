@@ -6,6 +6,8 @@ Create by Jimmy, 2018.9
 
 import numpy as np
 import time
+import scipy.io as sio
+
 from key_frame import KeyFrame
 from util import overlap_pan_angle
 from bundle_adjustment import bundle_adjustment
@@ -106,8 +108,8 @@ class Map:
                 print('warning: key frame, %d, image index %d is not included in the map' % (i, image_indices[i]))
 
         if verbose:
-            print('updated map, number of key frame: %d, number of landmark %d', len(self.keyframe_list),
-                  len(landmarks))
+            print('updated map, number of key frame: %d, number of landmark %d' %
+                  (len(self.keyframe_list), len(landmarks)))
 
         print("BA time", end - start)
 
@@ -144,6 +146,25 @@ class Map:
         max_overlap = max(pan_angle_overlaps)
         print("overlap", max_overlap)
         return max_overlap > threshold1 and max_overlap < threshold2
+
+    def save_keyframes_to_mat(self, path):
+        """
+        Save the map to a .mat file.
+        """
+        keyframe_data = dict()
+        keyframes = []
+
+        for keyframe in self.keyframe_list:
+            keyframe_dict = {'index': keyframe.img_index,
+                             'ptz': np.array([keyframe.pan, keyframe.tilt, keyframe.f]),
+                             'center': keyframe.center,
+                             'base_rotation': keyframe.base_rotation,
+                             'principal_point': np.array([keyframe.u, keyframe.v])}
+
+            keyframes.append(keyframe_dict)
+
+        keyframe_data['keyframes'] = keyframes
+        sio.savemat(path, mdict=keyframe_data)
 
 
 def ut_add_first_key_frame():

@@ -58,9 +58,9 @@ class KeyFrame:
         """
         keyframe_data = dict()
         keyframe_data['img_index'] = self.img_index
-        keyframe_data['feature_pts'] = self.feature_pts
-        keyframe_data['feature_des'] = self.feature_des
-        keyframe_data['landmark_index'] = self.landmark_index
+        # keyframe_data['feature_pts'] = self.feature_pts
+        # keyframe_data['feature_des'] = self.feature_des
+        # keyframe_data['landmark_index'] = self.landmark_index
         keyframe_data['camera_pose'] = self.pan, self.tilt, self.f
         keyframe_data['center'] = self.center
         keyframe_data['base_rotation'] = self.base_rotation

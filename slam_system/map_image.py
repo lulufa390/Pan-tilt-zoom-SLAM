@@ -10,6 +10,7 @@ import scipy.io as sio
 import numpy.linalg as lg
 
 from ptz_camera import PTZCamera
+from sequence_manager import SequenceManager
 
 
 def get_wrap_matrix(camera, src_ptz, target_ptz):
@@ -179,6 +180,7 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
         wrap_mask_list.append(wrap_mask)
 
     panorama = blending_with_avg(dst_img_list, wrap_mask_list)
+    # panorama = blending_with_median(dst_img_list, wrap_mask_list)
 
     return panorama
 
@@ -213,5 +215,37 @@ def ut_basketball_map():
     cv.waitKey(0)
 
 
+def ut_basketball_estimated_map():
+
+    sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/bounding_box.mat")
+
+    keyframe_list = []
+    for i in range(9):
+        keyframe = sio.loadmat("../../map/" + str(i) + ".mat")
+        keyframe_list.append(keyframe)
+
+    camera = sequence.get_camera(0)
+
+    images = []
+    for keyframe in keyframe_list:
+        img_index = keyframe['img_index'].squeeze()
+        img = sequence.get_image(img_index, 0)
+        images.append(img)
+
+    ptz_list = []
+    for keyframe in keyframe_list:
+        ptz = keyframe['camera_pose'].squeeze()
+        ptz_list.append(ptz)
+
+    panorama = generate_panoramic_image(camera, images, ptz_list)
+    cv.imshow("test", panorama)
+
+    cv.imwrite("../../map/panorama2.jpg", panorama)
+    cv.waitKey(0)
+
 if __name__ == "__main__":
-    ut_basketball_map()
+    # ut_basketball_map()
+    ut_basketball_estimated_map()

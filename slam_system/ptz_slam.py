@@ -4,17 +4,17 @@ Main part of our system. Ray landmarks based PTZ SLAM.
 Created by Luke, 2018.9
 """
 
-import copy
-from image_process import *
-from sequence_manager import SequenceManager
-from scene_map import Map
-from util import *
-from key_frame import KeyFrame
-from relocalization import relocalization_camera
-
 import scipy.io as sio
 import cv2 as cv
+import copy
+
+from sequence_manager import SequenceManager
+from scene_map import Map
+from key_frame import KeyFrame
+from relocalization import relocalization_camera
 from ptz_camera import PTZCamera
+from image_process import *
+from util import *
 
 
 class PtzSlam:
@@ -391,7 +391,7 @@ class PtzSlam:
 
         if tracking_percentage > bad_tracking_percentage:
             # basketball set to (10, 25), soccer maybe (10, 15)
-            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
+            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 25):
                 self.new_keyframe = True
 
     def relocalize(self, img, camera):
@@ -476,10 +476,10 @@ def ut_soccer():
 
 def ut_basketball():
     """this for basketball"""
-    sequence = SequenceManager("../../dataset/basketball/seq1/ground_truth.mat",
-                               "../../dataset/basketball/seq1/images",
-                               "../../dataset/basketball/seq1/ground_truth.mat",
-                               "../../dataset/basketball/seq1/player_bounding_box.mat")
+    sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/bounding_box.mat")
     slam = PtzSlam()
 
     first_img = sequence.get_image_gray(index=0, dataset_type=0)
@@ -508,6 +508,16 @@ def ut_basketball():
         print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
         print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
         print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
+
+        slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
+
+        # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
+        #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
+
+    slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
+
+    # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
+    #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
 
 
 def ut_hockey():
@@ -553,5 +563,5 @@ def ut_hockey():
 
 
 if __name__ == "__main__":
-    # ut_basketball()
-    ut_hockey()
+    ut_basketball()
+    # ut_hockey()
