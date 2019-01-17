@@ -246,6 +246,31 @@ def ut_basketball_estimated_map():
     cv.imwrite("../../map/panorama2.jpg", panorama)
     cv.waitKey(0)
 
+
+def ut_hockey_map():
+    annotation = sio.loadmat("../../ice_hockey_1/olympic_2010_reference_frame.mat")
+    filename = annotation["images"]
+    ptzs = annotation["opt_ptzs"]
+    cameras = annotation["opt_cameras"]
+    shared_parameters = annotation["shared_parameters"]
+
+    camera = PTZCamera(cameras[0, 0:2], shared_parameters[0:3, 0],
+                       shared_parameters[3:6, 0], shared_parameters[6:12, 0])
+
+    images = []
+    ptz_list = []
+    for i in range(0, 26, 3):
+        img = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[i])
+        images.append(img)
+        ptz_list.append(ptzs[i])
+
+    panorama = generate_panoramic_image(camera, images, ptz_list)
+    cv.imshow("test", panorama)
+
+    cv.imwrite("../../map/panorama_hockey.jpg", panorama)
+    cv.waitKey(0)
+
 if __name__ == "__main__":
     # ut_basketball_map()
-    ut_basketball_estimated_map()
+    # ut_basketball_estimated_map()
+    ut_hockey_map()
