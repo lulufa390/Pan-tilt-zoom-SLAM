@@ -4,6 +4,7 @@ This file is to generate a panoramic image as the map.
 Created by Luke, 2019.1.8
 """
 
+import glob
 import cv2 as cv
 import numpy as np
 import scipy.io as sio
@@ -34,6 +35,17 @@ def get_wrap_matrix(camera, src_ptz, target_ptz):
     # p1to2 is the homography matrix from img
     p1to2 = np.dot(target_k, np.dot(target_rotation, np.dot(lg.inv(src_rotation), lg.inv(src_k))))
 
+    return p1to2
+
+
+def get_wrap_matrix_with_k_and_rotation(src_k, target_k, src_rotation, target_rotation):
+    src_rotation_matrix = np.zeros((3, 3))
+    cv.Rodrigues(src_rotation, src_rotation_matrix)
+
+    target_rotation_matrix = np.zeros((3, 3))
+    cv.Rodrigues(target_rotation, target_rotation_matrix)
+
+    p1to2 = np.dot(target_k, np.dot(target_rotation_matrix, np.dot(lg.inv(src_rotation_matrix), lg.inv(src_k))))
     return p1to2
 
 
@@ -185,6 +197,82 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
     return panorama
 
 
+def generate_panoramic_image_with_k_rotation(img_list, camera_list):
+
+    assert len(img_list) == len(camera_list)
+
+    for image in img_list:
+        assert len(image.shape) == 3
+
+    vertical_border = 100
+    horizontal_border = 500
+
+    # the pan tilt zoom angles that all images project to
+    # here it is set to be the median of all pans, tilts, zooms
+    u, v = camera_list[0][0], camera_list[0][1]
+    f_array = []
+    rotation_array1 = []
+    rotation_array2 = []
+    rotation_array3 = []
+
+    for camera in camera_list:
+        f_array.append(camera[2])
+        rotation_array1.append(camera[3])
+        rotation_array2.append(camera[4])
+        rotation_array3.append(camera[5])
+
+    median_f = np.median(f_array)
+
+    standard_k = np.array([[median_f, 0, u],
+                           [0, median_f, v],
+                           [0, 0, 1]])
+
+    standard_rotation = np.array([np.median(rotation_array1), np.median(rotation_array2), np.median(rotation_array3)])
+
+    # mask = 0 if it's in the border, else mask = 1
+    mask = np.ones(img_list[0].shape, np.uint8)
+
+    # wrap each image in enlarged_img_list with homography matrix
+    dst_img_list = []
+
+    # also wrap the mask
+    wrap_mask_list = []
+
+    for i, img in enumerate(img_list):
+        # homography matrix
+        u, v = camera_list[i][0], camera_list[i][1]
+        f = camera_list[i][2]
+
+        src_k = np.array([[f, 0, u],
+                          [0, f, v],
+                          [0, 0, 1]])
+
+        src_rotation = camera_list[i][3:6]
+
+        matrix = get_wrap_matrix_with_k_and_rotation(src_k, standard_k, src_rotation, standard_rotation)
+
+        # transformation to right-down, to avoid being wrapped to axes' negative side
+        trans_matrix = np.identity(3)
+        trans_matrix[0, 2] = horizontal_border
+        trans_matrix[1, 2] = vertical_border
+        matrix = np.dot(trans_matrix, matrix)
+
+        # wrapped images shape, larger than origin images
+        dst_shape = (mask.shape[1] + horizontal_border * 2, mask.shape[0] + vertical_border * 2)
+
+        # wrap origin image and mask
+        dst = cv.warpPerspective(img, matrix, dst_shape)
+        wrap_mask = cv.warpPerspective(mask, matrix, dst_shape)
+
+        dst_img_list.append(dst)
+        wrap_mask_list.append(wrap_mask)
+
+    panorama = blending_with_avg(dst_img_list, wrap_mask_list)
+    # panorama = blending_with_median(dst_img_list, wrap_mask_list)
+
+    return panorama
+
+
 def ut_basketball_map():
     seq = sio.loadmat("../../dataset/basketball/basketball_anno.mat")
 
@@ -192,7 +280,7 @@ def ut_basketball_map():
     meta = seq["meta"]
 
     # the sequence to generate panorama
-    img_sequence = [0, 600, 650, 700, 800, 900]
+    img_sequence = [0, 237, 664, 683, 700, 722, 740, 778, 2461]
 
     # shared parameters for ptz camera
     camera = PTZCamera(annotation[0][700]['camera'][0][0:2], meta[0][0]["cc"][0], meta[0][0]["base_rotation"][0])
@@ -270,7 +358,38 @@ def ut_hockey_map():
     cv.imwrite("../../map/panorama_hockey.jpg", panorama)
     cv.waitKey(0)
 
+
+def ut_hockey_before_optimize_map():
+    files = glob.glob("../../ice_hockey_1/olympic_2010_reference_frame/annotation/*.txt")
+    N = len(files)
+    # initial camera data
+    init_cameras = []
+    images = []
+
+    annotation = sio.loadmat("../../ice_hockey_1/olympic_2010_reference_frame.mat")
+    filename = annotation["images"]
+
+
+    num_list = [0, 1]
+
+    for i in num_list:
+        file_name = files[i]
+
+        data = np.loadtxt(file_name, delimiter='\t', skiprows=2)
+        # init_cameras[i, :] = data
+        init_cameras.append(data)
+
+        img = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[i])
+        images.append(img)
+
+    panorama = generate_panoramic_image_with_k_rotation(images, init_cameras)
+    cv.imshow("test", panorama)
+
+    cv.imwrite("../../map/before_optimize_hockey.jpg", panorama)
+    cv.waitKey(0)
+
 if __name__ == "__main__":
     # ut_basketball_map()
     # ut_basketball_estimated_map()
-    ut_hockey_map()
+    # ut_hockey_map()
+    ut_hockey_before_optimize_map()

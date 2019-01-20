@@ -367,7 +367,7 @@ def ut_broadcast_camera_model():
             end = line_index[j][1]
 
             cv.line(img, (int(image_points[begin][0]), int(image_points[begin][1])),
-                    (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 5)
+                    (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
 
         cv.imshow("result", img)
         cv.waitKey(0)
