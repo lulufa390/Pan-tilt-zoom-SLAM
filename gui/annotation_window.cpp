@@ -2,12 +2,14 @@
 #include "annotation_window.h"
 
 AnnotationWindow::AnnotationWindow(MouseClickCallback mouseClick){
+	// base information of the window
 	frame = cv::Mat(750, 1400, CV_8UC3);
 	frame = cv::Scalar(50, 50, 50);
 	window_name = "Camera Calibration Tool";
 
-	source_img = cv::Mat(360, 640, CV_8UC3, cv::Scalar(0, 0, 0));
-	model_img = cv::Mat(360, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+	// the source image and model image are set to be black as default
+	source_img = cv::Mat(img_size.height, img_size.width, CV_8UC3, cv::Scalar(0, 0, 0));
+	model_img = cv::Mat(img_size.height, img_size.width, CV_8UC3, cv::Scalar(0, 0, 0));
 }
 
 AnnotationWindow::~AnnotationWindow(){}
@@ -15,12 +17,24 @@ AnnotationWindow::~AnnotationWindow(){}
 
 void AnnotationWindow::set_source_img(cv::Mat & origin_source_img)
 {
-	cv::resize(origin_source_img, source_img, cv::Size(640, 360), cv::INTER_LINEAR);
+	source_img_origin_size = cv::Size(origin_source_img.cols, origin_source_img.rows);
+	cv::resize(origin_source_img, source_img, img_size, cv::INTER_LINEAR);
 }
 
 void AnnotationWindow::set_model_img(cv::Mat & origin_model_img)
 {
-	cv::resize(origin_model_img, model_img, cv::Size(640, 360), cv::INTER_LINEAR);
+	model_img_origin_size = cv::Size(origin_model_img.cols, origin_model_img.rows);
+	cv::resize(origin_model_img, model_img, img_size, cv::INTER_LINEAR);
+}
+
+void AnnotationWindow::draw_point(cv::Point p)
+{
+	cv::Point leftup = cv::Point(p.x - 5, p.y - 5);
+	cv::Point leftdown = cv::Point(p.x - 5, p.y + 5);
+	cv::Point rightup = cv::Point(p.x + 5, p.y - 5);
+	cv::Point rightdown = cv::Point(p.x + 5, p.y + 5);
+	cv::line(frame, leftup, rightdown, cv::Scalar(255, 0, 0), 1);
+	cv::line(frame, leftdown, rightup, cv::Scalar(255, 0, 0), 1);
 }
 
 void AnnotationWindow::StartLoop(){
@@ -29,25 +43,57 @@ void AnnotationWindow::StartLoop(){
 
 	while (true) {
 
-		cvui::image(frame, 20, 20, source_img);
+		cvui::image(frame, source_img_position.x, source_img_position.y, source_img);
+		cvui::image(frame, model_img_position.x, model_img_position.y, model_img);
 
-		cvui::image(frame, 680, 20, model_img);
+		int source_img_status = cvui::iarea(source_img_position.x, source_img_position.y, img_size.width, img_size.height);
+		int model_img_status = cvui::iarea(model_img_position.x, model_img_position.y, img_size.width, img_size.height);
 
-
-		// Check what is the current status of the mouse cursor
-		// regarding the previously rendered rectangle.
-		int status = cvui::iarea(20, 20, 640, 360);
-
-		switch (status)
+		switch (source_img_status)
 		{
-			case cvui::CLICK:	std::cout << "Rectangle was clicked!" << std::endl; break;
-			case cvui::DOWN:	cvui::printf(frame, 240, 70, "Mouse is: DOWN"); break;
-			case cvui::OVER:	cvui::printf(frame, 240, 70, "Mouse is: OVER"); break;
-			case cvui::OUT:		cvui::printf(frame, 240, 70, "Mouse is: OUT"); break;
+			case cvui::CLICK:	
+				
+				double scale_x = 1.0 * (source_img_origin_size.width - 1) / (img_size.width - 1);
+				double scale_y = 1.0 * (source_img_origin_size.height - 1) / (img_size.height - 1);
+				int x = round((cvui::mouse().x - source_img_position.x) * scale_x);
+				int y = round((cvui::mouse().y - source_img_position.y) * scale_y);
+
+				source_img_pts.push_back(cv::Point(x, y));
+				source_img_pts_show.push_back(cvui::mouse());
+
+				break;
 		}
 
-		// Show the coordinates of the mouse pointer on the screen
-		cvui::printf(frame, 240, 500, "Mouse pointer is at (%d,%d)", cvui::mouse().x, cvui::mouse().y);
+		switch (model_img_status)
+		{
+			case cvui::CLICK:
+				
+				double scale_x = 1.0 * (model_img_origin_size.width - 1) / (img_size.width - 1);
+				double scale_y = 1.0 * (model_img_origin_size.height - 1) / (img_size.height - 1);
+				int x = round((cvui::mouse().x - model_img_position.x) * scale_x);
+				int y = round((cvui::mouse().y - model_img_position.y) * scale_y);
+
+				model_img_pts.push_back(cv::Point(x, y));
+				model_img_pts_show.push_back(cvui::mouse());
+
+				
+				break;
+		}
+
+		for (auto iter = source_img_pts_show.begin(); iter != source_img_pts_show.end(); iter++)
+		{
+			draw_point(*iter);
+		}
+
+		for (auto iter = model_img_pts_show.begin(); iter != model_img_pts_show.end(); iter++)
+		{
+			draw_point(*iter);
+		}
+
+
+		if (cvui::button(frame, 20, 500, 100, 30, "Button")) {
+			// button was clicked
+		}
 
 		// This function must be called *AFTER* all UI components. It does
 		// all the behind the scenes magic to handle mouse clicks, etc.
