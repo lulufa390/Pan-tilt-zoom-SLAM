@@ -13,6 +13,9 @@
 #include <vnl/algo/vnl_levenberg_marquardt.h>
 #include <vnl/vnl_inverse.h>
 #include <vnl/algo/vnl_matrix_inverse.h>
+#include <vgl/vgl_intersection.h>
+#include <vgl/vgl_distance.h>
+
 #include "bcv_vgl_h_matrix_2d_compute_linear.h"
 #include "bcv_vgl_h_matrix_2d_optimize_lmq.h"
 #include "bcv_vgl_h_matrix_2d_decompose.h"
@@ -245,10 +248,128 @@ namespace cvx {
         
         return true;
     }
-
-
     
     
+    class optimize_perspective_camera_ICP_residual: public vnl_least_squares_function
+    {
+    protected:
+        const vector<vgl_point_2d<double> > wldPts_;
+        const vector<vgl_point_2d<double> > imgPts_;
+        const vector<vgl_line_3d_2_points<double> >  wldLines_;
+        const vector<vector<vgl_point_2d<double> > >  imgLinePts_;
+        const vgl_point_2d<double> principlePoint_;
+    public:
+        optimize_perspective_camera_ICP_residual(const vector<vgl_point_2d<double> > & wldPts,
+                                                 const vector<vgl_point_2d<double> > & imgPts,
+                                                 const vector<vgl_line_3d_2_points<double> >  & wldLines,
+                                                 const vector<vector<vgl_point_2d<double> > >  & imgLinePts,
+                                                 const vgl_point_2d<double> & pp,
+                                                 const int num_line_pts):
+        vnl_least_squares_function(7, (unsigned int)(wldPts.size()) * 2 + num_line_pts, no_gradient),
+        wldPts_(wldPts),
+        imgPts_(imgPts),
+        wldLines_(wldLines),
+        imgLinePts_(imgLinePts),
+        principlePoint_(pp)
+        {
+            assert(wldPts.size() == imgPts.size());
+            assert(wldPts.size() + wldLines.size() >= 4);
+            assert(wldLines.size() == imgLinePts.size());
+        }
+        
+        void f(vnl_vector<double> const &x, vnl_vector<double> &fx)
+        {
+            //focal length, Rxyz, Camera_center_xyz
+            vpgl_calibration_matrix<double> K(x[0], principlePoint_);
+            
+            vnl_vector_fixed<double, 3> rod(x[1], x[2], x[3]);
+            vgl_rotation_3d<double>  R(rod);
+            vgl_point_3d<double> cc(x[4], x[5], x[6]);  //camera center
+            
+            vpgl_perspective_camera<double> camera;
+            camera.set_calibration(K);
+            camera.set_rotation(R);
+            camera.set_camera_center(cc);
+            
+            //loop all points
+            int idx = 0;
+            for (int i = 0; i<wldPts_.size(); i++) {
+                vgl_point_3d<double> p(wldPts_[i].x(), wldPts_[i].y(), 0);
+                vgl_point_2d<double> proj_p = (vgl_point_2d<double>)camera.project(p);
+                
+                fx[idx] = imgPts_[i].x() - proj_p.x();
+                idx++;
+                fx[idx] = imgPts_[i].y() - proj_p.y();
+                idx++;
+            }
+            
+            // for points locate on the line
+            for (int i = 0; i<wldLines_.size(); i++) {
+                vgl_point_2d<double> p1 = camera.project(wldLines_[i].point1());
+                vgl_point_2d<double> p2 = camera.project(wldLines_[i].point2());
+                vgl_line_2d<double> line(p1, p2);
+                for (int j = 0; j<imgLinePts_[i].size(); j++) {
+                    vgl_point_2d<double> p3 = imgLinePts_[i][j];
+                    fx[idx] = vgl_distance(line, p3);
+                    idx++;
+                }
+            }
+        }
+        
+        void getCamera(vnl_vector<double> const &x, vpgl_perspective_camera<double> &camera)
+        {
+            
+            vpgl_calibration_matrix<double> K(x[0], principlePoint_);
+            
+            vnl_vector_fixed<double, 3> rod(x[1], x[2], x[3]);
+            vgl_rotation_3d<double>  R(rod);
+            vgl_point_3d<double> camera_center(x[4], x[5], x[6]);
+            
+            camera.set_calibration(K);
+            camera.set_rotation(R);
+            camera.set_camera_center(camera_center);
+        }
+    };
+    
+    
+    bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wld_pts,
+                                                   const vector<vgl_point_2d<double> > &img_pts,
+                                                   const vector<vgl_line_3d_2_points<double> > & wld_lines,
+                                                   const vector<vector<vgl_point_2d<double> > > & img_line_pts,
+                                                   const vpgl_perspective_camera<double> & init_camera,
+                                                   vpgl_perspective_camera<double> &camera)
+    {
+        assert(wld_pts.size() == img_pts.size());
+        assert(wld_pts.size() + wld_lines.size() >= 4);
+        assert(wld_lines.size() == img_line_pts.size());
+        
+        int num_line_pts = 0;
+        for (int i = 0; i<img_line_pts.size(); i++) {
+            num_line_pts += (int)img_line_pts[i].size();
+        }
+        optimize_perspective_camera_ICP_residual residual(wld_pts, img_pts, wld_lines, img_line_pts, init_camera.get_calibration().principal_point(), num_line_pts);
+        
+        vnl_vector<double> x(7, 0);
+        x[0] = init_camera.get_calibration().get_matrix()[0][0];
+        x[1] = init_camera.get_rotation().as_rodrigues()[0];
+        x[2] = init_camera.get_rotation().as_rodrigues()[1];
+        x[3] = init_camera.get_rotation().as_rodrigues()[2];
+        x[4] = init_camera.camera_center().x();
+        x[5] = init_camera.camera_center().y();
+        x[6] = init_camera.camera_center().z();
+        
+        vnl_levenberg_marquardt lmq(residual);
+        
+        bool isMinimied = lmq.minimize(x);
+        if (!isMinimied) {
+            std::cerr<<"Error: perspective camera optimize not converge.\n";
+            lmq.diagnose_outcome();
+            return false;
+        }
+        lmq.diagnose_outcome();
+        residual.getCamera(x, camera);
+        return true;
+    }
 }
 
 

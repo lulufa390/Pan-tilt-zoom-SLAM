@@ -41,8 +41,19 @@ namespace cvx {
                            const vector<vgl_point_2d<double> >& img_pts,
                            const vector<vgl_line_segment_2d<double>>& world_line_segment,
                            const vector<vgl_line_segment_2d<double>>& image_line_segment,
-                           const vgl_point_2d<double> &principlePoint,
+                           const vgl_point_2d<double> &principle_point,
                            vpgl_perspective_camera<double> &camera);
+    
+    // iterated closest points (ICP) on the line to optimize the camera parameter
+    // optimize camera pose by minimizing re-projection error between point-to-point
+    // point-on-line
+    bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wld_pts,
+                                                const vector<vgl_point_2d<double> > &img_pts,
+                                                const vector<vgl_line_3d_2_points<double> > & wld_lines,
+                                                const vector<vector<vgl_point_2d<double> > > & img_line_pts,
+                                                const vpgl_perspective_camera<double> & init_camera,
+                                                vpgl_perspective_camera<double> &camera);
+    
     
 }
 
