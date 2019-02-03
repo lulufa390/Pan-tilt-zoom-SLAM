@@ -29,12 +29,12 @@ class VpglPTZCameraOptimize
 {
 public:
     // iterative cloesest points (ICP) by line segments and conic (only circle)
-    static bool optimize_PTZ_camera_ICP(const vcl_vector<vgl_point_3d<double> > &wldPts,
-                                                const vcl_vector<vgl_point_2d<double> > &imgPts,
-                                                const vcl_vector<vgl_line_3d_2_points<double> > & wldLines,
-                                                const vcl_vector<vcl_vector<vgl_point_2d<double> > > & imgLinePts,
-                                                const vcl_vector<vgl_conic<double> > & wldConics,
-                                                const vcl_vector<vcl_vector<vgl_point_2d<double> > > & imgConicPts,
+    static bool optimize_PTZ_camera_ICP(const vector<vgl_point_3d<double> > &wldPts,
+                                                const vector<vgl_point_2d<double> > &imgPts,
+                                                const vector<vgl_line_3d_2_points<double> > & wldLines,
+                                                const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                const vector<vgl_conic<double> > & wldConics,
+                                                const vector<vector<vgl_point_2d<double> > > & imgConicPts,
                                                 const vpgl_ptz_camera & initPTZ,
                                                 const VpglPTZCameraOptimizeParameter & para,
                                                 vpgl_ptz_camera & optimizedPTZ,

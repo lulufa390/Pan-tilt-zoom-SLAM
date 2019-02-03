@@ -9,6 +9,7 @@
 #include <vnl/vnl_least_squares_function.h>
 #include <vnl/algo/vnl_levenberg_marquardt.h>
 #include <vnl/vnl_inverse.h>
+#include <iostream>
 
 
 vpgl_ptz_camera::vpgl_ptz_camera()
@@ -94,8 +95,8 @@ bool vpgl_ptz_camera::setPTZ(const double pan, const double tilt, const double f
 }
 
 bool vpgl_ptz_camera::setCamera(const vpgl_perspective_camera<double> & camera,
-                                const vcl_vector<vgl_point_2d<double> > & wld_pts,
-                                const vcl_vector<vgl_point_2d<double> > & img_pts)
+                                const vector<vgl_point_2d<double> > & wld_pts,
+                                const vector<vgl_point_2d<double> > & img_pts)
 {
     K_ = camera.get_calibration();
     camera_center_ = camera.get_camera_center();
@@ -112,8 +113,8 @@ bool vpgl_ptz_camera::setCamera(const vpgl_perspective_camera<double> & camera,
 }
 
 bool vpgl_ptz_camera::setCamera(const vpgl_perspective_camera<double> & camera,
-                                const vcl_vector<vgl_point_3d<double> > & wld_pts,
-                                const vcl_vector<vgl_point_2d<double> > & img_pts)
+                                const vector<vgl_point_3d<double> > & wld_pts,
+                                const vector<vgl_point_2d<double> > & img_pts)
 {
     K_ = camera.get_calibration();
     camera_center_ = camera.get_camera_center();
@@ -148,16 +149,16 @@ vnl_matrix_fixed<double, 3, 3>  vpgl_ptz_camera::stationaryRotation() const
 class estimatePanTiltByFixsingModelPositionRotationResidual: public vnl_least_squares_function
 {
 protected:
-    const vcl_vector<vgl_point_2d<double> > & wld_pts_;
-    const vcl_vector<vgl_point_2d<double> > & img_pts_;
+    const vector<vgl_point_2d<double> > & wld_pts_;
+    const vector<vgl_point_2d<double> > & img_pts_;
     const vgl_point_2d<double> principlePoint_;
     const vgl_point_3d<double> cameraCenter_;
     const vnl_vector_fixed<double, 3> rod_; //rodrigue angle of model rotation
     const vnl_vector_fixed<double, 6> coeff_;
     
 public:
-    estimatePanTiltByFixsingModelPositionRotationResidual(const vcl_vector<vgl_point_2d<double> > & wld_pts,
-                                                          const vcl_vector<vgl_point_2d<double> > & img_pts,
+    estimatePanTiltByFixsingModelPositionRotationResidual(const vector<vgl_point_2d<double> > & wld_pts,
+                                                          const vector<vgl_point_2d<double> > & img_pts,
                                                           const vgl_point_2d<double> & pp,
                                                           const vgl_point_3d<double> & cc, const vnl_vector_fixed<double, 3> & rod,
                                                           const vnl_vector_fixed<double, 6> & coeff,
@@ -250,8 +251,8 @@ public:
     }
 };
 
-bool vpgl_ptz_camera::estimateFlPanTiltByFixingModelPositionRotation (const vcl_vector<vgl_point_2d<double> > & wld_pts,
-                                                                      const vcl_vector<vgl_point_2d<double> > & img_pts,
+bool vpgl_ptz_camera::estimateFlPanTiltByFixingModelPositionRotation (const vector<vgl_point_2d<double> > & wld_pts,
+                                                                      const vector<vgl_point_2d<double> > & img_pts,
                                                                       const vpgl_perspective_camera<double> & initCamera,
                                                            const vgl_point_3d<double> & cameraCenter, const vnl_vector_fixed<double, 3> & rod,
                                                            const vnl_vector_fixed<double, 6> & coeff, vnl_vector_fixed<double, 3> & flPanTilt,
@@ -279,7 +280,7 @@ bool vpgl_ptz_camera::estimateFlPanTiltByFixingModelPositionRotation (const vcl_
     
     bool isMinimized = lmq.minimize(x);
     if (!isMinimized) {
-        vcl_cerr<<"Error: minimization failed.\n";
+        std::cerr<<"Error: minimization failed.\n";
         lmq.diagnose_outcome();
         return false;
     }
@@ -298,16 +299,16 @@ bool vpgl_ptz_camera::estimateFlPanTiltByFixingModelPositionRotation (const vcl_
 class estimatePTZByFixingModelPositionRotationResidual: public vnl_least_squares_function
 {
 protected:
-    const vcl_vector<vgl_point_3d<double> > & wld_pts_;
-    const vcl_vector<vgl_point_2d<double> > & img_pts_;
+    const vector<vgl_point_3d<double> > & wld_pts_;
+    const vector<vgl_point_2d<double> > & img_pts_;
     const vgl_point_2d<double> principlePoint_;
     const vgl_point_3d<double> cameraCenter_;
     const vnl_vector_fixed<double, 3> rod_; //rodrigue angle of model rotation
     const vnl_vector_fixed<double, 6> coeff_;
     
 public:
-    estimatePTZByFixingModelPositionRotationResidual(const vcl_vector<vgl_point_3d<double> > & wld_pts,
-                                                          const vcl_vector<vgl_point_2d<double> > & img_pts,
+    estimatePTZByFixingModelPositionRotationResidual(const vector<vgl_point_3d<double> > & wld_pts,
+                                                          const vector<vgl_point_2d<double> > & img_pts,
                                                           const vgl_point_2d<double> & pp,
                                                           const vgl_point_3d<double> & cc, const vnl_vector_fixed<double, 3> & rod,
                                                           const vnl_vector_fixed<double, 6> & coeff,
@@ -401,8 +402,8 @@ public:
 };
 
 
-bool vpgl_ptz_camera::estimatePTZByFixingModelPositionRotation (const vcl_vector<vgl_point_3d<double> > & wld_pts,
-                                               const vcl_vector<vgl_point_2d<double> > & img_pts,
+bool vpgl_ptz_camera::estimatePTZByFixingModelPositionRotation (const vector<vgl_point_3d<double> > & wld_pts,
+                                               const vector<vgl_point_2d<double> > & img_pts,
                                                const vpgl_perspective_camera<double> & initCamera,
                                                const vgl_point_3d<double> & cameraCenter, const vnl_vector_fixed<double, 3> & rod,
                                                const vnl_vector_fixed<double, 6> & coeff, vnl_vector_fixed<double, 3> & ptz,
@@ -435,7 +436,7 @@ bool vpgl_ptz_camera::estimatePTZByFixingModelPositionRotation (const vcl_vector
     
     bool isMinimized = lmq.minimize(x);
     if (!isMinimized) {
-        vcl_cerr<<"Error: minimization failed.\n";
+        std::cerr<<"Error: minimization failed.\n";
         lmq.diagnose_outcome();
         return false;
     }

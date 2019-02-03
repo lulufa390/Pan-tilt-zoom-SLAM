@@ -11,6 +11,11 @@
 #include <vpgl/algo/vpgl_camera_compute.h>
 #include <vnl/vnl_least_squares_function.h>
 #include <vnl/algo/vnl_levenberg_marquardt.h>
+#include <vnl/vnl_inverse.h>
+#include <vnl/algo/vnl_matrix_inverse.h>
+#include "bcv_vgl_h_matrix_2d_compute_linear.h"
+#include "bcv_vgl_h_matrix_2d_optimize_lmq.h"
+#include "bcv_vgl_h_matrix_2d_decompose.h"
 
 
 namespace cvx {
@@ -142,6 +147,102 @@ namespace cvx {
         
         //    lmq.diagnose_outcome();
         residual.getCamera(x, final_camera);
+        return true;
+    }
+    
+    
+    bool init_calib(const vector<vgl_point_2d<double> >& world_pts,
+                              const vector<vgl_point_2d<double> >& image_pts,
+                              const vector<vgl_line_segment_2d<double>>& world_line_segment,
+                              const vector<vgl_line_segment_2d<double>>& image_line_segment,
+                              const vgl_point_2d<double> &principle_point,
+                              vpgl_perspective_camera<double> &camera)
+    {
+        assert(world_pts.size() == image_pts.size());
+        assert(world_line_segment.size() == image_line_segment.size());
+        
+        // step 1: estimate H_world_to_image, First, image to world, then invert
+        vector<vgl_homg_point_2d<double> > points1, points2;
+        for (int i = 0; i<world_pts.size(); i++) {
+            points1.push_back(vgl_homg_point_2d<double>(image_pts[i]));
+            points2.push_back(vgl_homg_point_2d<double>(world_pts[i]));
+        }
+        
+        vector<vgl_homg_line_2d<double> > lines1, lines2;
+        vector<vector<vgl_homg_point_2d<double>> > point_on_line1;
+        for (int i = 0; i<world_line_segment.size(); i++) {
+            vgl_homg_point_2d<double> p1 = vgl_homg_point_2d<double>(image_line_segment[i].point1());
+            vgl_homg_point_2d<double> p2 = vgl_homg_point_2d<double>(image_line_segment[i].point2());
+            lines1.push_back(vgl_homg_line_2d<double>(p1, p2));
+            
+            vector<vgl_homg_point_2d<double>> pts;
+            pts.push_back(p1);
+            pts.push_back(p2);
+            point_on_line1.push_back(pts);
+            
+            p1 = vgl_homg_point_2d<double>(world_line_segment[i].point1());
+            p2 = vgl_homg_point_2d<double>(world_line_segment[i].point2());
+            lines2.push_back(vgl_homg_line_2d<double>(p1, p2));
+        }
+        
+        bool is_valid = false;
+        bcv_vgl_h_matrix_2d_compute_linear hcl;
+        vgl_h_matrix_2d<double> H;
+        is_valid = hcl.compute_pl(points1, points2, lines1, lines2, H);
+        if (!is_valid) {
+            return false;
+        }
+        
+        bcv_vgl_h_matrix_2d_optimize_lmq hcl_lmq(H);
+        vgl_h_matrix_2d<double> opt_h;
+        is_valid = hcl_lmq.optimize_pl(points1, points2, point_on_line1, lines2, opt_h);
+        if (!is_valid) {
+            return false;
+        }
+        
+        // step 2: estimate K
+        vpgl_calibration_matrix<double> K;
+        is_valid = vpgl_calibration_matrix_compute::natural(opt_h.get_inverse(), principle_point, K);
+        if (!is_valid) {
+            return false;
+        }
+        
+        
+        vnl_matrix_fixed<double, 3, 3> h_world_to_img = opt_h.get_inverse().get_matrix();
+        //cout<<"homography is "<<h_world_to_img<<endl;
+        bcv_vgl_h_matrix_2d_decompose hd;
+        std::vector<vnl_matrix_fixed<double, 3, 3>> rotations;
+        std::vector<vnl_vector_fixed<double, 3>> translations;
+        is_valid = hd.compute(K.get_matrix(), h_world_to_img.as_matrix(), rotations, translations);
+        if (!is_valid) {
+            return false;
+        }
+        
+        assert(rotations.size() == translations.size());
+        assert(rotations.size() == 2);
+        
+        vnl_matrix<double> invR1 = vnl_matrix_inverse<double>(rotations[0].as_matrix());
+        vnl_vector<double> cc1 = -invR1*translations[0];
+        
+        vnl_matrix<double> invR2 = vnl_matrix_inverse<double>(rotations[1].as_matrix());
+        vnl_vector<double> cc2 = -invR2*translations[1];
+        
+        if (cc1[2] < 0 && cc2[2] < 0) {
+            printf("Warning: two solutions are below z = 0 plane \n");
+            return false;
+        }
+        else if(cc1[2] >= 0 && cc2[2] >= 0) {
+            printf("Warning: two ambiguity solutions \n");
+            return false;
+        }
+        
+        vnl_matrix_fixed<double, 3, 3> R = cc1[2]> 0? rotations[0]:rotations[1];
+        vnl_vector<double> cc   = cc1[2]>0 ?cc1:cc2;
+        
+        camera.set_calibration(K);
+        camera.set_rotation(vgl_rotation_3d<double>(R));
+        camera.set_camera_center(vgl_point_3d<double>(cc[0], cc[1], cc[2]));
+        
         return true;
     }
 

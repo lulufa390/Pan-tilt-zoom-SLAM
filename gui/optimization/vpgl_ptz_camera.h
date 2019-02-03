@@ -13,6 +13,9 @@
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_vector_fixed.h>
+#include <vector>
+
+using std::vector;
 
 
 // camera model from "Mimicking Human Camera Operators" from WACV 2015
@@ -94,12 +97,12 @@ public:
     bool setPTZ(const double pan, const double tilt, const double fl);
     // set camera, get PTZ
     bool setCamera(const vpgl_perspective_camera<double> & camera,
-                   const vcl_vector<vgl_point_2d<double> > & wld_pts,
-                   const vcl_vector<vgl_point_2d<double> > & img_pts);
+                   const vector<vgl_point_2d<double> > & wld_pts,
+                   const vector<vgl_point_2d<double> > & img_pts);
     
     bool setCamera(const vpgl_perspective_camera<double> & camera,
-                   const vcl_vector<vgl_point_3d<double> > & wld_pts,
-                   const vcl_vector<vgl_point_2d<double> > & img_pts);
+                   const vector<vgl_point_3d<double> > & wld_pts,
+                   const vector<vgl_point_2d<double> > & img_pts);
     
     virtual ~vpgl_ptz_camera(){}
     
@@ -116,15 +119,15 @@ public:
     
 private:
     // bug, assume the camera coordinate (Z) looking to +Y of world coordinate
-    static bool estimateFlPanTiltByFixingModelPositionRotation (const vcl_vector<vgl_point_2d<double> > & wld_pts,
-                                                                const vcl_vector<vgl_point_2d<double> > & img_pts,
+    static bool estimateFlPanTiltByFixingModelPositionRotation (const vector<vgl_point_2d<double> > & wld_pts,
+                                                                const vector<vgl_point_2d<double> > & img_pts,
                                                                 const vpgl_perspective_camera<double> & initCamera,
                                                                 const vgl_point_3d<double> & cameraCenter, const vnl_vector_fixed<double, 3> & rod,
                                                                 const vnl_vector_fixed<double, 6> & coeff, vnl_vector_fixed<double, 3> & flPanTilt,
                                                                 vpgl_perspective_camera<double> & estimatedCamera);
     // initial pan, tilt from decompose R_pan_tilt
-    static bool estimatePTZByFixingModelPositionRotation (const vcl_vector<vgl_point_3d<double> > & wld_pts,
-                                                                const vcl_vector<vgl_point_2d<double> > & img_pts,
+    static bool estimatePTZByFixingModelPositionRotation (const vector<vgl_point_3d<double> > & wld_pts,
+                                                                const vector<vgl_point_2d<double> > & img_pts,
                                                                 const vpgl_perspective_camera<double> & initCamera,
                                                                 const vgl_point_3d<double> & cameraCenter, const vnl_vector_fixed<double, 3> & rod,
                                                                 const vnl_vector_fixed<double, 6> & coeff, vnl_vector_fixed<double, 3> & ptz,
