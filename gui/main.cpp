@@ -33,8 +33,9 @@ cv::Mat calib_button(cv::Mat img, std::vector<cv::Point> source_img_pts, std::ve
 
 int main(int argc, char *argv[])
 {
-	cv::Mat source_img = cv::imread("1.jpg", cv::IMREAD_COLOR);
-	cv::Mat model_img = cv::imread("model.png", cv::IMREAD_COLOR);
+    std::string folder = "/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/";
+	cv::Mat source_img = cv::imread(folder + "1.jpg", cv::IMREAD_COLOR);
+	cv::Mat model_img = cv::imread(folder + "model.png", cv::IMREAD_COLOR);
 
 
 	AnnotationWindow window;
