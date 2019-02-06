@@ -16,6 +16,10 @@
 
 using std::vector;
 class CourtView: public CVImageView {
+
+private:
+	std::vector<cv::Point> courtPoints;
+
 public:
     CourtView();
     ~CourtView();

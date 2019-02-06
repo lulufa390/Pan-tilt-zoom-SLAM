@@ -3,6 +3,9 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 
+#include <vpgl/vpgl_perspective_camera.h>
+#include <vgl/vgl_point_2d.h>
+
 #include "annotation_window.h"
 
 void callback(cv::Point p){
@@ -12,6 +15,20 @@ void callback(cv::Point p){
 
 cv::Mat calib_button(cv::Mat img, std::vector<cv::Point> source_img_pts, std::vector<cv::Point2d> model_img_pts)
 {
+
+	MATFile *pmatFile = NULL;
+	mxArray *pMxArray = NULL;
+
+	// 读取.mat文件（例：mat文件名为"initUrban.mat"，其中包含"initA"）
+	double *initA;
+
+	pmatFile = matOpen("ice_hockey_model.mat", "r");
+	pMxArray = matGetVariable(pmatFile, "points");
+	
+
+	
+
+
 	for (auto iter = source_img_pts.begin(); iter != source_img_pts.end(); iter++)
 	{
 		printf("(%d, %d). \n", iter->x, iter->y);
@@ -33,18 +50,21 @@ cv::Mat calib_button(cv::Mat img, std::vector<cv::Point> source_img_pts, std::ve
 
 int main(int argc, char *argv[])
 {
-    std::string folder = "/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/";
-	cv::Mat source_img = cv::imread(folder + "1.jpg", cv::IMREAD_COLOR);
-	cv::Mat model_img = cv::imread(folder + "model.png", cv::IMREAD_COLOR);
+	std::vector<vgl_point_2d<double>> points;
 
 
-	AnnotationWindow window;
+	//cv::Mat source_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/x64/Debug/1.jpg", cv::IMREAD_COLOR);
+	//cv::Mat model_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/x64/Debug/model.png", cv::IMREAD_COLOR);
 
-	window.set_source_img(source_img);
-	window.set_model_img(model_img);
+	//cv::imshow("fuck", source_img);
 
-	window.set_button_click_event(calib_button);
+	//AnnotationWindow window;
 
-	window.StartLoop();
+	//window.set_source_img(source_img);
+	//window.set_model_img(model_img);
+
+	//window.set_button_click_event(calib_button);
+
+	//window.StartLoop();
 	return 0;
 }

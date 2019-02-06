@@ -14,11 +14,14 @@
 #include <vector>
 #include "cvimage_view.hpp"
 
-
 using std::vector;
 
 // a view shows the image and use can annotate features (point, line)
 class FeatureAnnotationView: public CVImageView{
+
+private:
+	std::vector<cv::Point> imagePoints;
+
 public:
     FeatureAnnotationView();
     ~FeatureAnnotationView();
