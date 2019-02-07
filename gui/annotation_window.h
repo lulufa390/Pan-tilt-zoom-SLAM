@@ -8,29 +8,26 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
 #include <mat.h>
 
-#include "cvui.h"
 #include "cvimage_view.hpp"
+#include "feature_annotation_view.hpp"
+#include "court_view.hpp"
 
-//typedef void(*MouseClickCallback)(cv::Point);
-//typedef cv::Mat(*ButtonClickCallback)(cv::Mat img, std::vector<cv::Point> source_img_pts, std::vector<cv::Point2d> model_img_pts);
-
-class AnnotationWindow{
+class AnnotationWindow {
 
 private:
-	std::vector<CVImageView> image_views;
+	std::vector<CVImageView*> image_views;
 
 public:
 
 	AnnotationWindow();
 	~AnnotationWindow();
 
-	void addImageView(CVImageView & newImageView);
+	void addImageView(CVImageView* newImageView);
 	void clearImageViews();
 
-	
+
 	void StartLoop();
 
 	//void set_source_img(cv::Mat & origin_img);
@@ -79,7 +76,7 @@ protected:
 	//MouseClickCallback mouse_click;
 	//ButtonClickCallback calib_button;
 
-	
+
 };
 
 #endif

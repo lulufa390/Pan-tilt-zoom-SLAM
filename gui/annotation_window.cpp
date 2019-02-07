@@ -15,10 +15,10 @@ AnnotationWindow::AnnotationWindow()
 
 }
 
-AnnotationWindow::~AnnotationWindow(){}
+AnnotationWindow::~AnnotationWindow() {}
 
 
-void AnnotationWindow::addImageView(CVImageView & newImageView)
+void AnnotationWindow::addImageView(CVImageView * newImageView)
 {
 	image_views.push_back(newImageView);
 }
@@ -57,13 +57,13 @@ void AnnotationWindow::clearImageViews()
 //	cv::line(frame, leftdown, rightup, cv::Scalar(255, 0, 0), 1);
 //}
 
-void AnnotationWindow::StartLoop(){
+void AnnotationWindow::StartLoop() {
 
 	int windowCnt = image_views.size();
 	cv::String * windowArray = new cv::String[windowCnt];
 	for (int i = 0; i < windowCnt; i++)
 	{
-		windowArray[i] = image_views[i].getWindowName();
+		windowArray[i] = image_views[i]->getWindowName();
 	}
 
 	// init multiple windows
@@ -73,76 +73,44 @@ void AnnotationWindow::StartLoop(){
 
 		for (int i = 0; i < windowCnt; i++)
 		{
-			CVImageView & view = image_views[i];
-			cv::String name = view.getWindowName();
+			CVImageView * view = image_views[i];
+			cv::String name = view->getWindowName();
 
 			cvui::context(name);
-			
-			cvui::imshow(name, view.getFrame());
+
+
+
 			// mainloop for each window
+			view->drawFrame();
+			view->annotate();
 
 
+			cvui::imshow(name, view->frame);
 
 		}
 
+		if (cv::waitKey(20) == 'P') {
 
-		//cvui::image(frame, source_img_position.x, source_img_position.y, source_img);
-		//cvui::image(frame, model_img_position.x, model_img_position.y, model_img);
-		//cvui::image(frame, visualize_img_position.x, visualize_img_position.y, visualize_img);
+			FeatureAnnotationView * viewAnno = (FeatureAnnotationView *)image_views[0];
 
-		//int source_img_status = cvui::iarea(source_img_position.x, source_img_position.y, img_size.width, img_size.height);
-		//int model_img_status = cvui::iarea(model_img_position.x, model_img_position.y, img_size.width, img_size.height);
+			CourtView * viewCourt = (CourtView *)image_views[1];
 
-		//switch (source_img_status)
-		//{
-		//	case cvui::CLICK:	
-		//		
-		//		double scale_x = 1.0 * (origin_source_img.size().width - 1) / (img_size.width - 1);
-		//		double scale_y = 1.0 * (origin_source_img.size().height - 1) / (img_size.height - 1);
-		//		int x = round((cvui::mouse().x - source_img_position.x) * scale_x);
-		//		int y = round((cvui::mouse().y - source_img_position.y) * scale_y);
+			vector<vgl_point_2d<double>> pointsAnno = viewAnno->getPoints();
 
-		//		source_img_pts.push_back(cv::Point(x, y));
-		//		source_img_pts_show.push_back(cvui::mouse());
+			vector<vgl_point_2d<double>> pointsCourt = viewCourt->getPoints();
 
-		//		//printf("source img: (%d, %d)\n", x, y);
+			for (auto iter = pointsAnno.begin(); iter != pointsAnno.end(); ++iter)
+			{
+				printf("Annotations: (%f, %f)\n", iter->x(), iter->y());
+			}
 
-		//		break;
-		//}
-
-		//switch (model_img_status)
-		//{
-		//	case cvui::CLICK:
-		//		
-		//		double scale_x = 1.0 * (origin_model_img.size().width - 1) / (img_size.width - 1);
-		//		double scale_y = 1.0 * (origin_model_img.size().height - 1) / (img_size.height - 1);
-
-		//		//printf("scale: %f, %f\n", scale_x, scale_y);
-
-		//		int x = round((cvui::mouse().x - model_img_position.x) * scale_x);
-		//		int y = round((cvui::mouse().y - model_img_position.y) * scale_y);
-
-		//		cv::Point2d actual_point = hockey_transformation(cv::Point(x, y));
-
-		//		model_img_pts.push_back(actual_point);
-		//		model_img_pts_show.push_back(cvui::mouse());
+			for (auto iter = pointsCourt.begin(); iter != pointsCourt.end(); ++iter)
+			{
+				printf("Court: (%f, %f)\n", iter->x(), iter->y());
+			}
 
 
-		//		//printf("model img before: (%d, %d)\n", x, y);
-		//		//printf("model img: (%f, %f)\n", actual_point.x, actual_point.y);
-		//		break;
-		//}
-
-		//for (auto iter = source_img_pts_show.begin(); iter != source_img_pts_show.end(); iter++)
-		//{
-		//	draw_point(*iter);
-		//}
-
-		//for (auto iter = model_img_pts_show.begin(); iter != model_img_pts_show.end(); iter++)
-		//{
-		//	draw_point(*iter);
-		//}
-
+		}
 
 		//if (cvui::button(frame, 20, 500, 100, 30, "Start Calibration")) {
 
@@ -175,15 +143,6 @@ void AnnotationWindow::StartLoop(){
 		//	//	//  will return the file anme only.
 		//	//}
 		//}
-
-		// This function must be called *AFTER* all UI components. It does
-		// all the behind the scenes magic to handle mouse clicks, etc.
-		//cvui::update();
-
-		// Show everything on the screen
-		//cv::imshow(window_name, frame);
-
-
 
 		// Check if ESC key was pressed
 		if (cv::waitKey(20) == 27) {

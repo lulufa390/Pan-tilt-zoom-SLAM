@@ -17,19 +17,19 @@
 using std::vector;
 
 // a view shows the image and use can annotate features (point, line)
-class FeatureAnnotationView: public CVImageView{
+class FeatureAnnotationView : public CVImageView {
 
 private:
 	std::vector<cv::Point> imagePoints;
 
 public:
-    FeatureAnnotationView();
-    ~FeatureAnnotationView();
-    
-    // get points on image coordinate
-    vector<vgl_point_2d<double>> getPoints() const;
-    
-    virtual void annotate();
+	FeatureAnnotationView(std::string name);
+	~FeatureAnnotationView();
+
+	// get points on image coordinate
+	vector<vgl_point_2d<double>> getPoints() const;
+
+	virtual void annotate();
 };
 
 #endif /* feature_annotation_view_hpp */

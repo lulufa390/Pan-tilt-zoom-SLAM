@@ -15,20 +15,20 @@
 #include "cvimage_view.hpp"
 
 using std::vector;
-class CourtView: public CVImageView {
+class CourtView : public CVImageView {
 
 private:
-	std::vector<cv::Point> courtPoints;
+	std::vector<cv::Point> imagePoints;
 
 public:
-    CourtView();
-    ~CourtView();
-    
-    // get points on world coordinate, unit meter
-    vector<vgl_point_2d<double>> getPoints() const;
-    
-    virtual void annotate();
-    
+	CourtView(std::string name);
+	~CourtView();
+
+	// get points on world coordinate, unit meter
+	vector<vgl_point_2d<double>> getPoints() const;
+
+	virtual void annotate();
+
 };
 
 #endif /* court_view_hpp */

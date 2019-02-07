@@ -8,7 +8,7 @@
 
 #include "annotation_window.h"
 
-void callback(cv::Point p){
+void callback(cv::Point p) {
 	printf("%d, %d", p.x, p.y);
 }
 
@@ -24,9 +24,9 @@ cv::Mat calib_button(cv::Mat img, std::vector<cv::Point> source_img_pts, std::ve
 
 	pmatFile = matOpen("ice_hockey_model.mat", "r");
 	pMxArray = matGetVariable(pmatFile, "points");
-	
 
-	
+
+
 
 
 	for (auto iter = source_img_pts.begin(); iter != source_img_pts.end(); iter++)
@@ -52,9 +52,20 @@ int main(int argc, char *argv[])
 {
 	std::vector<vgl_point_2d<double>> points;
 
+	AnnotationWindow app;
 
-	//cv::Mat source_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/x64/Debug/1.jpg", cv::IMREAD_COLOR);
-	//cv::Mat model_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/x64/Debug/model.png", cv::IMREAD_COLOR);
+	FeatureAnnotationView featureAnnotation("Feature Annotation");
+	CourtView courtView("Court View");
+
+	cv::Mat source_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/1.jpg", cv::IMREAD_COLOR);
+	cv::Mat model_img = cv::imread("C:/graduate_design/cvui/cvuiApp/cvuiApp/model.png", cv::IMREAD_COLOR);
+
+	featureAnnotation.setImage(source_img);
+	courtView.setImage(model_img);
+
+	app.addImageView(&featureAnnotation);
+	app.addImageView(&courtView);
+	app.StartLoop();
 
 	//cv::imshow("fuck", source_img);
 
@@ -64,7 +75,7 @@ int main(int argc, char *argv[])
 	//window.set_model_img(model_img);
 
 	//window.set_button_click_event(calib_button);
-
 	//window.StartLoop();
+
 	return 0;
 }
