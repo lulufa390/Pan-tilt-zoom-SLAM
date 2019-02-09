@@ -11,16 +11,16 @@
 CVImageView::CVImageView(std::string name)
 {
 	// default parameters for CVImageView
-	windowSize = cv::Size(1400, 750);
+	windowSize = cv::Size(1300, 740);
 	imageSize = cv::Size(1280, 720);
-	imagePos = cv::Point(0, 0);
+	imagePos = cv::Point(10, 10);
 
 	window_name = name;
 
 	frame = cv::Mat(windowSize.height, windowSize.width, CV_8UC3);
 	frame = cv::Scalar(50, 50, 50);
 
-	image_after_scale = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
+	imageAfterScale = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
 
 
 }
@@ -56,7 +56,7 @@ Mat CVImageView::getImage() const
 void CVImageView::setImage(const Mat& img)
 {
 	image = img;
-	cv::resize(image, image_after_scale, imageSize, cv::INTER_LINEAR);
+	cv::resize(image, imageAfterScale, imageSize, cv::INTER_LINEAR);
 }
 
 cv::Point CVImageView::getImagePosition() const
@@ -77,7 +77,7 @@ cv::Size CVImageView::getImageSize() const
 void CVImageView::setImageSize(cv::Size size)
 {
 	imageSize = size;
-	cv::resize(image, image_after_scale, imageSize, cv::INTER_LINEAR);
+	cv::resize(image, imageAfterScale, imageSize, cv::INTER_LINEAR);
 }
 
 // exchange between window point and image point
@@ -89,7 +89,7 @@ cv::Point CVImageView::windowPointForImagePoint(const cv::Point& p) const
 cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 {
 	cv::Size beforeScale = image.size();
-	cv::Size afterScale = image_after_scale.size();
+	cv::Size afterScale = imageAfterScale.size();
 
 	double scale_x = 1.0 * (beforeScale.width - 1) / (afterScale.width - 1);
 	double scale_y = 1.0 * (beforeScale.height - 1) / (afterScale.height - 1);
@@ -113,7 +113,7 @@ void CVImageView::drawPoint(cv::Point p)
 
 void CVImageView::drawFrame()
 {
-	cvui::image(frame, imagePos.x, imagePos.y, image_after_scale);
+	cvui::image(frame, imagePos.x, imagePos.y, imageAfterScale);
 
 	for (auto iter = windowPoints.begin(); iter != windowPoints.end(); iter++)
 	{

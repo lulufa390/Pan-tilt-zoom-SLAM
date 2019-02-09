@@ -27,7 +27,7 @@ private:
 	cv::Size imageSize;
 
 	Mat image;
-	Mat image_after_scale;
+	Mat imageAfterScale;
 
 protected:
 	std::vector<cv::Point> windowPoints;
@@ -65,7 +65,6 @@ public:
 
 	// interface
 	// subclasses must draw annotation (point, line)
-
 
 	virtual void annotate() = 0;
 };
