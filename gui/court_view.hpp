@@ -13,11 +13,14 @@
 #include <vgl/vgl_point_2d.h>
 #include <vector>
 #include "cvimage_view.hpp"
+#include "play_field.h"
 
 using std::vector;
 class CourtView : public CVImageView {
 
 private:
+    std::shared_ptr<PlayField> play_field_;
+    
 	std::vector<cv::Point> imagePoints;
 
 public:

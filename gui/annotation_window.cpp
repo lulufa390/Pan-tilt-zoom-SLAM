@@ -37,11 +37,27 @@ void AnnotationWindow::calibButtonFunc()
 	{
 		printf("(%f, %f)\n", iter->x(), iter->y());
 	}
+    
+    if (pointsAnno.size() == pointsCourt.size() &&
+        pointsAnno.size() >=4) {
+        vgl_point_2d<double> principal_point(640, 360);
+        vpgl_perspective_camera<double> camera;
+        
+        bool is_calib = cvx::init_calib(pointsCourt, pointsAnno, principal_point, camera);
+        if (is_calib) {
+            printf("successfully init calib.\n");
+            // draw annotation
+            // save camera
+            
+        }
+        else {
+            printf("Warning: init calib failed.\n");
+            
+        }
+        
+    }
 
-	vgl_point_2d<double> principal_point(640, 360);
-	vpgl_perspective_camera<double> camera;
-
-	cvx::init_calib(pointsCourt, pointsAnno, principal_point, camera);
+	
 
 }
 

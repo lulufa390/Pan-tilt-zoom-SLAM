@@ -46,7 +46,6 @@ namespace cvx {
     
     // iterated closest points (ICP) on the line to optimize the camera parameter
     // optimize camera pose by minimizing re-projection error between point-to-point
-    // point-on-line
     bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wld_pts,
                                                 const vector<vgl_point_2d<double> > &img_pts,
                                                 const vector<vgl_line_3d_2_points<double> > & wld_lines,

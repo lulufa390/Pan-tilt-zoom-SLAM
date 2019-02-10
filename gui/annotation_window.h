@@ -15,7 +15,7 @@
 #include "cvimage_view.hpp"
 #include "feature_annotation_view.hpp"
 #include "court_view.hpp"
-#include "optimization\camera_estimation.hpp"
+#include "optimization/camera_estimation.hpp"
 
 class AnnotationWindow {
 
