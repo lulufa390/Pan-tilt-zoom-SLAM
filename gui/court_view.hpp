@@ -10,10 +10,11 @@
 #define court_view_hpp
 
 #include <stdio.h>
+#include <memory>
 #include <vgl/vgl_point_2d.h>
 #include <vector>
 #include "cvimage_view.hpp"
-#include "play_field.h"
+#include "court/play_field.h"
 
 using std::vector;
 class CourtView : public CVImageView {
@@ -21,7 +22,9 @@ class CourtView : public CVImageView {
 private:
     std::shared_ptr<PlayField> play_field_;
     
-	std::vector<cv::Point> imagePoints;
+	std::vector<vgl_point_2d<double>> imagePoints;
+	std::vector<vgl_point_2d<double>> world_points;
+
 
 public:
 	CourtView(std::string name);
