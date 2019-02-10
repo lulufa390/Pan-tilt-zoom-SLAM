@@ -28,6 +28,10 @@ int main(int argc, char *argv[])
 	FeatureAnnotationView featureAnnotation("Feature Annotation");
 	CourtView courtView("Court View");
 
+	courtView.setWindowSize(cv::Size(800, 400));
+	courtView.setImagePosition(cv::Point(30, 20));
+	courtView.setImageSize(cv::Size(762, 348));
+
 	cv::Mat source_img = cv::imread(im_name, cv::IMREAD_COLOR);
 	cv::Mat model_img = cv::imread(model_name, cv::IMREAD_COLOR);
 

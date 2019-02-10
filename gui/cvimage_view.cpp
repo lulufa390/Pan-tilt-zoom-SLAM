@@ -20,8 +20,8 @@ CVImageView::CVImageView(std::string name)
 	frame = cv::Mat(windowSize.height, windowSize.width, CV_8UC3);
 	frame = cv::Scalar(50, 50, 50);
 
+	image = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
 	imageAfterScale = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
-
 
 }
 
@@ -35,6 +35,8 @@ cv::Size CVImageView::getWindowSize() const
 void CVImageView::setWindowSize(cv::Size size)
 {
 	windowSize = size;
+	frame = cv::Mat(windowSize.height, windowSize.width, CV_8UC3);
+	frame = cv::Scalar(50, 50, 50);
 }
 
 std::string CVImageView::getWindowName() const
