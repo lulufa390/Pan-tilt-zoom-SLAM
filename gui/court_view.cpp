@@ -53,3 +53,9 @@ void CourtView::annotate()
 		break;
 	}
 }
+
+void CourtView::clearAnnotations()
+{
+	windowPoints.clear();
+	imagePoints.clear();
+}

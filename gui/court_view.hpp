@@ -28,7 +28,7 @@ public:
 	vector<vgl_point_2d<double>> getPoints() const;
 
 	virtual void annotate();
-
+	virtual void clearAnnotations();
 };
 
 #endif /* court_view_hpp */

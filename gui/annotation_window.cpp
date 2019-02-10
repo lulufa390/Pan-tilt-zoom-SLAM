@@ -6,6 +6,7 @@ AnnotationWindow::AnnotationWindow(cv::String name)
 	mainViewName = name;
 
 	frame = cv::Mat(200, 400, CV_8UC3);
+	frame = cv::Scalar(50, 50, 50);
 }
 
 AnnotationWindow::~AnnotationWindow() {}
@@ -20,52 +21,46 @@ void AnnotationWindow::setCourtView(CourtView* imageView)
 	courtView = imageView;
 }
 
+void AnnotationWindow::calibButtonFunc()
+{
+	vector<vgl_point_2d<double>> pointsAnno = featureAnnotationView->getPoints();
+	vector<vgl_point_2d<double>> pointsCourt = courtView->getPoints();
+
+	printf("Annotations in image:\n");
+	for (auto iter = pointsAnno.begin(); iter != pointsAnno.end(); ++iter)
+	{
+		printf("(%f, %f)\n", iter->x(), iter->y());
+	}
+
+	printf("points in world coordinates:\n");
+	for (auto iter = pointsCourt.begin(); iter != pointsCourt.end(); ++iter)
+	{
+		printf("(%f, %f)\n", iter->x(), iter->y());
+	}
+
+	vgl_point_2d<double> principal_point(640, 360);
+	vpgl_perspective_camera<double> camera;
+
+	cvx::init_calib(pointsCourt, pointsAnno, principal_point, camera);
+
+}
+
+
+void AnnotationWindow::clearButtonFunc()
+{
+	featureAnnotationView->clearAnnotations();
+	courtView->clearAnnotations();
+}
+
 void AnnotationWindow::mainControlHandler()
 {
 	if (cvui::button(frame, 100, 40, "Do Calibration")) {
-		vector<vgl_point_2d<double>> pointsAnno = featureAnnotationView->getPoints();
+		calibButtonFunc();
+	}
 
-		vector<vgl_point_2d<double>> pointsCourt = courtView->getPoints();
-
-		vector<cv::Point> cvPointAnno;
-		vector<cv::Point> cvPointCourt;
-
-
-		for (auto iter = pointsAnno.begin(); iter != pointsAnno.end(); ++iter)
-		{
-			printf("Annotations: (%f, %f)\n", iter->x(), iter->y());
-
-			cvPointAnno.push_back(cv::Point(iter->x(), iter->y()));
-		}
-
-		for (auto iter = pointsCourt.begin(); iter != pointsCourt.end(); ++iter)
-		{
-			printf("Court: (%f, %f)\n", iter->x(), iter->y());
-
-			cvPointCourt.push_back(cv::Point(iter->x(), iter->y()));
-		}
-
-		vgl_point_2d<double> principal_point(640, 360);
-		vpgl_perspective_camera<double> camera;
-
-		cvx::init_calib(pointsCourt, pointsAnno, principal_point, camera);
-
-		printf("here debug!");
-
-		/*cv::Mat homographyMat = cv::findHomography(cvPointCourt, cvPointAnno);
-
-		printf("vector size: %d, %d", cvPointCourt.size(), cvPointAnno.size());
-
-		printf("size: %d, %d", homographyMat.size().height, homographyMat.size().width);
-
-		for (int i = 0; i < homographyMat.size().height; ++i)
-		{
-		for (int j = 0; j < homographyMat.size().width; ++j)
-		{
-		printf("%f ", homographyMat.at<float>(i, j));
-		}
-		printf("\n");
-		}*/
+	if (cvui::button(frame, 100, 80, "Clear Annotations"))
+	{
+		clearButtonFunc();
 	}
 }
 

@@ -44,3 +44,9 @@ void FeatureAnnotationView::annotate()
 		break;
 	}
 }
+
+void FeatureAnnotationView::clearAnnotations()
+{
+	windowPoints.clear();
+	imagePoints.clear();
+}

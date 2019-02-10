@@ -67,6 +67,8 @@ public:
 	// subclasses must draw annotation (point, line)
 
 	virtual void annotate() = 0;
+
+	virtual void clearAnnotations() = 0;
 };
 
 #endif /* cvimage_view_hpp */

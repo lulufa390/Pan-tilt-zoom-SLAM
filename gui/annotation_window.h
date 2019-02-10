@@ -23,11 +23,13 @@ private:
 	FeatureAnnotationView * featureAnnotationView;
 	CourtView * courtView;
 
+private:
 	// frame for main control view
 	Mat frame;
 	cv::String mainViewName;
 	void mainControlHandler();
-
+	void calibButtonFunc();
+	void clearButtonFunc();
 
 public:
 
