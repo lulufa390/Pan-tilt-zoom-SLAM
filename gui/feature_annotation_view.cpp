@@ -19,7 +19,7 @@ FeatureAnnotationView::~FeatureAnnotationView() {}
 vector<vgl_point_2d<double>> FeatureAnnotationView::getPoints() const
 {
 	vector<vgl_point_2d<double>> points;
-	for (auto iter = imagePoints.begin(); iter != imagePoints.end(); iter++)
+	for (auto iter = image_points_.begin(); iter != image_points_.end(); iter++)
 	{
 		vgl_point_2d<double> p((double)iter->x, (double)iter->y);
 		points.push_back(p);
@@ -30,23 +30,23 @@ vector<vgl_point_2d<double>> FeatureAnnotationView::getPoints() const
 
 void FeatureAnnotationView::annotate()
 {
-	cv::Point imagePos = getImagePosition();
-	cv::Size imageSize = getImageSize();
-	int activeArea = cvui::iarea(imagePos.x, imagePos.y, imageSize.width, imageSize.height);
+	cv::Point image_pos = getImagePosition();
+	cv::Size image_size = getImageSize();
+	int active_area = cvui::iarea(image_pos.x, image_pos.y, image_size.width, image_size.height);
 
-	switch (activeArea)
+	switch (active_area)
 	{
 	case cvui::CLICK:
-		cv::Point windowPoint = cvui::mouse();
-		cv::Point imagePoint = imagePointForWindowPoint(windowPoint);
-		windowPoints.push_back(windowPoint);
-		imagePoints.push_back(imagePoint);
+		cv::Point window_point = cvui::mouse();
+		cv::Point image_point = imagePointForWindowPoint(window_point);
+		windows_points_.push_back(window_point);
+		image_points_.push_back(image_point);
 		break;
 	}
 }
 
 void FeatureAnnotationView::clearAnnotations()
 {
-	windowPoints.clear();
-	imagePoints.clear();
+	windows_points_.clear();
+	image_points_.clear();
 }

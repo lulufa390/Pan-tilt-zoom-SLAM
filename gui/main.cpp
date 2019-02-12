@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
 	CourtView courtView("Court View");
 
 	courtView.setWindowSize(cv::Size(800, 400));
-	courtView.setImagePosition(cv::Point(30, 20));
+	courtView.setImagePosition(cv::Point(19, 26));
 	courtView.setImageSize(cv::Size(762, 348));
 
 	cv::Mat source_img = cv::imread(im_name, cv::IMREAD_COLOR);
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
 	app.setFeatureAnnotationView(&featureAnnotation);
 	app.setCourtView(&courtView);
-	app.StartLoop();
+	app.startLoop();
 
 	return 0;
 }

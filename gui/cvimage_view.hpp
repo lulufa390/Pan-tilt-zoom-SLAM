@@ -20,20 +20,20 @@ using cv::Mat;
 class CVImageView {
 
 private:
-	std::string window_name;
-	cv::Point imagePos;
+	std::string window_name_;
+	cv::Point image_pos_;
 
-	cv::Size windowSize;
-	cv::Size imageSize;
+	cv::Size window_size_;
+	cv::Size image_size_;
 
-	Mat image;
-	Mat imageAfterScale;
+	Mat image_;
+	Mat image_after_scale_;
 
 protected:
-	std::vector<cv::Point> windowPoints;
+	std::vector<cv::Point> windows_points_;
 
 public:
-	Mat frame;
+	Mat frame_;
 
 public:
 	CVImageView(std::string name);

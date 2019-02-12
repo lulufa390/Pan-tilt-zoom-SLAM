@@ -43,33 +43,31 @@ vector<vgl_point_2d<double>> CourtView::getPoints() const
 	//	points.push_back(p);
 	//}
 
-	return world_points;
+	return world_points_;
 
 }
 
 void CourtView::annotate()
 {
-	cv::Point imagePos = getImagePosition();
-	cv::Size imageSize = getImageSize();
-	int activeArea = cvui::iarea(imagePos.x, imagePos.y, imageSize.width, imageSize.height);
+	cv::Point image_pos = getImagePosition();
+	cv::Size image_size = getImageSize();
+	int active_area = cvui::iarea(image_pos.x, image_pos.y, image_size.width, image_size.height);
 
-	switch (activeArea)
+	switch (active_area)
 	{
 	case cvui::CLICK:
-		cv::Point windowPoint = cvui::mouse();
-		cv::Point imagePoint = imagePointForWindowPoint(windowPoint);
+		cv::Point window_point = cvui::mouse();
+		cv::Point image_point = imagePointForWindowPoint(window_point);
 
-		vgl_point_2d<double> image_point_vgl = vgl_point_2d<double>(imagePoint.x, imagePoint.y);
+		vgl_point_2d<double> image_point_vgl = vgl_point_2d<double>(image_point.x, image_point.y);
 		vgl_point_2d<double> world_point;
 
-
-		printf("(%f, %f)\n", image_point_vgl.x(), image_point_vgl.y());
 		bool is_find = play_field_->find_candinate_point(image_point_vgl, world_point, 10);
 		if (is_find) {
-			printf("Has find\n");
-			windowPoints.push_back(windowPoint);
-			imagePoints.push_back(image_point_vgl);
-			world_points.push_back(world_point);
+
+			windows_points_.push_back(window_point);
+			image_points_.push_back(image_point_vgl);
+			world_points_.push_back(world_point);
 		}
 
 		break;
@@ -78,7 +76,7 @@ void CourtView::annotate()
 
 void CourtView::clearAnnotations()
 {
-	windowPoints.clear();
-	imagePoints.clear();
-	world_points.clear();
+	windows_points_.clear();
+	image_points_.clear();
+	world_points_.clear();
 }

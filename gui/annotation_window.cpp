@@ -3,47 +3,47 @@
 
 AnnotationWindow::AnnotationWindow(cv::String name)
 {
-	mainViewName = name;
+	main_view_name_ = name;
 
-	frame = cv::Mat(200, 400, CV_8UC3);
-	frame = cv::Scalar(50, 50, 50);
+	frame_ = cv::Mat(200, 400, CV_8UC3);
+	frame_ = cv::Scalar(50, 50, 50);
 }
 
 AnnotationWindow::~AnnotationWindow() {}
 
-void AnnotationWindow::setFeatureAnnotationView(FeatureAnnotationView* imageView)
+void AnnotationWindow::setFeatureAnnotationView(FeatureAnnotationView* image_view)
 {
-	featureAnnotationView = imageView;
+	feature_annotation_view_ = image_view;
 }
 
-void AnnotationWindow::setCourtView(CourtView* imageView)
+void AnnotationWindow::setCourtView(CourtView* image_view)
 {
-	courtView = imageView;
+	court_view_ = image_view;
 }
 
 void AnnotationWindow::calibButtonFunc()
 {
-	vector<vgl_point_2d<double>> pointsAnno = featureAnnotationView->getPoints();
-	vector<vgl_point_2d<double>> pointsCourt = courtView->getPoints();
+	vector<vgl_point_2d<double>> points_annotation = feature_annotation_view_->getPoints();
+	vector<vgl_point_2d<double>> points_court = court_view_->getPoints();
 
 	printf("Annotations in image:\n");
-	for (auto iter = pointsAnno.begin(); iter != pointsAnno.end(); ++iter)
+	for (auto iter = points_annotation.begin(); iter != points_annotation.end(); ++iter)
 	{
 		printf("(%f, %f)\n", iter->x(), iter->y());
 	}
 
 	printf("points in world coordinates:\n");
-	for (auto iter = pointsCourt.begin(); iter != pointsCourt.end(); ++iter)
+	for (auto iter = points_court.begin(); iter != points_court.end(); ++iter)
 	{
 		printf("(%f, %f)\n", iter->x(), iter->y());
 	}
     
-    if (pointsAnno.size() == pointsCourt.size() &&
-        pointsAnno.size() >=4) {
+    if (points_annotation.size() == points_court.size() &&
+        points_annotation.size() >=4) {
         vgl_point_2d<double> principal_point(640, 360);
         vpgl_perspective_camera<double> camera;
         
-        bool is_calib = cvx::init_calib(pointsCourt, pointsAnno, principal_point, camera);
+        bool is_calib = cvx::init_calib(points_court, points_annotation, principal_point, camera);
         if (is_calib) {
             printf("successfully init calib.\n");
             // draw annotation
@@ -64,55 +64,55 @@ void AnnotationWindow::calibButtonFunc()
 
 void AnnotationWindow::clearButtonFunc()
 {
-	featureAnnotationView->clearAnnotations();
-	courtView->clearAnnotations();
+	feature_annotation_view_->clearAnnotations();
+	court_view_->clearAnnotations();
 }
 
 void AnnotationWindow::mainControlHandler()
 {
-	if (cvui::button(frame, 100, 40, "Do Calibration")) {
+	if (cvui::button(frame_, 100, 40, "Do Calibration")) {
 		calibButtonFunc();
 	}
 
-	if (cvui::button(frame, 100, 80, "Clear Annotations"))
+	if (cvui::button(frame_, 100, 80, "Clear Annotations"))
 	{
 		clearButtonFunc();
 	}
 }
 
-void AnnotationWindow::StartLoop() {
+void AnnotationWindow::startLoop() {
 
-	const int viewNumber = 3;
+	const int view_number = 3;
 
-	const cv::String featureViewName = featureAnnotationView->getWindowName();
-	const cv::String courtViewName = courtView->getWindowName();
+	const cv::String feature_view_name = feature_annotation_view_->getWindowName();
+	const cv::String court_view_name = court_view_->getWindowName();
 
-	const cv::String viewNames[] =
+	const cv::String view_names[] =
 	{
-		featureViewName,
-		courtViewName,
-		mainViewName,
+		feature_view_name,
+		court_view_name,
+		main_view_name_,
 	};
 
 	// init multiple windows
-	cvui::init(viewNames, viewNumber);
+	cvui::init(view_names, view_number);
 
 	while (true) {
 
 
-		cvui::context(featureViewName);
-		featureAnnotationView->drawFrame();
-		featureAnnotationView->annotate();
-		cvui::imshow(featureViewName, featureAnnotationView->frame);
+		cvui::context(feature_view_name);
+		feature_annotation_view_->drawFrame();
+		feature_annotation_view_->annotate();
+		cvui::imshow(feature_view_name, feature_annotation_view_->frame_);
 
-		cvui::context(courtViewName);
-		courtView->drawFrame();
-		courtView->annotate();
-		cvui::imshow(courtViewName, courtView->frame);
+		cvui::context(court_view_name);
+		court_view_->drawFrame();
+		court_view_->annotate();
+		cvui::imshow(court_view_name, court_view_->frame_);
 
-		cvui::context(mainViewName);
+		cvui::context(main_view_name_);
 		mainControlHandler();
-		cvui::imshow(mainViewName, frame);
+		cvui::imshow(main_view_name_, frame_);
 
 
 		// Check if ESC key was pressed

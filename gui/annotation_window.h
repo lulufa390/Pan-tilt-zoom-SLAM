@@ -20,28 +20,29 @@
 class AnnotationWindow {
 
 private:
-	FeatureAnnotationView * featureAnnotationView;
-	CourtView * courtView;
+	// pointer for two views
+	FeatureAnnotationView * feature_annotation_view_;
+	CourtView * court_view_;
 
 private:
 	// frame for main control view
-	Mat frame;
-	cv::String mainViewName;
+	Mat frame_;
+	cv::String main_view_name_;
 	void mainControlHandler();
 	void calibButtonFunc();
 	void clearButtonFunc();
 
 public:
-
+	// interface for annotation application
 	AnnotationWindow(cv::String name);
 	~AnnotationWindow();
 
-	void setFeatureAnnotationView(FeatureAnnotationView* imageView);
+	void setFeatureAnnotationView(FeatureAnnotationView* image_view);
 
-	void setCourtView(CourtView* imageView);
+	void setCourtView(CourtView* image_view);
 
 	// main function to start window application
-	void StartLoop();
+	void startLoop();
 };
 
 #endif

@@ -20,7 +20,7 @@ using std::vector;
 class FeatureAnnotationView : public CVImageView {
 
 private:
-	std::vector<cv::Point> imagePoints;
+	std::vector<cv::Point> image_points_;
 
 public:
 	FeatureAnnotationView(std::string name);

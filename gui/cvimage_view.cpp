@@ -11,17 +11,17 @@
 CVImageView::CVImageView(std::string name)
 {
 	// default parameters for CVImageView
-	windowSize = cv::Size(1300, 740);
-	imageSize = cv::Size(1280, 720);
-	imagePos = cv::Point(10, 10);
+	window_size_ = cv::Size(1300, 740);
+	image_size_ = cv::Size(1280, 720);
+	image_pos_ = cv::Point(10, 10);
 
-	window_name = name;
+	window_name_ = name;
 
-	frame = cv::Mat(windowSize.height, windowSize.width, CV_8UC3);
-	frame = cv::Scalar(50, 50, 50);
+	frame_ = cv::Mat(window_size_.height, window_size_.width, CV_8UC3);
+	frame_ = cv::Scalar(50, 50, 50);
 
-	image = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
-	imageAfterScale = cv::Mat(imageSize.height, imageSize.width, CV_8UC3, cv::Scalar(0, 0, 0));
+	image_ = cv::Mat(image_size_.height, image_size_.width, CV_8UC3, cv::Scalar(0, 0, 0));
+	image_after_scale_ = cv::Mat(image_size_.height, image_size_.width, CV_8UC3, cv::Scalar(0, 0, 0));
 
 }
 
@@ -29,57 +29,57 @@ CVImageView::~CVImageView() {}
 
 cv::Size CVImageView::getWindowSize() const
 {
-	return windowSize;
+	return window_size_;
 }
 
 void CVImageView::setWindowSize(cv::Size size)
 {
-	windowSize = size;
-	frame = cv::Mat(windowSize.height, windowSize.width, CV_8UC3);
-	frame = cv::Scalar(50, 50, 50);
+	window_size_ = size;
+	frame_ = cv::Mat(window_size_.height, window_size_.width, CV_8UC3);
+	frame_ = cv::Scalar(50, 50, 50);
 }
 
 std::string CVImageView::getWindowName() const
 {
-	return window_name;
+	return window_name_;
 }
 
 void CVImageView::setWindowName(std::string name)
 {
-	window_name = name;
+	window_name_ = name;
 }
 
 // set/get image
 Mat CVImageView::getImage() const
 {
-	return image;
+	return image_;
 }
 
 void CVImageView::setImage(const Mat& img)
 {
-	image = img;
-	cv::resize(image, imageAfterScale, imageSize, cv::INTER_LINEAR);
+	image_ = img;
+	cv::resize(image_, image_after_scale_, image_size_, cv::INTER_LINEAR);
 }
 
 cv::Point CVImageView::getImagePosition() const
 {
-	return imagePos;
+	return image_pos_;
 }
 
 void CVImageView::setImagePosition(cv::Point p)
 {
-	imagePos = p;
+	image_pos_ = p;
 }
 
 cv::Size CVImageView::getImageSize() const
 {
-	return imageSize;
+	return image_size_;
 }
 
 void CVImageView::setImageSize(cv::Size size)
 {
-	imageSize = size;
-	cv::resize(image, imageAfterScale, imageSize, cv::INTER_LINEAR);
+	image_size_ = size;
+	cv::resize(image_, image_after_scale_, image_size_, cv::INTER_LINEAR);
 }
 
 // exchange between window point and image point
@@ -90,14 +90,14 @@ cv::Point CVImageView::windowPointForImagePoint(const cv::Point& p) const
 
 cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 {
-	cv::Size beforeScale = image.size();
-	cv::Size afterScale = imageAfterScale.size();
+	cv::Size before_scale = image_.size();
+	cv::Size after_scale = image_after_scale_.size();
 
-	double scale_x = 1.0 * (beforeScale.width - 1) / (afterScale.width - 1);
-	double scale_y = 1.0 * (beforeScale.height - 1) / (afterScale.height - 1);
+	double scale_x = 1.0 * (before_scale.width - 1) / (after_scale.width - 1);
+	double scale_y = 1.0 * (before_scale.height - 1) / (after_scale.height - 1);
 
-	int x = round((p.x - imagePos.x) * scale_x);
-	int y = round((p.y - imagePos.y) * scale_y);
+	int x = round((p.x - image_pos_.x) * scale_x);
+	int y = round((p.y - image_pos_.y) * scale_y);
 
 	return cv::Point(x, y);
 }
@@ -105,19 +105,19 @@ cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 
 void CVImageView::drawPoint(cv::Point p)
 {
-	cv::Point leftup = cv::Point(p.x - 5, p.y - 5);
-	cv::Point leftdown = cv::Point(p.x - 5, p.y + 5);
-	cv::Point rightup = cv::Point(p.x + 5, p.y - 5);
-	cv::Point rightdown = cv::Point(p.x + 5, p.y + 5);
-	cv::line(frame, leftup, rightdown, cv::Scalar(255, 0, 0), 1);
-	cv::line(frame, leftdown, rightup, cv::Scalar(255, 0, 0), 1);
+	cv::Point left_up = cv::Point(p.x - 5, p.y - 5);
+	cv::Point left_down = cv::Point(p.x - 5, p.y + 5);
+	cv::Point right_up = cv::Point(p.x + 5, p.y - 5);
+	cv::Point right_down = cv::Point(p.x + 5, p.y + 5);
+	cv::line(frame_, left_up, right_down, cv::Scalar(255, 0, 0), 1);
+	cv::line(frame_, left_down, right_up, cv::Scalar(255, 0, 0), 1);
 }
 
 void CVImageView::drawFrame()
 {
-	cvui::image(frame, imagePos.x, imagePos.y, imageAfterScale);
+	cvui::image(frame_, image_pos_.x, image_pos_.y, image_after_scale_);
 
-	for (auto iter = windowPoints.begin(); iter != windowPoints.end(); iter++)
+	for (auto iter = windows_points_.begin(); iter != windows_points_.end(); iter++)
 	{
 		drawPoint(*iter);
 	}
