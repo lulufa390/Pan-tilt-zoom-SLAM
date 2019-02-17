@@ -64,9 +64,13 @@ void CourtView::annotate()
 
 		bool is_find = play_field_->find_candinate_point(image_point_vgl, world_point, 10);
 		if (is_find) {
+			vgl_point_2d<double> reverse_image_point = play_field_->world_point_to_image_point(world_point);
+			cv::Point reverse_image_point_cv = cv::Point(reverse_image_point.x(), reverse_image_point.y());
+			cv::Point reverse_window_point_cv = windowPointForImagePoint(reverse_image_point_cv);
 
-			windows_points_.push_back(window_point);
-			image_points_.push_back(image_point_vgl);
+			windows_points_.push_back(reverse_window_point_cv);
+			//image_points_.push_back(image_point_vgl);
+
 			world_points_.push_back(world_point);
 		}
 
@@ -77,6 +81,6 @@ void CourtView::annotate()
 void CourtView::clearAnnotations()
 {
 	windows_points_.clear();
-	image_points_.clear();
+	//image_points_.clear();
 	world_points_.clear();
 }

@@ -85,7 +85,16 @@ void CVImageView::setImageSize(cv::Size size)
 // exchange between window point and image point
 cv::Point CVImageView::windowPointForImagePoint(const cv::Point& p) const
 {
-	return cv::Point(0, 0);
+	cv::Size before_scale = image_.size();
+	cv::Size after_scale = image_after_scale_.size();
+
+	double scale_x = 1.0 * (after_scale.width - 1) / (before_scale.width - 1);
+	double scale_y = 1.0 * (after_scale.height - 1) / (before_scale.height - 1);
+
+	int x = round(p.x * scale_x + image_pos_.x);
+	int y = round(p.y * scale_y + image_pos_.y);
+
+	return cv::Point(x, y);
 }
 
 cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
@@ -95,6 +104,7 @@ cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 
 	double scale_x = 1.0 * (before_scale.width - 1) / (after_scale.width - 1);
 	double scale_y = 1.0 * (before_scale.height - 1) / (after_scale.height - 1);
+
 
 	int x = round((p.x - image_pos_.x) * scale_x);
 	int y = round((p.y - image_pos_.y) * scale_y);
