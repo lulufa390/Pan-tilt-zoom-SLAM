@@ -34,7 +34,9 @@ public:
     
     // When user click the court image, the location will be away from the exact location.
     // This function returns the closest points in the all candidate points
-    // both are in world coordinate
+    // inPt: image coordiante
+    // outPt: world coordinate
+    // threshold: pixel
     bool find_candinate_point(const vgl_point_2d<double> &inPt,
                               vgl_point_2d<double> &outPt,
                               double threshold);
