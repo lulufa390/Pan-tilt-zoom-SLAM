@@ -17,6 +17,8 @@
 #include "court_view.hpp"
 #include "optimization/camera_estimation.hpp"
 
+enum AnnotationState { point, line_intersection, circle };
+
 class AnnotationWindow {
 
 private:
@@ -28,9 +30,13 @@ private:
 	// frame for main control view
 	Mat frame_;
 	cv::String main_view_name_;
+
+	AnnotationState state_;
+
 	void mainControlHandler();
 	void calibButtonFunc();
 	void clearButtonFunc();
+	void annotationStateFunc();
 
 public:
 	// interface for annotation application
