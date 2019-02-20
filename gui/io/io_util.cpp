@@ -75,4 +75,39 @@ namespace io_util {
         
         return true;
     }
+
+	bool readModel(const char * file_name,
+		std::vector<vgl_point_2d<double>> & points,
+		std::vector<std::pair<int, int>> & index)
+	{
+		points.clear();
+		index.clear();
+
+		assert(file_name);
+		FILE *pf = fopen(file_name, "r");
+		if (!pf) {
+			printf("can not open file %s\n", file_name);
+			return false;
+		}
+
+		int point_num, pair_num;
+		int num = fscanf(pf, "%d %d\n", &point_num, &pair_num);
+		assert(num == 2);
+		
+		for (int i = 0; i < point_num; i++)
+		{
+			double x, y;
+			int ret = fscanf(pf, "%lf %lf", &x, &y);
+			points.push_back(vgl_point_2d<double>(x, y));
+		}
+
+		for (int i = 0; i < pair_num; i++)
+		{
+			int p1, p2;
+			int ret = fscanf(pf, "%d %d", &p1, &p2);
+			index.push_back(std::pair<int, int>(p1, p2));
+		}
+
+		return true;
+	}
 }

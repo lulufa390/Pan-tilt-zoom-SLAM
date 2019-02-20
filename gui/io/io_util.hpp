@@ -25,6 +25,11 @@ namespace io_util {
     bool readCamera(const char *file_name,
                     std::string & image_name,
                     vpgl_perspective_camera<double> & camera);
+
+	// read court model from a .txt file
+	bool readModel(const char * file_name,
+				   std::vector<vgl_point_2d<double>> & points,
+				   std::vector<std::pair<int, int>> & index);
 }
 
 #endif /* io_util_hpp */

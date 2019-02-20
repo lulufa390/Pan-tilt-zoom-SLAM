@@ -9,6 +9,7 @@
 #include <vgl/vgl_point_2d.h>
 
 #include "annotation_window.h"
+#include "io/io_util.hpp"
 
 using std::string;
 
@@ -21,7 +22,11 @@ int main(int argc, char *argv[])
     string im_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/1.jpg");
     string model_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/model.png");
 #endif
+
 	std::vector<vgl_point_2d<double>> points;
+	std::vector<std::pair<int, int>> pairs;
+	io_util::readModel("./resource/ice_hockey_model.txt", points, pairs);
+
 
 	AnnotationWindow app("Main View");
 
