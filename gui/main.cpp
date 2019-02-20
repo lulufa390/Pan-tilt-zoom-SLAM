@@ -25,21 +25,24 @@ int main(int argc, char *argv[])
 
 	AnnotationWindow app("Main View");
 
-	FeatureAnnotationView featureAnnotation("Feature Annotation");
-	CourtView courtView("Court View");
+	FeatureAnnotationView * feature_annotation = new FeatureAnnotationView("Feature Annotation");
+	CourtView * court_view = new CourtView("Court View");
+	
 
-	courtView.setWindowSize(cv::Size(800, 400));
-	courtView.setImagePosition(cv::Point(19, 26));
-	courtView.setImageSize(cv::Size(762, 348));
+	court_view->setWindowSize(cv::Size(800, 400));
+	court_view->setImagePosition(cv::Point(19, 26));
+	court_view->setImageSize(cv::Size(762, 348));
 
 	cv::Mat source_img = cv::imread(im_name, cv::IMREAD_COLOR);
 	cv::Mat model_img = cv::imread(model_name, cv::IMREAD_COLOR);
 
-	featureAnnotation.setImage(source_img);
-	courtView.setImage(model_img);
+	feature_annotation->setImage(source_img);
+	court_view->setImage(model_img);
 
-	app.setFeatureAnnotationView(&featureAnnotation);
-	app.setCourtView(&courtView);
+	app.setFeatureAnnotationView(feature_annotation);
+	app.setCourtView(court_view);
+	
+
 	app.startLoop();
 
 	return 0;

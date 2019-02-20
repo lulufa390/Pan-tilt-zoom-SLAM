@@ -9,8 +9,9 @@ AnnotationWindow::AnnotationWindow(cv::String name)
 	frame_ = cv::Scalar(50, 50, 50);
 
 	state_ = AnnotationState::point;
-}
 
+	visualize_view_ = new VisualizeView("Visualize View");
+}
 
 AnnotationWindow::~AnnotationWindow() {}
 
@@ -136,16 +137,18 @@ void AnnotationWindow::annotationStateFunc()
 
 void AnnotationWindow::startLoop() {
 
-	const int view_number = 3;
+	const int view_number = 4;
 
 	const cv::String feature_view_name = feature_annotation_view_->getWindowName();
 	const cv::String court_view_name = court_view_->getWindowName();
+	const cv::String visualize_view_name = visualize_view_->getWindowName();
 
 	const cv::String view_names[] =
 	{
 		feature_view_name,
 		court_view_name,
 		main_view_name_,
+		visualize_view_name
 	};
 
 	// init multiple windows
@@ -168,6 +171,10 @@ void AnnotationWindow::startLoop() {
 		cvui::context(main_view_name_);
 		mainControlHandler();
 		cvui::imshow(main_view_name_, frame_);
+
+		cvui::context(visualize_view_name);
+		visualize_view_->drawFrame();
+		cvui::imshow(visualize_view_name, visualize_view_->frame_);
 
 
 		// Check if ESC key was pressed
