@@ -98,7 +98,7 @@ namespace io_util {
 		{
 			double x, y;
 			int ret = fscanf(pf, "%lf %lf", &x, &y);
-			points.push_back(vgl_point_2d<double>(x, y));
+			points.push_back(vgl_point_2d<double>( x / 0.3048, y / 0.3048));
 		}
 
 		for (int i = 0; i < pair_num; i++)

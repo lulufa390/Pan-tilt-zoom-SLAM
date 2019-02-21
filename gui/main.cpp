@@ -9,30 +9,24 @@
 #include <vgl/vgl_point_2d.h>
 
 #include "annotation_window.h"
-#include "io/io_util.hpp"
 
 using std::string;
 
 int main(int argc, char *argv[])
 {
 #ifdef _WIN32
-    string im_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/1.jpg");
-    string model_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/model.png");
+	string im_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/2.jpg");
+	string model_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/model.png");
 #elif __APPLE__
-    string im_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/1.jpg");
-    string model_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/model.png");
+	string im_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/1.jpg");
+	string model_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/model.png");
 #endif
-
-	std::vector<vgl_point_2d<double>> points;
-	std::vector<std::pair<int, int>> pairs;
-	io_util::readModel("./resource/ice_hockey_model.txt", points, pairs);
-
 
 	AnnotationWindow app("Main View");
 
 	FeatureAnnotationView * feature_annotation = new FeatureAnnotationView("Feature Annotation");
 	CourtView * court_view = new CourtView("Court View");
-	
+
 
 	court_view->setWindowSize(cv::Size(800, 400));
 	court_view->setImagePosition(cv::Point(19, 26));
@@ -46,7 +40,7 @@ int main(int argc, char *argv[])
 
 	app.setFeatureAnnotationView(feature_annotation);
 	app.setCourtView(court_view);
-	
+
 
 	app.startLoop();
 

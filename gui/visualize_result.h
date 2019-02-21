@@ -10,8 +10,8 @@ public:
 	VisualizeView(std::string name);
 	~VisualizeView();
 
-	virtual void annotate(){}
-	virtual void clearAnnotations(){}
+	virtual void annotate() {}
+	virtual void clearAnnotations() {}
 };
 
 #endif

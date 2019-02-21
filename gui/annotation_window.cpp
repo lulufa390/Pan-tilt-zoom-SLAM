@@ -11,6 +11,8 @@ AnnotationWindow::AnnotationWindow(cv::String name)
 	state_ = AnnotationState::point;
 
 	visualize_view_ = new VisualizeView("Visualize View");
+
+	io_util::readModel("./resource/ice_hockey_model.txt", points_, pairs_);
 }
 
 AnnotationWindow::~AnnotationWindow() {}
@@ -43,28 +45,48 @@ void AnnotationWindow::calibButtonFunc()
 	}
 
 	if (points_annotation.size() == points_court.size() &&
-		points_annotation.size() >= 4) {
+		points_annotation.size() >= 4)
+	{
 		vgl_point_2d<double> principal_point(640, 360);
 		vpgl_perspective_camera<double> camera;
 
 		bool is_calib = cvx::init_calib(points_court, points_annotation, principal_point, camera);
-		if (is_calib) {
+		if (is_calib)
+		{
 			printf("successfully init calib.\n");
 			// draw annotation
 			// save camera
 
-		}
-		else {
-			printf("Warning: init calib failed.\n");
+			cv::Mat img = cv::Mat(feature_annotation_view_->getImage());
 
+			for (auto iter = pairs_.begin(); iter != pairs_.end(); ++iter)
+			{
+				int p1_index = iter->first;
+				int p2_index = iter->second;
+
+				vgl_point_2d<double> p1 = points_[p1_index];
+				vgl_point_2d<double> p2 = points_[p2_index];
+
+				vgl_homg_point_3d<double> p1_3d(p1.x(), p1.y(), 0);
+				vgl_homg_point_3d<double> p2_3d(p2.x(), p2.y(), 0);
+
+
+				vgl_homg_point_2d<double> result1 = camera.project(p1_3d);
+				vgl_homg_point_2d<double> result2 = camera.project(p2_3d);
+
+				cv::line(img, cv::Point(result1.x() / result1.w(), result1.y() / result1.w()),
+					cv::Point(result2.x() / result2.w(), result2.y() / result2.w()), cv::Scalar(255, 0, 0), 3);
+			}
+
+			visualize_view_->setImage(img);
+		}
+		else
+		{
+			printf("Warning: init calib failed.\n");
 		}
 
 	}
-
-
-
 }
-
 
 void AnnotationWindow::clearButtonFunc()
 {
@@ -82,7 +104,6 @@ void AnnotationWindow::mainControlHandler()
 	{
 		clearButtonFunc();
 	}
-
 
 	annotationStateFunc();
 }
@@ -131,8 +152,6 @@ void AnnotationWindow::annotationStateFunc()
 			state_ = AnnotationState::line_intersection;
 		break;
 	}
-
-
 }
 
 void AnnotationWindow::startLoop() {
@@ -154,7 +173,6 @@ void AnnotationWindow::startLoop() {
 	// init multiple windows
 	cvui::init(view_names, view_number);
 
-
 	while (true) {
 		frame_ = cv::Scalar(50, 50, 50);
 
@@ -175,7 +193,6 @@ void AnnotationWindow::startLoop() {
 		cvui::context(visualize_view_name);
 		visualize_view_->drawFrame();
 		cvui::imshow(visualize_view_name, visualize_view_->frame_);
-
 
 		// Check if ESC key was pressed
 		if (cv::waitKey(20) == 27) {

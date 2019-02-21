@@ -17,6 +17,7 @@
 #include "court_view.hpp"
 #include "visualize_result.h"
 #include "optimization/camera_estimation.hpp"
+#include "io/io_util.hpp"
 
 enum AnnotationState { point, line_intersection, circle };
 
@@ -27,6 +28,10 @@ private:
 	FeatureAnnotationView * feature_annotation_view_;
 	CourtView * court_view_;
 	VisualizeView * visualize_view_;
+
+	// for hockey model
+	std::vector<vgl_point_2d<double>> points_;
+	std::vector<std::pair<int, int>> pairs_;
 
 private:
 	// frame for main control view
