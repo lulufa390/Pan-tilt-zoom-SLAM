@@ -12,7 +12,11 @@ AnnotationWindow::AnnotationWindow(cv::String name)
 
 	visualize_view_ = new VisualizeView("Visualize View");
 
-	io_util::readModel("./resource/ice_hockey_model.txt", points_, pairs_);
+#ifdef _WIN32
+    io_util::readModel("./resource/ice_hockey_model.txt", points_, pairs_);
+#elif __APPLE__
+    io_util::readModel("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/resource/ice_hockey_model.txt", points_, pairs_);
+#endif	
 }
 
 AnnotationWindow::~AnnotationWindow() {}
@@ -77,6 +81,7 @@ void AnnotationWindow::calibButtonFunc()
 				cv::line(img, cv::Point(result1.x() / result1.w(), result1.y() / result1.w()),
 					cv::Point(result2.x() / result2.w(), result2.y() / result2.w()), cv::Scalar(255, 0, 0), 3);
 			}
+            cv::imwrite("visualization_debug.jpg", img);
 
 			visualize_view_->setImage(img);
 		}

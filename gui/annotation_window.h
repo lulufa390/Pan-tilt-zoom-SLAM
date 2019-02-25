@@ -31,7 +31,7 @@ private:
 
 	// for hockey model
 	std::vector<vgl_point_2d<double>> points_;
-	std::vector<std::pair<int, int>> pairs_;
+	std::vector<std::pair<int, int>> pairs_;  // what is this?
 
 private:
 	// frame for main control view

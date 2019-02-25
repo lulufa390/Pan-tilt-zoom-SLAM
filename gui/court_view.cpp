@@ -62,7 +62,7 @@ void CourtView::annotate()
 		vgl_point_2d<double> image_point_vgl = vgl_point_2d<double>(image_point.x, image_point.y);
 		vgl_point_2d<double> world_point;
 
-		bool is_find = play_field_->find_candinate_point(image_point_vgl, world_point, 10);
+		bool is_find = play_field_->find_candinate_point(image_point_vgl, world_point, 15);
 		if (is_find) {
 			vgl_point_2d<double> reverse_image_point = play_field_->world_point_to_image_point(world_point);
 			cv::Point reverse_image_point_cv = cv::Point(reverse_image_point.x(), reverse_image_point.y());
