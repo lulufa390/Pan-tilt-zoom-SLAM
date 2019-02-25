@@ -16,7 +16,7 @@ AnnotationWindow::AnnotationWindow(cv::String name)
     io_util::readModel("./resource/ice_hockey_model.txt", points_, pairs_);
 #elif __APPLE__
     io_util::readModel("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/resource/ice_hockey_model.txt", points_, pairs_);
-#endif	
+#endif
 }
 
 AnnotationWindow::~AnnotationWindow() {}
@@ -57,7 +57,13 @@ void AnnotationWindow::calibButtonFunc()
 		bool is_calib = cvx::init_calib(points_court, points_annotation, principal_point, camera);
 		if (is_calib)
 		{
-			printf("successfully init calib.\n");
+			printf("successfully init calib.\n");           
+            vpgl_perspective_camera<double> refined_caemra;
+            bool is_optimized = cvx::optimize_perspective_camera(points_court, points_annotation,
+                                                                 camera, refined_caemra);
+            if (is_optimized) {
+                camera = refined_caemra;
+            }
 			// draw annotation
 			// save camera
 
