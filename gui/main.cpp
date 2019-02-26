@@ -28,8 +28,12 @@ int main(int argc, char *argv[])
 	CourtView * court_view = new CourtView("Court View");
 
 
-	court_view->setWindowSize(cv::Size(800, 400));
-	court_view->setImagePosition(cv::Point(19, 26));
+	//court_view->setWindowSize(cv::Size(800, 400));
+	//court_view->setImagePosition(cv::Point(19, 26));
+	//court_view->setImageSize(cv::Size(762, 348));
+
+	court_view->setWindowSize(cv::Size(762, 348));
+	court_view->setImagePosition(cv::Point(0, 0));
 	court_view->setImageSize(cv::Size(762, 348));
 
 	cv::Mat source_img = cv::imread(im_name, cv::IMREAD_COLOR);

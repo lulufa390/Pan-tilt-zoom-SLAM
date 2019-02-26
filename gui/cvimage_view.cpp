@@ -11,9 +11,13 @@
 CVImageView::CVImageView(std::string name)
 {
 	// default parameters for CVImageView
-	window_size_ = cv::Size(1300, 740);
+	//window_size_ = cv::Size(1300, 740);
+	//image_size_ = cv::Size(1280, 720);
+	//image_pos_ = cv::Point(10, 10);
+
+	window_size_ = cv::Size(1280, 720);
 	image_size_ = cv::Size(1280, 720);
-	image_pos_ = cv::Point(10, 10);
+	image_pos_ = cv::Point(0, 0);
 
 	window_name_ = name;
 
@@ -97,7 +101,7 @@ cv::Point CVImageView::windowPointForImagePoint(const cv::Point& p) const
 	return cv::Point(x, y);
 }
 
-cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
+cv::Point CVImageView:: imagePointForWindowPoint(const cv::Point& p) const
 {
 	cv::Size before_scale = image_.size();
 	cv::Size after_scale = image_after_scale_.size();
