@@ -44,6 +44,10 @@ private:
 	void calibButtonFunc();
 	void clearButtonFunc();
 	void annotationStateFunc();
+    
+    
+    // Ice hockey specific
+    void refineCalibIceHockey();
 
 public:
 	// interface for annotation application

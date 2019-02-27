@@ -53,6 +53,24 @@ namespace cvx {
                                                 const vpgl_perspective_camera<double> & init_camera,
                                                 vpgl_perspective_camera<double> &camera);
     
+    // optimize camera by point-point, point-on-line and point-on-circle
+    // assume: initCamera close to ground truth
+    // imgConicPts: belongs to one of the conic (circles) but do not known which one
+    bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wldPts,
+                                                const vector<vgl_point_2d<double> > &imgPts,
+                                                const vector<vgl_line_3d_2_points<double> > & wldLines,
+                                                const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                const vector<vgl_conic<double> > & wldConics,
+                                                const vector<vgl_point_2d<double>> & imgConicPts,
+                                                const vpgl_perspective_camera<double> & initCamera,
+                                                vpgl_perspective_camera<double> &camera);
+    // extract H matrix from a projection matrix
+    vnl_matrix_fixed<double, 3, 3> homographyFromProjectiveCamera(const vpgl_perspective_camera<double> & camera);
+    
+    // project a conic by H, assume conic is a circle
+    vgl_conic<double> projectConic(const vnl_matrix_fixed<double, 3, 3> & H, const vgl_conic<double> & conic);
+    
+    
     
 }
 

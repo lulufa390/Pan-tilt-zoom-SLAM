@@ -15,6 +15,7 @@
 #include <vnl/algo/vnl_matrix_inverse.h>
 #include <vgl/vgl_intersection.h>
 #include <vgl/vgl_distance.h>
+#include <vgl/algo/vgl_homg_operators_2d.h>
 
 #include "bcv_vgl_h_matrix_2d_compute_linear.h"
 #include "bcv_vgl_h_matrix_2d_optimize_lmq.h"
@@ -370,6 +371,199 @@ namespace cvx {
         residual.getCamera(x, camera);
         return true;
     }
+    
+    vnl_matrix_fixed<double, 3, 3> homographyFromProjectiveCamera(const vpgl_perspective_camera<double> & camera)
+    {
+        vnl_matrix_fixed<double, 3, 3> H;
+        vnl_matrix_fixed<double, 3, 4> P = camera.get_matrix();
+        
+        H(0, 0) = P(0, 0); H(0, 1) = P(0, 1); H(0, 2) = P(0, 3);
+        H(1, 0) = P(1, 0); H(1, 1) = P(1, 1); H(1, 2) = P(1, 3);
+        H(2, 0) = P(2, 0); H(2, 1) = P(2, 1); H(2, 2) = P(2, 3);
+        
+        return H;
+    }
+    
+    vgl_conic<double> projectConic(const vnl_matrix_fixed<double, 3, 3> & H, const vgl_conic<double> & conic)
+    {
+        double a = conic.a();
+        double b = conic.b();
+        double c = conic.c();
+        double d = conic.d();
+        double e = conic.e();
+        double f = conic.f();
+        vnl_matrix_fixed<double, 3, 3> C;
+        C(0, 0) = a;     C(0, 1) = b/2.0; C(0, 2) = d/2.0;
+        C(1, 0) = b/2.0; C(1, 1) = c;     C(1, 2) = e/2.0;
+        C(2, 0) = d/2.0; C(2, 1) = e/2.0; C(2, 2) = f;
+        // project conic by H
+        vnl_matrix_fixed<double, 3, 3> H_inv = vnl_inverse(H);
+        vnl_matrix_fixed<double, 3, 3> C_proj = H_inv.transpose() * C * H_inv;
+        
+        // approximate a conic from 3*3 matrix
+        double aa =  C_proj(0, 0);
+        double bb = (C_proj(0, 1) + C_proj(1, 0));
+        double cc =  C_proj(1, 1);
+        double dd = (C_proj(0, 2) + C_proj(2, 0));
+        double ee = (C_proj(1, 2) + C_proj(2, 1));
+        double ff =  C_proj(2, 2);
+        
+        // project conic
+        vgl_conic<double> conic_proj(aa, bb, cc, dd, ee, ff);
+        return conic_proj;
+    }
+    
+    class optimize_perspective_camera_line_conic_ICP_residual: public vnl_least_squares_function
+    {
+    protected:
+        const vector<vgl_point_2d<double> > wldPts_;
+        const vector<vgl_point_2d<double> > imgPts_;
+        const vector<vgl_line_3d_2_points<double> >  wldLines_;
+        const vector<vector<vgl_point_2d<double> > >  imgLinePts_;
+        const vector<vgl_conic<double> >  wldConics_;
+        const vector<vector<vgl_point_2d<double> > >  imgConicPts_;
+        const vgl_point_2d<double> principlePoint_;
+    public:
+        optimize_perspective_camera_line_conic_ICP_residual(const vector<vgl_point_2d<double> > & wldPts,
+                                                            const vector<vgl_point_2d<double> > & imgPts,
+                                                            const vector<vgl_line_3d_2_points<double> > & wldLines,
+                                                            const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                            
+                                                            const vector<vgl_conic<double> >  & wldConics,
+                                                            const vector<vector<vgl_point_2d<double> > >  & imgConicPts,
+                                                            
+                                                            const vgl_point_2d<double> & pp,
+                                                            const int num_line_pts,
+                                                            const int num_conic_pts):
+        vnl_least_squares_function(7, (unsigned int)(wldPts.size()) * 2 + num_line_pts + num_conic_pts, no_gradient),
+        wldPts_(wldPts),
+        imgPts_(imgPts),
+        wldLines_(wldLines),
+        imgLinePts_(imgLinePts),
+        wldConics_(wldConics),
+        imgConicPts_(imgConicPts),
+        principlePoint_(pp)
+        {
+            assert(wldPts.size() == imgPts.size());
+            assert(wldPts.size() >= 2);
+            assert(wldLines.size() == imgLinePts.size());
+            assert(wldConics.size() == imgConicPts.size());
+        }
+        
+        void f(vnl_vector<double> const &x, vnl_vector<double> &fx)
+        {
+            //focal length, Rxyz, Camera_center_xyz
+            vpgl_calibration_matrix<double> K(x[0], principlePoint_);
+            vnl_vector_fixed<double, 3> rod(x[1], x[2], x[3]);
+            vgl_rotation_3d<double>  R(rod);
+            vgl_point_3d<double> cc(x[4], x[5], x[6]);  //camera center
+            vpgl_perspective_camera<double> camera;
+            camera.set_calibration(K);
+            camera.set_rotation(R);
+            camera.set_camera_center(cc);
+            
+            //loop all points
+            int idx = 0;
+            for (int i = 0; i<wldPts_.size(); i++) {
+                vgl_point_3d<double> p(wldPts_[i].x(), wldPts_[i].y(), 0);
+                vgl_point_2d<double> proj_p = (vgl_point_2d<double>)camera.project(p);
+                
+                fx[idx] = imgPts_[i].x() - proj_p.x();
+                idx++;
+                fx[idx] = imgPts_[i].y() - proj_p.y();
+                idx++;
+            }
+            
+            // for points locate on the line
+            for (int i = 0; i<wldLines_.size(); i++) {
+                vgl_point_2d<double> p1 = camera.project(wldLines_[i].point1());
+                vgl_point_2d<double> p2 = camera.project(wldLines_[i].point2());
+                vgl_line_2d<double> line(p1, p2);
+                for (int j = 0; j<imgLinePts_[i].size(); j++) {
+                    vgl_point_2d<double> p3 = imgLinePts_[i][j];
+                    fx[idx] = vgl_distance(line, p3);
+                    idx++;
+                }
+            }
+            
+            // for points locate on the conics
+            vnl_matrix_fixed<double, 3, 3> H = homographyFromProjectiveCamera(camera);
+            for (int i = 0; i<wldConics_.size(); i++) {
+                vgl_conic<double> conic_proj = projectConic(H, wldConics_[i]);
+                for (int j = 0; j<imgConicPts_[i].size(); j++) {
+                    vgl_point_2d<double> p = imgConicPts_[i][j];
+                    double dis = vgl_homg_operators_2d<double>::distance_squared(conic_proj, vgl_homg_point_2d<double>(p.x(), p.y(), 1.0));
+                    dis = sqrt(dis + 0.0000001);
+                    fx[idx] = dis;
+                    idx++;
+                }
+            }
+            
+        }
+        
+        void getCamera(vnl_vector<double> const &x, vpgl_perspective_camera<double> &camera)
+        {
+            
+            vpgl_calibration_matrix<double> K(x[0], principlePoint_);
+            
+            vnl_vector_fixed<double, 3> rod(x[1], x[2], x[3]);
+            vgl_rotation_3d<double>  R(rod);
+            vgl_point_3d<double> camera_center(x[4], x[5], x[6]);
+            
+            camera.set_calibration(K);
+            camera.set_rotation(R);
+            camera.set_camera_center(camera_center);
+        }
+    };
+    
+    
+    bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wldPts,
+                                                   const vector<vgl_point_2d<double> > &imgPts,
+                                                   const vector<vgl_line_3d_2_points<double> > & wldLines,
+                                                   const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                   const vector<vgl_conic<double> > & wldConics,
+                                                   const vector<vector<vgl_point_2d<double> > > & imgConicPts,
+                                                   const vpgl_perspective_camera<double> & initCamera,
+                                                   vpgl_perspective_camera<double> &camera)
+    {
+        assert(wldPts.size() == imgPts.size());
+        assert(wldLines.size() == imgLinePts.size());
+        assert(wldConics.size() == imgConicPts.size());
+        
+        int num_line_pts = 0;
+        int num_conic_pts = 0;
+        for (int i = 0; i<imgLinePts.size(); i++) {
+            num_line_pts += imgLinePts[i].size();
+        }
+        for (int i = 0; i<imgConicPts.size(); i++) {
+            num_conic_pts += imgConicPts[i].size();
+        }
+        assert((unsigned int)(wldPts.size()) * 2 + num_line_pts + num_conic_pts > 7);
+        
+        optimize_perspective_camera_line_conic_ICP_residual residual(wldPts, imgPts, wldLines, imgLinePts, wldConics, imgConicPts,
+                                                                     initCamera.get_calibration().principal_point(),
+                                                                     num_line_pts, num_conic_pts);
+        vnl_vector<double> x(7, 0);
+        x[0] = initCamera.get_calibration().get_matrix()[0][0];
+        x[1] = initCamera.get_rotation().as_rodrigues()[0];
+        x[2] = initCamera.get_rotation().as_rodrigues()[1];
+        x[3] = initCamera.get_rotation().as_rodrigues()[2];
+        x[4] = initCamera.camera_center().x();
+        x[5] = initCamera.camera_center().y();
+        x[6] = initCamera.camera_center().z();
+        
+        vnl_levenberg_marquardt lmq(residual);
+        bool isMinimied = lmq.minimize(x);
+        if (!isMinimied) {
+            printf("Error: perspective camera optimize not converge.\n");
+            lmq.diagnose_outcome();
+            return false;
+        }
+        lmq.diagnose_outcome();
+        residual.getCamera(x, camera);
+        return true;
+    }
+    
 }
 
 
