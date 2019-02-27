@@ -101,34 +101,37 @@ void AnnotationWindow::calibButtonFunc()
 
 void AnnotationWindow::refineCalibIceHockey()
 {
-    
+    //@tod this function is unfinished
+    assert(0);
     //get point from image and world
-    vector<vgl_point_2d<double> > world_pts = [m_courtImageView getPoints:true];
-    vector<vgl_point_2d<double> > image_pts   = [m_orgImageView pts_];
+    vector<vgl_point_2d<double> > world_pts; // = [m_courtImageView getPoints:true];
+    vector<vgl_point_2d<double> > image_pts; //   = [m_orgImageView pts_];
     if (!(world_pts.size() >= 2 && image_pts.size() >= 2)) {
-        NSLog(@"Warning: Ice hockey, at least two point correspondences.\n");
+        printf("Warning: Ice hockey, at least two point correspondences.\n");
         return;
     }
     if (world_pts.size() != image_pts.size()) {
-        NSLog(@"Warning: Ice hockey, number of world points and image points is not equal.\n");
+        printf("Warning: Ice hockey, number of world points and image points is not equal.\n");
         return;
     }
-    /*
+    
     // line segments
     vector<vgl_line_3d_2_points<double> > world_line;
-    vector<vgl_line_segment_2d<double> > world_line_segment = [m_courtImageView getLineSegment: true];
+    vector<vgl_line_segment_2d<double> > world_line_segment; // = [m_courtImageView getLineSegment: true];
     for (int i = 0; i<world_line_segment.size(); i++) {
         vgl_point_3d<double> p1(world_line_segment[i].point1().x(), world_line_segment[i].point1().y(), 0);
         vgl_point_3d<double> p2(world_line_segment[i].point2().x(), world_line_segment[i].point2().y(), 0);
         world_line.push_back(vgl_line_3d_2_points<double>(p1, p2));
     }
-    vector<vgl_line_segment_2d<double> > image_line_segment = [m_orgImageView lines_];
+    
+    vector<vgl_line_segment_2d<double> > image_line_segment;// = [m_orgImageView lines_];
+    
     
     // circle
     
     // group circle annotation into five circles
     vector<vgl_conic<double>> world_conics = NHLIceHockeyPlayField::getCircles();
-    vector<vgl_point_2d<double>> circle_pts = [m_orgImageView circle_pts_];
+    vector<vgl_point_2d<double>> circle_pts;// = [m_orgImageView circle_pts_];
     
     if (image_line_segment.size() == world_line.size() && (world_line.size() > 0 || circle_pts.size() > 0))
     {
@@ -142,18 +145,18 @@ void AnnotationWindow::refineCalibIceHockey()
         }
         
         vpgl_perspective_camera<double> opt_camera;
-        bool is_opt = VpglPlus::optimize_perspective_camera_ICP(world_pts, image_pts,
+        bool is_opt = cvx::optimize_perspective_camera_point_line_circle(world_pts, image_pts,
                                                                 world_line, image_line_pt_groups,
                                                                 world_conics, circle_pts, init_camera_, opt_camera);
         if (is_opt) {
-            [self drawCourtAndSave:opt_camera];
-            NSLog(@"Ice hockey camera refinement done.\n");
+            //[self drawCourtAndSave:opt_camera];
+            printf("Ice hockey camera refinement done.\n");
         }
         else {
-            NSLog(@"Warning: refine camera failed\n");
+            printf("Warning: refine camera failed\n");
         }
     }
-     */
+    
 }
 
 void AnnotationWindow::clearButtonFunc()

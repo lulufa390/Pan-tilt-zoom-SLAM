@@ -372,7 +372,7 @@ namespace cvx {
         return true;
     }
     
-    vnl_matrix_fixed<double, 3, 3> homographyFromProjectiveCamera(const vpgl_perspective_camera<double> & camera)
+    vnl_matrix_fixed<double, 3, 3> homography_from_projective_camera(const vpgl_perspective_camera<double> & camera)
     {
         vnl_matrix_fixed<double, 3, 3> H;
         vnl_matrix_fixed<double, 3, 4> P = camera.get_matrix();
@@ -384,7 +384,7 @@ namespace cvx {
         return H;
     }
     
-    vgl_conic<double> projectConic(const vnl_matrix_fixed<double, 3, 3> & H, const vgl_conic<double> & conic)
+    vgl_conic<double> project_conic(const vnl_matrix_fixed<double, 3, 3> & H, const vgl_conic<double> & conic)
     {
         double a = conic.a();
         double b = conic.b();
@@ -487,9 +487,9 @@ namespace cvx {
             }
             
             // for points locate on the conics
-            vnl_matrix_fixed<double, 3, 3> H = homographyFromProjectiveCamera(camera);
+            vnl_matrix_fixed<double, 3, 3> H = homography_from_projective_camera(camera);
             for (int i = 0; i<wldConics_.size(); i++) {
-                vgl_conic<double> conic_proj = projectConic(H, wldConics_[i]);
+                vgl_conic<double> conic_proj = project_conic(H, wldConics_[i]);
                 for (int j = 0; j<imgConicPts_[i].size(); j++) {
                     vgl_point_2d<double> p = imgConicPts_[i][j];
                     double dis = vgl_homg_operators_2d<double>::distance_squared(conic_proj, vgl_homg_point_2d<double>(p.x(), p.y(), 1.0));
@@ -517,10 +517,11 @@ namespace cvx {
     };
     
     
+    
     bool optimize_perspective_camera_ICP(const vector<vgl_point_2d<double> > &wldPts,
                                                    const vector<vgl_point_2d<double> > &imgPts,
                                                    const vector<vgl_line_3d_2_points<double> > & wldLines,
-                                                   const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                   const vector<vector<vgl_point_2d<double> > > & imgLinePts,                                                       
                                                    const vector<vgl_conic<double> > & wldConics,
                                                    const vector<vector<vgl_point_2d<double> > > & imgConicPts,
                                                    const vpgl_perspective_camera<double> & initCamera,
@@ -563,6 +564,47 @@ namespace cvx {
         residual.getCamera(x, camera);
         return true;
     }
+    
+    bool optimize_perspective_camera_point_line_circle(const vector<vgl_point_2d<double> > &wldPts,
+                                                   const vector<vgl_point_2d<double> > &imgPts,
+                                                   const vector<vgl_line_3d_2_points<double> > & wldLines,
+                                                   const vector<vector<vgl_point_2d<double> > > & imgLinePts,
+                                                   const vector<vgl_conic<double> > & wldConics,
+                                                   const vector<vgl_point_2d<double>> & imgConicPts,
+                                                   const vpgl_perspective_camera<double> & initCamera,
+                                                   vpgl_perspective_camera<double> &camera)
+    {
+        // for points locate on the conics
+        vnl_matrix_fixed<double, 3, 3> H = homography_from_projective_camera(initCamera);
+        vector<vgl_conic<double>> projected_conics;
+        for (int i = 0; i<wldConics.size(); i++) {
+            projected_conics.push_back(project_conic(H, wldConics[i]));
+        }
+        
+        vector<vector<vgl_point_2d<double>> > img_conic_pts_groups(wldConics.size());
+        // min projection error
+        for (const vgl_point_2d<double>& p: imgConicPts) {
+            int min_index = -1;
+            double min_dist = INT_MAX;
+            for (int j = 0; j<projected_conics.size(); j++) {
+                vgl_conic<double> conic_proj = projected_conics[j];
+                double dist = vgl_homg_operators_2d<double>::distance_squared(conic_proj, vgl_homg_point_2d<double>(p.x(), p.y(), 1.0));
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    min_index = j;
+                }
+            }
+            if (min_index != -1) {
+                img_conic_pts_groups[min_index].push_back(p);
+            }
+        }
+        
+        return optimize_perspective_camera_ICP(wldPts, imgPts,
+                                                         wldLines, imgLinePts,
+                                                         wldConics, img_conic_pts_groups,
+                                                         initCamera, camera);
+    }
+
     
 }
 
