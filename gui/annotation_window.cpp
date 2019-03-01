@@ -105,7 +105,7 @@ void AnnotationWindow::refineCalibIceHockey()
     assert(0);
     //get point from image and world
     vector<vgl_point_2d<double> > world_pts; // = [m_courtImageView getPoints:true];
-    vector<vgl_point_2d<double> > image_pts; //   = [m_orgImageView pts_];
+    vector<vgl_point_2d<double> > image_pts; // @1 This the point in image  = [m_orgImageView pts_];
     if (!(world_pts.size() >= 2 && image_pts.size() >= 2)) {
         printf("Warning: Ice hockey, at least two point correspondences.\n");
         return;
@@ -124,14 +124,14 @@ void AnnotationWindow::refineCalibIceHockey()
         world_line.push_back(vgl_line_3d_2_points<double>(p1, p2));
     }
     
-    vector<vgl_line_segment_2d<double> > image_line_segment;// = [m_orgImageView lines_];
+    vector<vgl_line_segment_2d<double> > image_line_segment;// @2 This is the line in imge = [m_orgImageView lines_];
     
     
     // circle
     
     // group circle annotation into five circles
     vector<vgl_conic<double>> world_conics = NHLIceHockeyPlayField::getCircles();
-    vector<vgl_point_2d<double>> circle_pts;// = [m_orgImageView circle_pts_];
+    vector<vgl_point_2d<double>> circle_pts; // @3 this point in image // = [m_orgImageView circle_pts_];
     
     if (image_line_segment.size() == world_line.size() && (world_line.size() > 0 || circle_pts.size() > 0))
     {
