@@ -92,26 +92,26 @@ cv::Point CVImageView::windowPointForImagePoint(const cv::Point& p) const
 	cv::Size before_scale = image_.size();
 	cv::Size after_scale = image_after_scale_.size();
 
-	double scale_x = 1.0 * (after_scale.width - 1) / (before_scale.width - 1);
-	double scale_y = 1.0 * (after_scale.height - 1) / (before_scale.height - 1);
+	double scale_x = 1.0 * after_scale.width / before_scale.width;
+	double scale_y = 1.0 * after_scale.height / before_scale.height;
 
-	int x = round(p.x * scale_x + image_pos_.x);
-	int y = round(p.y * scale_y + image_pos_.y);
+	int x = MIN(round(p.x * scale_x), image_size_.width - 1) + image_pos_.x;
+	int y = MIN(round(p.y * scale_y), image_size_.height - 1) + image_pos_.y;
 
 	return cv::Point(x, y);
 }
 
-cv::Point CVImageView:: imagePointForWindowPoint(const cv::Point& p) const
+cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 {
 	cv::Size before_scale = image_.size();
 	cv::Size after_scale = image_after_scale_.size();
 
-	double scale_x = 1.0 * (before_scale.width - 1) / (after_scale.width - 1);
-	double scale_y = 1.0 * (before_scale.height - 1) / (after_scale.height - 1);
+	double scale_x = 1.0 * before_scale.width / after_scale.width;
+	double scale_y = 1.0 * before_scale.height / after_scale.height;
 
 
-	int x = round((p.x - image_pos_.x) * scale_x);
-	int y = round((p.y - image_pos_.y) * scale_y);
+	int x = MIN(round((p.x - image_pos_.x) * scale_x), before_scale.width - 1);
+	int y = MIN(round((p.y - image_pos_.y) * scale_y), before_scale.height - 1);
 
 	return cv::Point(x, y);
 }

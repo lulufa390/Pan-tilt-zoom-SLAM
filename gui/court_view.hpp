@@ -20,8 +20,8 @@ using std::vector;
 class CourtView : public CVImageView {
 
 private:
-    std::shared_ptr<PlayField> play_field_;
-    
+	std::shared_ptr<PlayField> play_field_;
+
 	//std::vector<vgl_point_2d<double>> image_points_;
 	std::vector<vgl_point_2d<double>> world_points_;
 

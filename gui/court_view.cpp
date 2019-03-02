@@ -18,33 +18,7 @@ CourtView::~CourtView() {}
 
 vector<vgl_point_2d<double>> CourtView::getPoints() const
 {
-	//@todo replace this code with function in play_filed_
-	//vector<vgl_point_2d<double>> points;
-	//for (auto iter = imagePoints.begin(); iter != imagePoints.end(); iter++)
-	//{
-	//	vgl_point_2d<double> p;
-
-	//	bool is_find = play_field_->find_candinate_point(*iter, p, 10);
-
-	//	if (is_find)
-	//	{
-
-	//	}
-
-	//	//int x = iter->x - 70;
-	//	//int y = 1090 - iter->y;
-
-	//	//double actual_x = 1.0 * x / 2400 * 60.96;
-	//	//double actual_y = 1.0 * y / 1020 * 25.908;
-
-	//	//vgl_point_2d<double> p(actual_x, actual_y);
-
-
-	//	points.push_back(p);
-	//}
-
 	return world_points_;
-
 }
 
 void CourtView::annotate()

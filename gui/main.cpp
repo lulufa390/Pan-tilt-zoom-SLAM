@@ -15,8 +15,9 @@ using std::string;
 int main(int argc, char *argv[])
 {
 #ifdef _WIN32
-	string im_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/2.jpg");
-	string model_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/model.png");  
+	//string im_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/2.jpg");
+	string im_name = string("C:/graduate_design/UBC_2017/samples/00048656.jpg");
+	string model_name = string("C:/graduate_design/cvui/cvuiApp/cvuiApp/model.png");
 #elif __APPLE__
 	string im_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/00048671.jpg");
 	string model_name("/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/gui/model.png");

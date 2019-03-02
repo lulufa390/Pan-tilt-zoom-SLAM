@@ -39,8 +39,8 @@ void FeatureAnnotationView::annotate()
 	case cvui::CLICK:
 		cv::Point window_point = cvui::mouse();
 		cv::Point image_point = imagePointForWindowPoint(window_point);
-            //std::cout<<"window point: "<< window_point<<std::endl;
-            //std::cout<<"image point: "<<image_point<<std::endl;
+		//std::cout<<"window point: "<< window_point<<std::endl;
+		//std::cout<<"image point: "<<image_point<<std::endl;
 		windows_points_.push_back(window_point);
 		image_points_.push_back(image_point);
 		break;
