@@ -28,6 +28,18 @@ vector<vgl_point_2d<double>> FeatureAnnotationView::getPoints() const
 	return points;
 }
 
+// get line segment
+vector<vgl_line_segment_2d<double>> FeatureAnnotationView::getLines() const
+{
+    return lines_;
+}
+
+// get image point that are on circles
+vector<vgl_point_2d<double>> FeatureAnnotationView::getCirclePoints() const
+{
+    return circle_points_;
+}
+
 void FeatureAnnotationView::annotate()
 {
 	cv::Point image_pos = getImagePosition();

@@ -32,6 +32,8 @@ public:
 
 	// get points on world coordinate, unit meter
 	vector<vgl_point_2d<double>> getPoints() const;
+    
+    
 
 	virtual void annotate();
 	virtual void clearAnnotations();
