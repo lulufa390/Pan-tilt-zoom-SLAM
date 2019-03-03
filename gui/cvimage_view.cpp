@@ -129,7 +129,7 @@ void CVImageView::drawPoint(cv::Point p, cv::Scalar color = cv::Scalar(255, 0, 0
 
 void CVImageView::drawLine(std::pair<cv::Point, cv::Point> line, cv::Scalar color = cv::Scalar(255, 0, 0))
 {
-	cv::line(frame_, line.first, line.second, color, 1);
+	cv::line(frame_, line.first, line.second, color, 2);
 }
 
 void CVImageView::drawFrame()

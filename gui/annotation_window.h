@@ -31,10 +31,13 @@ private:
 
 	// for hockey model
 	std::vector<vgl_point_2d<double>> points_;
-	std::vector<std::pair<int, int>> pairs_;  // what is this?
+
+	// this is indexes for lines(two points) in hockey model
+	std::vector<std::pair<int, int>> pairs_;
 
 	// for camera refinement
 	vpgl_perspective_camera<double> init_camera_; // camera from initial calibration
+	vpgl_perspective_camera<double> opt_camera_; // refined camera
 
 private:
 	// frame for main control view
@@ -48,6 +51,7 @@ private:
 	void clearButtonFunc();
 	void annotationStateFunc();
 
+	void visualize_camera(vpgl_perspective_camera<double> camera);
 
 	// Ice hockey specific
 	void refineCalibIceHockey();
