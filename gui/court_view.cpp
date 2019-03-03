@@ -21,11 +21,21 @@ vector<vgl_point_2d<double>> CourtView::getPoints() const
 	return world_points_;
 }
 
+vector<vgl_line_segment_2d<double>> CourtView::getLines() const
+{
+	return lines_;
+}
+
 void CourtView::annotate()
 {
 	cv::Point image_pos = getImagePosition();
 	cv::Size image_size = getImageSize();
 	int active_area = cvui::iarea(image_pos.x, image_pos.y, image_size.width, image_size.height);
+
+	// for drawing line, save the begin point, and whether is continue a line
+	static bool continue_line = false;
+	static cv::Point line_begin;
+	static vgl_point_2d<double> line_being_world;
 
 	switch (active_area)
 	{
@@ -42,10 +52,37 @@ void CourtView::annotate()
 			cv::Point reverse_image_point_cv = cv::Point(reverse_image_point.x(), reverse_image_point.y());
 			cv::Point reverse_window_point_cv = windowPointForImagePoint(reverse_image_point_cv);
 
-			windows_points_.push_back(reverse_window_point_cv);
-			//image_points_.push_back(image_point_vgl);
+			if (state_ == AnnotationState::point)
+			{
+				windows_points_.push_back(reverse_window_point_cv);
+				world_points_.push_back(world_point);
+				continue_line = false;
+			}
+			else if (state_ == AnnotationState::line)
+			{
+				if (continue_line)
+				{
+					cv::Point line_end = reverse_window_point_cv;
+					vgl_point_2d<double> line_end_world = world_point;
 
-			world_points_.push_back(world_point);
+					windows_line_.push_back(std::pair<cv::Point, cv::Point>(line_begin, line_end));
+
+					lines_.push_back(vgl_line_segment_2d<double>(line_being_world, line_end_world));
+
+					continue_line = false;
+				}
+				else
+				{
+					line_begin = reverse_window_point_cv;
+					line_being_world = world_point;
+					continue_line = true;
+				}
+			}
+			else
+			{
+				continue_line = false;
+			}
+
 		}
 
 		break;
@@ -55,6 +92,8 @@ void CourtView::annotate()
 void CourtView::clearAnnotations()
 {
 	windows_points_.clear();
-	//image_points_.clear();
 	world_points_.clear();
+
+	windows_line_.clear();
+	lines_.clear();
 }

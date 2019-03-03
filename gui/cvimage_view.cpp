@@ -117,14 +117,19 @@ cv::Point CVImageView::imagePointForWindowPoint(const cv::Point& p) const
 }
 
 
-void CVImageView::drawPoint(cv::Point p)
+void CVImageView::drawPoint(cv::Point p, cv::Scalar color = cv::Scalar(255, 0, 0))
 {
 	cv::Point left_up = cv::Point(p.x - 5, p.y - 5);
 	cv::Point left_down = cv::Point(p.x - 5, p.y + 5);
 	cv::Point right_up = cv::Point(p.x + 5, p.y - 5);
 	cv::Point right_down = cv::Point(p.x + 5, p.y + 5);
-	cv::line(frame_, left_up, right_down, cv::Scalar(255, 0, 0), 1);
-	cv::line(frame_, left_down, right_up, cv::Scalar(255, 0, 0), 1);
+	cv::line(frame_, left_up, right_down, color, 1);
+	cv::line(frame_, left_down, right_up, color, 1);
+}
+
+void CVImageView::drawLine(std::pair<cv::Point, cv::Point> line, cv::Scalar color = cv::Scalar(255, 0, 0))
+{
+	cv::line(frame_, line.first, line.second, color, 1);
 }
 
 void CVImageView::drawFrame()
@@ -135,4 +140,21 @@ void CVImageView::drawFrame()
 	{
 		drawPoint(*iter);
 	}
+
+	for (auto iter = windows_points_circle_.begin(); iter != windows_points_circle_.end(); iter++)
+	{
+		drawPoint(*iter, cv::Scalar(0, 255, 0));
+	}
+
+	for (auto iter = windows_line_.begin(); iter != windows_line_.end(); iter++)
+	{
+		drawLine(*iter);
+	}
+
+
+}
+
+void CVImageView::setState(AnnotationState state)
+{
+	state_ = state;
 }

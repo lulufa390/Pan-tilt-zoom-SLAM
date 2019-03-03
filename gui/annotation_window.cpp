@@ -189,7 +189,7 @@ void AnnotationWindow::annotationStateFunc()
 	case AnnotationState::point:
 		point_checkbox = true;
 		break;
-	case AnnotationState::line_intersection:
+	case AnnotationState::line:
 		line_checkbox = true;
 		break;
 	case AnnotationState::circle:
@@ -198,18 +198,18 @@ void AnnotationWindow::annotationStateFunc()
 	}
 
 	cvui::checkbox(frame_, 100, 100, "point", &point_checkbox);
-	cvui::checkbox(frame_, 100, 120, "line_intersection", &line_checkbox);
+	cvui::checkbox(frame_, 100, 120, "line", &line_checkbox);
 	cvui::checkbox(frame_, 100, 140, "circle", &circle_checkbox);
 
 	switch (state_)
 	{
 	case AnnotationState::point:
 		if (line_checkbox)
-			state_ = AnnotationState::line_intersection;
+			state_ = AnnotationState::line;
 		else if (circle_checkbox)
 			state_ = AnnotationState::circle;
 		break;
-	case AnnotationState::line_intersection:
+	case AnnotationState::line:
 		if (point_checkbox)
 			state_ = AnnotationState::point;
 		else if (circle_checkbox)
@@ -219,9 +219,12 @@ void AnnotationWindow::annotationStateFunc()
 		if (point_checkbox)
 			state_ = AnnotationState::point;
 		else if (line_checkbox)
-			state_ = AnnotationState::line_intersection;
+			state_ = AnnotationState::line;
 		break;
 	}
+
+	court_view_->setState(state_);
+	feature_annotation_view_->setState(state_);
 }
 
 void AnnotationWindow::startLoop() {

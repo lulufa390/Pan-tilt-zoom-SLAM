@@ -25,6 +25,7 @@ private:
 	//std::vector<vgl_point_2d<double>> image_points_;
 	std::vector<vgl_point_2d<double>> world_points_;
 
+	vector<vgl_line_segment_2d<double>> lines_;
 
 public:
 	CourtView(std::string name);
@@ -32,8 +33,10 @@ public:
 
 	// get points on world coordinate, unit meter
 	vector<vgl_point_2d<double>> getPoints() const;
-    
-    
+
+	// get lines on world coordinate
+	vector<vgl_line_segment_2d<double>> getLines() const;
+
 
 	virtual void annotate();
 	virtual void clearAnnotations();

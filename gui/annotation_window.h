@@ -19,7 +19,7 @@
 #include "optimization/camera_estimation.hpp"
 #include "io/io_util.hpp"
 
-enum AnnotationState { point, line_intersection, circle };
+
 
 class AnnotationWindow {
 
