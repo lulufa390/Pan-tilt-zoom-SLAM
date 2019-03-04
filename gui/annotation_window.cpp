@@ -172,7 +172,13 @@ void AnnotationWindow::refineCalibIceHockey()
 			pts.push_back(image_line_segment[i].point2());
 			pts.push_back(centre(pts[0], pts[1]));
 			image_line_pt_groups.push_back(pts);
-		}
+		}       
+       
+        io_util::writeGUIRecord("debug.txt", "debug.jpg", world_pts, image_pts,
+                                world_line, image_line_segment,
+                                world_conics, circle_pts);
+        printf("save file to debug.txt\n");
+        
 
 		bool is_opt = cvx::optimize_perspective_camera_point_line_circle(world_pts, image_pts,
 			world_line, image_line_pt_groups,
