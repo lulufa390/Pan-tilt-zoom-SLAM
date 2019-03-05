@@ -54,7 +54,7 @@ private:
 	void visualize_camera(vpgl_perspective_camera<double> camera);
 
 	// Ice hockey specific
-	void refineCalibIceHockey();
+	bool refineCalibIceHockey();
 
 public:
 	// interface for annotation application

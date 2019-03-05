@@ -33,7 +33,7 @@ void AnnotationWindow::setCourtView(CourtView* image_view)
 
 void AnnotationWindow::visualize_camera(vpgl_perspective_camera<double> camera)
 {
-	cv::Mat img = cv::Mat(feature_annotation_view_->getImage());
+	cv::Mat img = feature_annotation_view_->getImage().clone();
 
 	for (auto iter = pairs_.begin(); iter != pairs_.end(); ++iter)
 	{
@@ -86,9 +86,16 @@ void AnnotationWindow::calibButtonFunc()
 		if (is_calib)
 		{
 			printf("successfully init calib.\n");
-			refineCalibIceHockey();
+			if (refineCalibIceHockey())
+			{
+				visualize_camera(opt_camera_);
+			}
+			else
+			{
+				visualize_camera(init_camera_);
+			}
 
-			visualize_camera(opt_camera_);
+
 
 			//vpgl_perspective_camera<double> refined_camera;
 			//bool is_optimized = cvx::optimize_perspective_camera(points_court, points_annotation,
@@ -131,18 +138,18 @@ void AnnotationWindow::calibButtonFunc()
 	}
 }
 
-void AnnotationWindow::refineCalibIceHockey()
+bool AnnotationWindow::refineCalibIceHockey()
 {
 	//get point from image and world
 	vector<vgl_point_2d<double> > world_pts = court_view_->getPoints(); // = [m_courtImageView getPoints:true];
 	vector<vgl_point_2d<double> > image_pts = feature_annotation_view_->getPoints(); // @1 This the point in image  = [m_orgImageView pts_];
 	if (!(world_pts.size() >= 2 && image_pts.size() >= 2)) {
 		printf("Warning: Ice hockey, at least two point correspondences.\n");
-		return;
+		return false;
 	}
 	if (world_pts.size() != image_pts.size()) {
 		printf("Warning: Ice hockey, number of world points and image points is not equal.\n");
-		return;
+		return false;
 	}
 
 	// line segments
@@ -186,12 +193,15 @@ void AnnotationWindow::refineCalibIceHockey()
 		if (is_opt) {
 			//[self drawCourtAndSave:opt_camera];
 			printf("Ice hockey camera refinement done.\n");
+			return true;
 		}
 		else {
 			printf("Warning: refine camera failed\n");
+			return false;
 		}
 	}
 
+	return false;
 }
 
 void AnnotationWindow::clearButtonFunc()
