@@ -1,7 +1,7 @@
 #define CVUI_IMPLEMENTATION
 #include "annotation_window.h"
 
-AnnotationWindow::AnnotationWindow(cv::String name)
+AnnotationWindow::AnnotationWindow(cv::String name, std::string index)
 {
 	main_view_name_ = name;
 
@@ -11,6 +11,8 @@ AnnotationWindow::AnnotationWindow(cv::String name)
 	state_ = AnnotationState::point;
 
 	visualize_view_ = new VisualizeView("Visualize View");
+
+	img_index_ = index;
 
 #ifdef _WIN32
 	io_util::readModel("./resource/ice_hockey_model.txt", points_, pairs_);
@@ -89,10 +91,13 @@ void AnnotationWindow::calibButtonFunc()
 			if (refineCalibIceHockey())
 			{
 				visualize_camera(opt_camera_);
+
+				io_util::writeCamera("camera.txt", (img_index_ + ".jpg").c_str(), opt_camera_);
 			}
 			else
 			{
 				visualize_camera(init_camera_);
+				io_util::writeCamera("camera.txt", (img_index_ + ".jpg").c_str(), init_camera_);
 			}
 
 

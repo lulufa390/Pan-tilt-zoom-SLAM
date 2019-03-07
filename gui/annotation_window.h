@@ -56,9 +56,11 @@ private:
 	// Ice hockey specific
 	bool refineCalibIceHockey();
 
+	string img_index_;
+
 public:
 	// interface for annotation application
-	AnnotationWindow(cv::String name);
+	AnnotationWindow(cv::String name, std::string index = "default");
 	~AnnotationWindow();
 
 	void setFeatureAnnotationView(FeatureAnnotationView* image_view);
