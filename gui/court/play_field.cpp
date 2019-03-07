@@ -828,7 +828,7 @@ vector<vgl_conic<double>> NHLIceHockeyPlayField::getCircles(void)
 
 	vector<vgl_conic<double>> circles;
 	vector<vgl_point_2d<double>> centers;
-	double radius = 15.0; // feet
+	double radius = 15.0 * LU_FEET2METER; // feet
 	double w = 200;
 	double h = 85;
 	double w1 = 11 + 20;
@@ -840,8 +840,8 @@ vector<vgl_conic<double>> NHLIceHockeyPlayField::getCircles(void)
 	centers.push_back(vgl_point_2d<double>(w - w1, h / 2 - h1));
 
 	for (int i = 0; i < centers.size(); i++) {
-		double x = centers[i].x();
-		double y = centers[i].y();
+		double x = centers[i].x() * LU_FEET2METER;
+		double y = centers[i].y() * LU_FEET2METER;
 		vgl_conic<double> conic(vgl_homg_point_2d<double>(x, y, 1.0), radius, radius, 0.0);
 		circles.push_back(conic);
 	}
