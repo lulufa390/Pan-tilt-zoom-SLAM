@@ -132,7 +132,7 @@ public:
 	vgl_point_2d<double> image_point_to_world_point(const vgl_point_2d<double> &p);  //pixel --> feet
 	vgl_point_2d<double> world_point_to_image_point(const vgl_point_2d<double> &p);  //feet --> pixel
 
-	// get 5 circles
+	// get 5 circles in meter
 	static vector<vgl_conic<double>> getCircles(void);
 };
 
