@@ -177,10 +177,101 @@ namespace io_util {
                        vector<vgl_point_2d<double> > &wld_pts,
                        vector<vgl_point_2d<double> > &img_pts,
                        vector<vgl_line_3d_2_points<double> > & wld_lines,
-                       vector<vector<vgl_point_2d<double> > > & img_line_pts,
+                       vector<vgl_line_segment_2d<double> > & img_lines,
                        vector<vgl_conic<double> > & wld_conics,
                        vector<vgl_point_2d<double>> & img_conic_pts)
     {
+        FILE *pf = fopen(file_name.c_str(), "r");
+        if (!pf) {
+            printf("can not open file %s\n", file_name.c_str());
+            return false;
+        }
+        
+        // 1. read image name
+        char buf[BUFSIZ] = { NULL };
+        int ret = fscanf(pf, "%s\n", buf);
+        assert(ret == 1);
+        image_name = string(buf);
+        
+        // 2. read point-to-point
+        auto readPoints = [&]() {
+            int num = 0;
+            int ret = fscanf(pf, "%d", &num);
+            assert(ret == 1);
+            vector<vgl_point_2d<double>> pts;
+            for (int i = 0; i<num; i++) {
+                double x = 0;
+                double y = 0;
+                ret = fscanf(pf, "%lf %lf", &x, &y);
+                assert(ret == 2);
+                vgl_point_2d<double> p(x, y);
+                pts.push_back(p);
+            }
+            return pts;
+        };
+        
+        wld_pts = readPoints();
+        img_pts = readPoints();
+        
+        // 3. point-on-line
+        auto readLine3D = [&]() {
+            vector<vgl_line_3d_2_points<double>> lines;
+            int num = 0;
+            int ret = fscanf(pf, "%d", &num);
+            assert(ret == 1);
+            for (int i = 0; i<num; i++) {
+                double x1 = 0, y1 = 0, z1 = 0;
+                double x2 = 0, y2 = 0, z2 = 0;
+                ret = fscanf(pf, "%lf %lf %lf %lf %lf %lf", &x1, &y1, &z1, &x2, &y2, &z2);
+                assert(ret == 6);
+                
+                vgl_point_3d<double> p1(x1, y1, z1);
+                vgl_point_3d<double> p2(x2, y2, z2);
+                lines.push_back(vgl_line_3d_2_points<double>(p1, p2));
+            }
+            return lines;
+        };
+        
+        auto readlineSegment2D = [&] {
+            vector<vgl_line_segment_2d<double>> lines;
+            int num = 0;
+            int ret = fscanf(pf, "%d", &num);
+            assert(ret == 1);
+            for (int i = 0; i<num; i++) {
+                double x1 = 0, y1 = 0;
+                double x2 = 0, y2 = 0;
+                ret = fscanf(pf, "%lf %lf %lf %lf", &x1, &y1, &x2, &y2);
+                assert(ret == 4);
+                
+                vgl_point_2d<double> p1(x1, y1);
+                vgl_point_2d<double> p2(x2, y2);
+                lines.push_back(vgl_line_segment_2d<double>(p1, p2));
+            }
+            return lines;
+        };
+        
+        wld_lines = readLine3D();
+        img_lines = readlineSegment2D();
+        assert(wld_lines.size() == img_lines.size());
+        
+        // 3. point-on-circle
+        auto readConic = [&]() {
+            vector<vgl_conic<double>> conics;
+            int num = 0;
+            int ret = fscanf(pf, "%d", &num);
+            assert(ret == 1);
+            for (int i = 0; i<num; i++) {
+                double data[6] = {0};
+                fscanf(pf, "%lf %lf %lf %lf %lf %lf", &data[0], &data[1], &data[2],
+                       &data[3], &data[4], &data[5]);
+                conics.push_back(vgl_conic<double>(data));
+            }
+            return conics;
+        };
+        
+        wld_conics = readConic();
+        img_conic_pts = readPoints();
+        
         return true;
     }
 }

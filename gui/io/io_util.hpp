@@ -58,7 +58,7 @@ namespace io_util {
                        vector<vgl_point_2d<double> > &wld_pts,
                        vector<vgl_point_2d<double> > &img_pts,
                        vector<vgl_line_3d_2_points<double> > & wld_lines,
-                       vector<vector<vgl_point_2d<double> > > & img_line_pts,
+                       vector<vgl_line_segment_2d<double> > & img_lines,
                        vector<vgl_conic<double> > & wld_conics,
                        vector<vgl_point_2d<double>> & img_conic_pts);
 }
