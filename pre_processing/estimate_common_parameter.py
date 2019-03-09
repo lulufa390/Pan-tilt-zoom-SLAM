@@ -1,4 +1,8 @@
 
+
+
+
+
 import scipy.io as sio
 import numpy as np
 
@@ -137,6 +141,19 @@ for i in range(len(files)):
     cv.imshow('init camera', im1)
     cv.imshow('refined camera', im2)
     cv.waitKey()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
