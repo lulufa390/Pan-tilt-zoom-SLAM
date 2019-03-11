@@ -42,22 +42,26 @@ void CourtView::annotate()
 	case cvui::CLICK:
 		cv::Point window_point = cvui::mouse();
 		cv::Point image_point = imagePointForWindowPoint(window_point);
-
 		vgl_point_2d<double> image_point_vgl = vgl_point_2d<double>(image_point.x, image_point.y);
-		vgl_point_2d<double> world_point_feet;
 
+		// get nearest world point in feet
+		vgl_point_2d<double> world_point_feet;
 		bool is_find = play_field_->find_candinate_point(image_point_vgl, world_point_feet, 15);
+
 		if (is_find) {
+			// only if candidate point is found, a point will be drawn on image
+			// world_point_feet(world coordinate) -> reverse_image_point(image coordinate) -> reverse_window_point_cv(window coordinate)
+			// the reverse_window_point_cv is used to draw that point on the window
 			vgl_point_2d<double> reverse_image_point = play_field_->world_point_to_image_point(world_point_feet);
 			cv::Point reverse_image_point_cv = cv::Point(reverse_image_point.x(), reverse_image_point.y());
 			cv::Point reverse_window_point_cv = windowPointForImagePoint(reverse_image_point_cv);
 
+			// world_point_meter is saved in court_view object as vector for future optimization
 			vgl_point_2d<double> world_point_meter(world_point_feet.x() * 0.3048, world_point_feet.y() * 0.3048);
 
 			if (state_ == AnnotationState::point)
 			{
 				windows_points_.push_back(reverse_window_point_cv);
-
 				world_points_.push_back(world_point_meter);
 				continue_line = false;
 			}
@@ -67,11 +71,8 @@ void CourtView::annotate()
 				{
 					cv::Point line_end = reverse_window_point_cv;
 					vgl_point_2d<double> line_end_world = world_point_meter;
-
 					windows_line_.push_back(std::pair<cv::Point, cv::Point>(line_begin, line_end));
-
 					lines_.push_back(vgl_line_segment_2d<double>(line_being_world, line_end_world));
-
 					continue_line = false;
 				}
 				else
