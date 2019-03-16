@@ -409,7 +409,7 @@ def run_ransac(points1, points2, index):
     return inner_kp, inner_index, outlier_index
 
 
-def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index):
+def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index, visualize=False):
     """
     matching with sparse optical flow and run ransac.
     :param img1: image 1
@@ -418,6 +418,9 @@ def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index):
     :param img1_keypoints_index: keypoints corresponding global indexes
     :return: inliers in current frame, inliers global indexes, outliers global indexes
     """
+
+    # local_matched_index is matched index in img1_keypoints (or current_keypoints)
+    # current_keypoints is matched keypoints in current frame (img2)
     local_matched_index, current_keypoints = optical_flow_matching(img1, img2, img1_keypoints)
 
     # current_keypoints_index is matched keypoints indexes in corresponding rays.
@@ -426,13 +429,26 @@ def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index):
     # previous_matched_keypoints is matched keypoints in previous frame.
     previous_matched_keypoints = img1_keypoints[local_matched_index]
 
-    # run RANSAC
+    # run RANSAC, local_inlier_index is index in the input for ransac
     local_inlier_index = homography_ransac(previous_matched_keypoints, current_keypoints,
                                            reprojection_threshold=0.5)
 
+    # inlier_keypoints is keypoints in current frame (img2) after 1: optical flow 2: homography RANSAC
     inlier_keypoints = current_keypoints[local_inlier_index]
+
+    # previous_inlier_keypoints is keypoints in previous frame (img2) after 1: optical flow 2: homography RANSAC
+    previous_inlier_keypoints = previous_matched_keypoints[local_inlier_index]
+
+    # an option to show the matching result for each frame
+    if visualize is True:
+        vis = draw_matches(img1, img2, previous_inlier_keypoints, inlier_keypoints)
+        cv.imshow("test", vis)
+        cv.waitKey(0)
+
+    # inlier_index is inliers global ray indexes
     inlier_index = current_keypoints_index[local_inlier_index]
 
+    # outlier_index is outliers global ray indexes
     outlier_index = np.delete(current_keypoints_index, local_inlier_index, axis=0)
 
     return inlier_keypoints, inlier_index, outlier_index
@@ -804,8 +820,6 @@ if __name__ == "__main__":
     im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
     im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
 
-
-
     start = time.time()
 
     for i in range(10):
@@ -815,13 +829,11 @@ if __name__ == "__main__":
         # fast
         # kp = detect_orb(im1, 50)
 
-
         # sift
         # kp1, des1 = detect_compute_sift(im1, 1500, False)
         # kp2, des2 = detect_compute_sift(im2, 1500, False)
         #
         # pt1, index1, pt2, index2 = match_sift_features(kp1, des1, kp2, des2, True)
-
 
         # orb
         # kp1, des1 = detect_compute_orb(im1, 6000, False)
@@ -837,8 +849,7 @@ if __name__ == "__main__":
 
     # ut_latch()
 
-
     end = time.time()
-    print(end-start)
+    print(end - start)
 
     # ut_match_sift_features()

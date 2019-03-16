@@ -132,7 +132,7 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 200)
+        first_img_kp = detect_sift(img, 500)
         # first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
@@ -150,7 +150,7 @@ class PtzSlam:
 
         # step 3: initialize convariance matrix of states
         # some parameters are manually selected
-        # @todo, note 0.001 and 1 are two parameters
+        # Note 0.001 and 1 are two parameters
         self.state_cov = 0.001 * np.eye(3 + 2 * len(self.rays))
         self.state_cov[2][2] = 1  # covariance for focal length
 
@@ -256,11 +256,7 @@ class PtzSlam:
         """
 
         # delete ray_global
-        delete_index = np.ndarray([0])
-        for j in range(len(index)):
-            if index[j] == 0:
-                delete_index = np.append(delete_index, j)
-
+        delete_index = np.array(index)
         self.rays = np.delete(self.rays, delete_index, axis=0)
 
         # delete p_global
@@ -291,7 +287,15 @@ class PtzSlam:
         keypoints, keypoints_index = self.current_camera.project_rays(
             self.rays, height, width)
 
-        # mask to remove keypoints near existing keypoints.
+        new_keypoints = detect_sift(img, 500)
+        # new_keypoints = detect_orb(img, 300)
+
+        # remove keypoints in player bounding boxes
+        if bounding_box is not None:
+            bounding_box_mask_index = keypoints_masking(new_keypoints, bounding_box)
+            new_keypoints = new_keypoints[bounding_box_mask_index]
+
+        # remove keypoints near existing keypoints
         mask = np.ones(img.shape[0:2], np.uint8)
 
         for j in range(len(keypoints)):
@@ -302,16 +306,8 @@ class PtzSlam:
             right_bound = int(min(width, x + 50))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
-        new_keypoints = detect_sift(img, 200)
-        # new_keypoints = detect_orb(img, 300)
-
-        # remove keypoints in player bounding boxes
-        if bounding_box is not None:
-            masked_index = keypoints_masking(new_keypoints, bounding_box)
-            new_keypoints = new_keypoints[masked_index]
-
-        # remove keypoints near existing keypoints
-        new_keypoints = new_keypoints[keypoints_masking(new_keypoints, mask)]
+        existing_keypoints_mask_index = keypoints_masking(new_keypoints, mask)
+        new_keypoints = new_keypoints[existing_keypoints_mask_index]
 
         # check if exist new keypoints after masking.
         if new_keypoints is not None:
@@ -345,8 +341,8 @@ class PtzSlam:
         if tracking_percentage < bad_tracking_percentage:
             self.bad_tracking_cnt += 1
 
-        if self.bad_tracking_cnt > 3:
-            self.tracking_lost = True
+        # if self.bad_tracking_cnt > 3:
+        #     self.tracking_lost = True
         """
         ===============================
         1. predict step
@@ -369,7 +365,6 @@ class PtzSlam:
         """
 
         height, width = next_img.shape[0:2]
-
         self.ekf_update(inlier_keypoints, inlier_index, height, width)
 
         """
@@ -388,6 +383,8 @@ class PtzSlam:
 
         self.previous_img = next_img
         self.previous_keypoints, self.previous_keypoints_index = self.add_rays(next_img, bounding_box)
+
+        print("tracking", tracking_percentage)
 
         if tracking_percentage > bad_tracking_percentage:
             # basketball set to (10, 25), soccer maybe (10, 15)
@@ -520,6 +517,7 @@ def ut_basketball():
     #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
 
 
+# deprecated Olympics hockey dataset
 def ut_hockey():
     slam = PtzSlam()
     sequence_length = 26
@@ -562,6 +560,76 @@ def ut_hockey():
         print("%f" % (slam.cameras[i].focal_length - ptzs[i, 2]))
 
 
+def ut_UBC_hockey():
+    slam = PtzSlam()
+    sequence_length = 900
+
+    annotation_mat = sio.loadmat("C:/graduate_design/UBC_2017/UBC_2017/UBC_hockey_ground_truth.mat")
+    bounding_box_mat_path = "C:/graduate_design/UBC_2017/UBC_2017/bounding_box.mat"
+
+    filename_list = ["000" + str(i + 48630) + ".jpg" for i in range(sequence_length)]
+    camera_list = annotation_mat["camera"]
+
+    ptz_list = annotation_mat["ptz"]
+    image_name_list = annotation_mat["image_name"].squeeze()
+
+    ptz_extend_list = -1 * np.ones([sequence_length, 3])
+
+    for i, image_name in enumerate(image_name_list, 0):
+        index = int(image_name[0][0:-4]) - 48630
+        ptz_extend_list[index, 0:3] = ptz_list[i, 0:3]
+
+    camera_center = annotation_mat["cc"].squeeze()
+    base_rotation = annotation_mat["base_rotation"].squeeze()
+
+    bounding_box_manager = SequenceManager(bounding_box_path=bounding_box_mat_path)
+
+    first_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[0],
+                          cv.IMREAD_GRAYSCALE)
+
+    first_camera = PTZCamera(camera_list[0, 0:2], camera_center, base_rotation)
+
+    first_camera.set_ptz(ptz_extend_list[0])
+
+    slam.init_system(first_img, first_camera, bounding_box_manager.get_bounding_box_mask(30, 0.5))
+    slam.add_keyframe(first_img, first_camera, 0)
+
+    with open("result.txt", 'w+') as f:
+        for i in range(1, sequence_length):
+            next_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[i],
+                                 cv.IMREAD_GRAYSCALE)
+
+            slam.tracking(next_img=next_img, bad_tracking_percentage=50,
+                          bounding_box=bounding_box_manager.get_bounding_box_mask(i + 30, 0.5))
+
+            # if slam.tracking_lost:
+            #     relocalized_camera = slam.relocalize(next_img, slam.current_camera)
+            #     slam.init_system(next_img, relocalized_camera, bounding_box_manager.get_bounding_box_mask(30 + i))
+            #     print("do relocalization!")
+            #
+            # elif slam.new_keyframe:
+            #     slam.add_keyframe(next_img, slam.current_camera, i)
+            #     print("add keyframe!")
+
+            print("=====The ", i, " iteration=====")
+
+            print("Pan: %f" % slam.cameras[i].pan)
+            print("Tilt: %f" % slam.cameras[i].tilt)
+            print("Zoom: %f" % slam.cameras[i].focal_length)
+
+            if not np.all(ptz_extend_list[i] == np.array([-1, -1, -1])):
+                print("Pan Error: %f" % (slam.cameras[i].pan - ptz_extend_list[i, 0]))
+                print("Tilt Error: %f" % (slam.cameras[i].tilt - ptz_extend_list[i, 1]))
+                print("zoom Error: %f" % (slam.cameras[i].focal_length - ptz_extend_list[i, 2]))
+
+                f.write(str(i) + "th frame\n")
+                f.write("Pan Error: %f\n" % (slam.cameras[i].pan - ptz_extend_list[i, 0]))
+                f.write("Tilt Error: %f\n" % (slam.cameras[i].tilt - ptz_extend_list[i, 1]))
+                f.write("zoom Error: %f\n" % (slam.cameras[i].focal_length - ptz_extend_list[i, 2]))
+
+
 if __name__ == "__main__":
-    ut_basketball()
+    # ut_basketball()
+
+    ut_UBC_hockey()
     # ut_hockey()

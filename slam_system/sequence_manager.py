@@ -17,32 +17,37 @@ import scipy.signal as sig
 
 
 class SequenceManager:
-    def __init__(self, annotation_path, image_path, ground_truth_path, bounding_box_path=None):
+    def __init__(self, annotation_path=None, image_path=None, ground_truth_path=None, bounding_box_path=None):
+
         self.height = 720
         self.width = 1280
 
         # annotation data
-        seq = sio.loadmat(annotation_path)
-        annotation = seq["annotation"]
-        meta = seq['meta']
-        u, v = annotation[0][0]['camera'][0][0:2]
-        base_rotation = np.zeros([3, 3])
-        cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
-        c = meta[0][0]["cc"][0]
+        if annotation_path is not None:
+            seq = sio.loadmat(annotation_path)
+            annotation = seq["annotation"]
+            meta = seq['meta']
+            u, v = annotation[0][0]['camera'][0][0:2]
+            base_rotation = np.zeros([3, 3])
+            cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
+            c = meta[0][0]["cc"][0]
 
-        self.camera = PTZCamera((u, v), c, base_rotation)
+            self.camera = PTZCamera((u, v), c, base_rotation)
 
         # image folder path
-        self.image_path = image_path
+        if image_path is not None:
+            self.image_path = image_path
 
         # ground truth
-        self.ground_truth_pan, self.ground_truth_tilt, self.ground_truth_f = load_camera_pose(ground_truth_path)
-        self.length = len(self.ground_truth_pan)
+        if ground_truth_path is not None:
+            self.ground_truth_pan, self.ground_truth_tilt, self.ground_truth_f = load_camera_pose(ground_truth_path)
+            self.length = len(self.ground_truth_pan)
 
         # bounding boxes
-        self.bounding_box = []
-        if bounding_box_path:
-            self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
+        if bounding_box_path is not None:
+            self.bounding_box = []
+            if bounding_box_path:
+                self.bounding_box = sio.loadmat(bounding_box_path)['bounding_box']
 
     def get_image_gray(self, index, dataset_type=0):
         """
@@ -88,10 +93,11 @@ class SequenceManager:
 
         return img
 
-    def get_bounding_box_mask(self, index):
+    def get_bounding_box_mask(self, index, threshold=0.6):
         """
         function to get mask to remove features on players
         :param index: image index for sequence
+        :param threshold: threshold for bounding box detected by faster-rcnn
         :return: a player mask for that frame (1 for no player, 0 for player)
         """
         if len(self.bounding_box) > 0:
@@ -100,8 +106,11 @@ class SequenceManager:
             # this only for soccer
             # tmp_mask[60:100, 60:490] = 0
 
+            # this for UBC hockey
+            tmp_mask[13:51, 303:976] = 0
+
             for j in range(self.bounding_box[0][index].shape[0]):
-                if self.bounding_box[0][index][j][4] > 0.6:
+                if self.bounding_box[0][index][j][4] > threshold:
                     for x in range(int(self.bounding_box[0][index][j][0]),
                                    int(self.bounding_box[0][index][j][2])):
                         for y in range(int(self.bounding_box[0][index][j][1]),
@@ -245,7 +254,6 @@ def generate_ground_truth():
     save_camera_pose(pan, tilt, f, ".", "synthesize_ground_truth.mat")
 
 
-
 def ut_ptz_camera():
     obj = SequenceManager("./basketball/basketball/basketball_anno.mat", "./basketball/basketball/images",
                           "./basketball_ground_truth.mat", "./objects_basketball.mat")
@@ -253,13 +261,13 @@ def ut_ptz_camera():
     print(obj.camera.project_3Dpoint([0, 0, 0]))
 
     print(TransFunction.from_3dpoint_to_image(obj.camera.principal_point[0], obj.camera.principal_point[1],
-                                      obj.camera.focal_length, obj.camera.pan, obj.camera.tilt,
-                                      obj.camera.camera_center, obj.camera.base_rotation, [0, 0, 0]))
+                                              obj.camera.focal_length, obj.camera.pan, obj.camera.tilt,
+                                              obj.camera.camera_center, obj.camera.base_rotation, [0, 0, 0]))
 
     print(obj.camera.project_ray([5, 1]))
 
     print(TransFunction.from_ray_to_image(obj.camera.principal_point[0], obj.camera.principal_point[1],
-                                            obj.camera.focal_length, obj.camera.pan, obj.camera.tilt, 5, 1))
+                                          obj.camera.focal_length, obj.camera.pan, obj.camera.tilt, 5, 1))
 
     print(obj.camera.back_project_to_3D_point(-1726.9998, 1295.25688))
 

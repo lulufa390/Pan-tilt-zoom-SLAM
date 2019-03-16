@@ -53,6 +53,7 @@ class Visualize:
             cv.line(img, (int(image_points[begin][0]), int(image_points[begin][1])),
                     (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 10)
 
+
 def project_model(camera, model_points, model_line_segment, rgb_image):
     """
     project a 2D field model to the image space
@@ -83,7 +84,7 @@ def project_model(camera, model_points, model_line_segment, rgb_image):
     rotation = np.zeros((3, 3))
     cv.Rodrigues(rod, rotation)
     cc = camera[6:9]
-    #print('rotation', rotation)
+    # print('rotation', rotation)
     N = model_points.shape[0]
     image_points = np.zeros((N, 2))
     for i in range(N):
@@ -92,7 +93,7 @@ def project_model(camera, model_points, model_line_segment, rgb_image):
         if p[2] != 0.0:
             image_points[i][0] = p[0] / p[2]
             image_points[i][1] = p[1] / p[2]
-    import  copy
+    import copy
     vis_image = copy.deepcopy(rgb_image)
     for i in range(len(model_line_segment)):
         begin = int(model_line_segment[i][0])
@@ -100,6 +101,7 @@ def project_model(camera, model_points, model_line_segment, rgb_image):
         cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
                 (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
     return vis_image
+
 
 def broadcast_ptz_camera_project_model(common_param, pp, ptz, model_points, model_line_segment, rgb_image):
     """
@@ -121,7 +123,7 @@ def broadcast_ptz_camera_project_model(common_param, pp, ptz, model_points, mode
     N = model_points.shape[0]
 
     points = np.zeros((N, 3))
-    points[:,:-1] = model_points
+    points[:, :-1] = model_points
 
     # import sys
     # sys.path.append('/Users/jimmy/Source/opencv_util/python_package')
@@ -151,7 +153,6 @@ def ut_project_model():
     image = project_model(camera, model_points, model_line_segment, image)
     cv.imshow('image', image)
     cv.waitKey(0)
-
 
     # I = imread('00003600.jpg');
     # load('soccer_field_model.mat');
