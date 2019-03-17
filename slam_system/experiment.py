@@ -4,7 +4,7 @@ from ptz_slam import *
 def ut_soccer3():
     """
     PTZ SLAM experiment code for soccer sequence3.
-    system parameters：
+    system parameters:
     init_system and add_rays: detect 300 orb keypoints each frame
     good new keyframe: 10 ~ 15
     images have been blurred. So there is no need to add mask to bounding_box
@@ -44,7 +44,13 @@ def ut_soccer3():
 
 
 def ut_basketball():
-    """this for basketball"""
+    """
+    PTZ SLAM experiment code for basketball dataset.
+    system parameters:
+    init_system and add_rays: detect 300 orb keypoints each frame
+    good new keyframe: 10 ~ 25
+    """
+
     sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
                                "../../dataset/basketball/images",
                                "../../dataset/basketball/ground_truth.mat",
@@ -135,7 +141,7 @@ def ut_basketball():
 def ut_UBC_hockey():
     """
     experiment code for UBC hockey data
-    system parameters：
+    system parameters:
     init_system and add_rays: detect 500 sift keypoints each frame
     good new keyframe: ???
     """
@@ -206,8 +212,43 @@ def ut_UBC_hockey():
                 f.write("zoom Error: %f\n" % (slam.cameras[i].focal_length - ptz_extend_list[i, 2]))
 
 
+def baseline_keyframe_based_homography_matching_basketball():
+    sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/bounding_box.mat")
+
+    keyframes = Map('sift')
+
+    keyframes_list = [0, 237, 664, 683, 700, 722, 740, 778, 2461]
+
+    for i in keyframes_list:
+        img = sequence.get_image_gray(i)
+        p, t, z = sequence.ground_truth_pan[i], sequence.ground_truth_tilt[i], sequence.ground_truth_f[i]
+
+        u, v = sequence.camera.principal_point
+        c = sequence.camera.camera_center
+        r = sequence.camera.base_rotation
+
+        new_keyframe = KeyFrame(img, i, c, r, u, v, p, t, z)
+
+        keyframes.add_keyframe_without_ba(new_keyframe)
+
+    for i in range(0, sequence.length):
+        img = sequence.get_image_gray(index=i, dataset_type=0)
+        lost_pose = 0, 0, 3000
+
+        relocalize_pose = relocalization_camera(keyframes, img, lost_pose)
+
+        print("=====The ", i, " iteration=====")
+
+        print("%f" % (relocalize_pose[0] - sequence.ground_truth_pan[i]))
+        print("%f" % (relocalize_pose[1] - sequence.ground_truth_tilt[i]))
+        print("%f" % (relocalize_pose[2] - sequence.ground_truth_f[i]))
+
+
 if __name__ == "__main__":
     # ut_basketball()
-    ut_soccer3()
-
+    # ut_soccer3()
+    baseline_keyframe_based_homography_matching_basketball()
     # ut_UBC_hockey()
