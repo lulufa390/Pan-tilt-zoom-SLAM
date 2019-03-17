@@ -132,8 +132,8 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 500)
-        # first_img_kp = detect_orb(img, 300)
+        # first_img_kp = detect_sift(img, 500)
+        first_img_kp = detect_orb(img, 300)
 
         # remove keypoints on players if bounding box mask is provided
         if bounding_box is not None:
@@ -287,8 +287,8 @@ class PtzSlam:
         keypoints, keypoints_index = self.current_camera.project_rays(
             self.rays, height, width)
 
-        new_keypoints = detect_sift(img, 500)
-        # new_keypoints = detect_orb(img, 300)
+        # new_keypoints = detect_sift(img, 500)
+        new_keypoints = detect_orb(img, 300)
 
         # remove keypoints in player bounding boxes
         if bounding_box is not None:
@@ -341,8 +341,8 @@ class PtzSlam:
         if tracking_percentage < bad_tracking_percentage:
             self.bad_tracking_cnt += 1
 
-        # if self.bad_tracking_cnt > 3:
-        #     self.tracking_lost = True
+        if self.bad_tracking_cnt > 3:
+            self.tracking_lost = True
         """
         ===============================
         1. predict step
@@ -388,7 +388,7 @@ class PtzSlam:
 
         if tracking_percentage > bad_tracking_percentage:
             # basketball set to (10, 25), soccer maybe (10, 15)
-            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 25):
+            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
                 self.new_keyframe = True
 
     def relocalize(self, img, camera):
@@ -434,202 +434,3 @@ class PtzSlam:
         else:
             self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
             self.new_keyframe = False
-
-
-def ut_soccer():
-    sequence = SequenceManager("../../dataset/soccer/seq1/seq1_anno.mat",
-                               "../../dataset/soccer/seq1/seq1_161",
-                               "../../dataset/soccer/seq1/soccer1_ground_truth.mat",
-                               "../../dataset/soccer/seq1/soccer1_bounding_box.mat")
-    slam = PtzSlam()
-
-    first_img = sequence.get_image_gray(index=0, dataset_type=1)
-    first_camera = sequence.get_camera(0)
-    first_bounding_box = sequence.get_bounding_box_mask(0)
-
-    slam.init_system(first_img, first_camera, first_bounding_box)
-    slam.add_keyframe(first_img, first_camera, 0)
-
-    for i in range(1, sequence.length, 5):
-        img = sequence.get_image_gray(index=i, dataset_type=1)
-        bounding_box = sequence.get_bounding_box_mask(i)
-        slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
-
-        if slam.tracking_lost:
-            relocalized_camera = slam.relocalize(img, slam.current_camera)
-            slam.init_system(img, relocalized_camera, bounding_box)
-
-            print("do relocalization!")
-        elif slam.new_keyframe:
-            slam.add_keyframe(img, slam.current_camera, i)
-            print("add keyframe!")
-
-        print("=====The ", i, " iteration=====")
-
-        print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
-        print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
-        print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
-
-
-def ut_basketball():
-    """this for basketball"""
-    sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
-                               "../../dataset/basketball/images",
-                               "../../dataset/basketball/ground_truth.mat",
-                               "../../dataset/basketball/bounding_box.mat")
-    slam = PtzSlam()
-
-    first_img = sequence.get_image_gray(index=0, dataset_type=0)
-    first_camera = sequence.get_camera(0)
-    first_bounding_box = sequence.get_bounding_box_mask(0)
-
-    slam.init_system(first_img, first_camera, first_bounding_box)
-    slam.add_keyframe(first_img, first_camera, 0)
-
-    for i in range(1, sequence.length):
-        img = sequence.get_image_gray(index=i, dataset_type=0)
-        bounding_box = sequence.get_bounding_box_mask(i)
-        slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
-
-        if slam.tracking_lost:
-            relocalized_camera = slam.relocalize(img, slam.current_camera)
-            slam.init_system(img, relocalized_camera, bounding_box)
-
-            print("do relocalization!")
-        elif slam.new_keyframe:
-            slam.add_keyframe(img, slam.current_camera, i)
-            print("add keyframe!")
-
-        print("=====The ", i, " iteration=====")
-
-        print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
-        print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
-        print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
-
-        slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
-
-        # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
-        #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
-
-    slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
-
-    # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
-    #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
-
-
-# deprecated Olympics hockey dataset
-def ut_hockey():
-    slam = PtzSlam()
-    sequence_length = 26
-
-    annotation = sio.loadmat("../../ice_hockey_1/olympic_2010_reference_frame.mat")
-
-    filename = annotation["images"]
-    ptzs = annotation["opt_ptzs"]
-    cameras = annotation["opt_cameras"]
-    shared_parameters = annotation["shared_parameters"]
-
-    first_img_color = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[0])
-    first_img_gray = cv.cvtColor(first_img_color, cv.COLOR_BGR2GRAY)
-
-    first_camera = PTZCamera(cameras[0, 0:2], shared_parameters[0:3, 0],
-                             shared_parameters[3:6, 0], shared_parameters[6:12, 0])
-    first_camera.set_ptz(ptzs[0])
-
-    slam.init_system(first_img_gray, first_camera)
-    slam.add_keyframe(first_img_gray, first_camera, 0)
-
-    for i in range(1, sequence_length):
-        next_img_color = cv.imread("../../ice_hockey_1/olympic_2010_reference_frame/image/" + filename[i])
-        next_img_gray = cv.cvtColor(next_img_color, cv.COLOR_BGR2GRAY)
-
-        slam.tracking(next_img=next_img_gray, bad_tracking_percentage=80, bounding_box=None)
-
-        if slam.tracking_lost:
-            relocalized_camera = slam.relocalize(next_img_gray, slam.current_camera)
-            slam.init_system(next_img_gray, relocalized_camera)
-
-            print("do relocalization!")
-        elif slam.new_keyframe:
-            slam.add_keyframe(next_img_gray, slam.current_camera, i)
-            print("add keyframe!")
-
-        print("=====The ", i, " iteration=====")
-        print("%f" % (slam.cameras[i].pan - ptzs[i, 0]))
-        print("%f" % (slam.cameras[i].tilt - ptzs[i, 1]))
-        print("%f" % (slam.cameras[i].focal_length - ptzs[i, 2]))
-
-
-def ut_UBC_hockey():
-    slam = PtzSlam()
-    sequence_length = 900
-
-    annotation_mat = sio.loadmat("C:/graduate_design/UBC_2017/UBC_2017/UBC_hockey_ground_truth.mat")
-    bounding_box_mat_path = "C:/graduate_design/UBC_2017/UBC_2017/bounding_box.mat"
-
-    filename_list = ["000" + str(i + 48630) + ".jpg" for i in range(sequence_length)]
-    camera_list = annotation_mat["camera"]
-
-    ptz_list = annotation_mat["ptz"]
-    image_name_list = annotation_mat["image_name"].squeeze()
-
-    ptz_extend_list = -1 * np.ones([sequence_length, 3])
-
-    for i, image_name in enumerate(image_name_list, 0):
-        index = int(image_name[0][0:-4]) - 48630
-        ptz_extend_list[index, 0:3] = ptz_list[i, 0:3]
-
-    camera_center = annotation_mat["cc"].squeeze()
-    base_rotation = annotation_mat["base_rotation"].squeeze()
-
-    bounding_box_manager = SequenceManager(bounding_box_path=bounding_box_mat_path)
-
-    first_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[0],
-                          cv.IMREAD_GRAYSCALE)
-
-    first_camera = PTZCamera(camera_list[0, 0:2], camera_center, base_rotation)
-
-    first_camera.set_ptz(ptz_extend_list[0])
-
-    slam.init_system(first_img, first_camera, bounding_box_manager.get_bounding_box_mask(30, 0.5))
-    slam.add_keyframe(first_img, first_camera, 0)
-
-    with open("result.txt", 'w+') as f:
-        for i in range(1, sequence_length):
-            next_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[i],
-                                 cv.IMREAD_GRAYSCALE)
-
-            slam.tracking(next_img=next_img, bad_tracking_percentage=50,
-                          bounding_box=bounding_box_manager.get_bounding_box_mask(i + 30, 0.5))
-
-            # if slam.tracking_lost:
-            #     relocalized_camera = slam.relocalize(next_img, slam.current_camera)
-            #     slam.init_system(next_img, relocalized_camera, bounding_box_manager.get_bounding_box_mask(30 + i))
-            #     print("do relocalization!")
-            #
-            # elif slam.new_keyframe:
-            #     slam.add_keyframe(next_img, slam.current_camera, i)
-            #     print("add keyframe!")
-
-            print("=====The ", i, " iteration=====")
-
-            print("Pan: %f" % slam.cameras[i].pan)
-            print("Tilt: %f" % slam.cameras[i].tilt)
-            print("Zoom: %f" % slam.cameras[i].focal_length)
-
-            if not np.all(ptz_extend_list[i] == np.array([-1, -1, -1])):
-                print("Pan Error: %f" % (slam.cameras[i].pan - ptz_extend_list[i, 0]))
-                print("Tilt Error: %f" % (slam.cameras[i].tilt - ptz_extend_list[i, 1]))
-                print("zoom Error: %f" % (slam.cameras[i].focal_length - ptz_extend_list[i, 2]))
-
-                f.write(str(i) + "th frame\n")
-                f.write("Pan Error: %f\n" % (slam.cameras[i].pan - ptz_extend_list[i, 0]))
-                f.write("Tilt Error: %f\n" % (slam.cameras[i].tilt - ptz_extend_list[i, 1]))
-                f.write("zoom Error: %f\n" % (slam.cameras[i].focal_length - ptz_extend_list[i, 2]))
-
-
-if __name__ == "__main__":
-    # ut_basketball()
-
-    ut_UBC_hockey()
-    # ut_hockey()

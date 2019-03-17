@@ -59,8 +59,8 @@ class SequenceManager:
         if dataset_type == 0:
             img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
         elif dataset_type == 1:
-            # img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
-            img = cv.imread(self.image_path + "/0" + str(index + 500) + ".jpg")
+            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
+            # img = cv.imread(self.image_path + "/0" + str(index + 500) + ".jpg")
         elif dataset_type == 2:
             img = cv.imread(self.image_path + "/" + str(index) + ".jpg")
         else:
