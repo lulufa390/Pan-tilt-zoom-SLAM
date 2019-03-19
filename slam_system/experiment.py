@@ -148,8 +148,8 @@ def ut_UBC_hockey():
     slam = PtzSlam()
     sequence_length = 900
 
-    annotation_mat = sio.loadmat("C:/graduate_design/UBC_2017/UBC_2017/UBC_hockey_ground_truth.mat")
-    bounding_box_mat_path = "C:/graduate_design/UBC_2017/UBC_2017/bounding_box.mat"
+    annotation_mat = sio.loadmat("../../UBC_2017/UBC_2017/UBC_hockey_ground_truth.mat")
+    bounding_box_mat_path = "../../UBC_2017/UBC_2017/bounding_box.mat"
 
     filename_list = ["000" + str(i + 48630) + ".jpg" for i in range(sequence_length)]
     camera_list = annotation_mat["camera"]
@@ -168,7 +168,7 @@ def ut_UBC_hockey():
 
     bounding_box_manager = SequenceManager(bounding_box_path=bounding_box_mat_path)
 
-    first_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[0],
+    first_img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[0],
                           cv.IMREAD_GRAYSCALE)
 
     first_camera = PTZCamera(camera_list[0, 0:2], camera_center, base_rotation)
@@ -180,7 +180,7 @@ def ut_UBC_hockey():
 
     with open("result.txt", 'w+') as f:
         for i in range(1, sequence_length):
-            next_img = cv.imread("C:/graduate_design/UBC_2017/UBC_2017/images/" + filename_list[i],
+            next_img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[i],
                                  cv.IMREAD_GRAYSCALE)
 
             slam.tracking(next_img=next_img, bad_tracking_percentage=40,
@@ -220,7 +220,13 @@ def baseline_keyframe_based_homography_matching_basketball():
 
     keyframes = Map('sift')
 
-    keyframes_list = [0, 237, 664, 683, 700, 722, 740, 778, 2461]
+    # keyframes_list = [0, 237, 664, 683, 700, 722, 740, 778, 2461]
+    keyframes_list = [0, 650, 698, 730, 804]
+
+    pan_list = []
+    tilt_list = []
+    zoom_list = []
+
 
     for i in keyframes_list:
         img = sequence.get_image_gray(i)
@@ -245,6 +251,12 @@ def baseline_keyframe_based_homography_matching_basketball():
         print("%f" % (relocalize_pose[0] - sequence.ground_truth_pan[i]))
         print("%f" % (relocalize_pose[1] - sequence.ground_truth_tilt[i]))
         print("%f" % (relocalize_pose[2] - sequence.ground_truth_f[i]))
+
+        pan_list.append(relocalize_pose[0])
+        tilt_list.append(relocalize_pose[1])
+        zoom_list.append(relocalize_pose[2])
+
+    save_camera_pose(pan_list, tilt_list, zoom_list, "./", "result.mat")
 
 
 if __name__ == "__main__":
