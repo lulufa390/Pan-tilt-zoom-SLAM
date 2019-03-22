@@ -227,7 +227,6 @@ def baseline_keyframe_based_homography_matching_basketball():
     tilt_list = []
     zoom_list = []
 
-
     for i in keyframes_list:
         img = sequence.get_image_gray(i)
         p, t, z = sequence.ground_truth_pan[i], sequence.ground_truth_tilt[i], sequence.ground_truth_f[i]
@@ -259,8 +258,50 @@ def baseline_keyframe_based_homography_matching_basketball():
     save_camera_pose(pan_list, tilt_list, zoom_list, "./", "result.mat")
 
 
+def baseline_keyframe_based_homography_matching_soccer3():
+    sequence = SequenceManager("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
+                               "../../dataset/soccer_dataset/seq3/seq3_330",
+                               "../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
+                               "../../dataset/soccer_dataset/seq3/seq3_player_bounding_box.mat")
+
+    keyframes = Map('sift')
+
+    keyframes_list = [75, 160, 200, 230, 300]
+    pan_list = []
+    tilt_list = []
+    zoom_list = []
+
+    for i in keyframes_list:
+        img = sequence.get_image_gray(index=i, dataset_type=1)
+        p, t, z = sequence.ground_truth_pan[i], sequence.ground_truth_tilt[i], sequence.ground_truth_f[i]
+        u, v = sequence.camera.principal_point
+        c = sequence.camera.camera_center
+        r = sequence.camera.base_rotation
+        new_keyframe = KeyFrame(img, i, c, r, u, v, p, t, z)
+        keyframes.add_keyframe_without_ba(new_keyframe)
+
+    for i in range(0, sequence.length):
+        img = sequence.get_image_gray(index=i, dataset_type=1)
+        lost_pose = 60, 0, 3000
+
+        relocalize_pose = relocalization_camera(keyframes, img, lost_pose)
+
+        print("=====The ", i, " iteration=====")
+
+        print("%f" % (relocalize_pose[0] - sequence.ground_truth_pan[i]))
+        print("%f" % (relocalize_pose[1] - sequence.ground_truth_tilt[i]))
+        print("%f" % (relocalize_pose[2] - sequence.ground_truth_f[i]))
+
+        pan_list.append(relocalize_pose[0])
+        tilt_list.append(relocalize_pose[1])
+        zoom_list.append(relocalize_pose[2])
+
+    save_camera_pose(pan_list, tilt_list, zoom_list, "./", "result.mat")
+
+
 if __name__ == "__main__":
     # ut_basketball()
     # ut_soccer3()
-    baseline_keyframe_based_homography_matching_basketball()
+    # baseline_keyframe_based_homography_matching_basketball()
+    baseline_keyframe_based_homography_matching_soccer3()
     # ut_UBC_hockey()

@@ -83,7 +83,7 @@ def relocalization_camera(map, img, pose):
     """
 
     if map.feature_method == 'sift':
-        kp, des = detect_compute_sift(img, 0)
+        kp, des = detect_compute_sift(img, 500)
     elif map.feature_method == 'orb':
         kp, des = detect_compute_orb(img, 6000)
     elif map.feature_method == 'latch':
@@ -104,7 +104,7 @@ def relocalization_camera(map, img, pose):
 
         if map.feature_method == 'sift':
             # keyframe_kp, keyframe_des = keyframe.feature_pts, keyframe.feature_des
-            keyframe_kp, keyframe_des = detect_compute_sift(keyframe.img, 1000)
+            keyframe_kp, keyframe_des = detect_compute_sift(keyframe.img, 500)
         elif map.feature_method == 'orb':
             keyframe_kp, keyframe_des = detect_compute_orb(keyframe.img, 6000)
         elif map.feature_method == 'latch':
