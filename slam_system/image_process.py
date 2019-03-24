@@ -279,6 +279,45 @@ def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose
     return pts1, index1, pts2, index2
 
 
+def compute_homography(keypiont1, descriptor1, keypoint2, descriptor2):
+    """
+    Get the estimated homography matrix from two sets of keypoints
+    :param keypiont1:
+    :param descriptor1:
+    :param keypoint2:
+    :param descriptor2:
+    :return:
+    """
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(descriptor1, descriptor2, k=2)  # (query_data, train_data)
+
+    # step 1: apply ratio test
+    good = []
+    for m, n in matches:
+        if m.distance < 0.7 * n.distance:
+            good.append(m)
+
+    N = len(good)
+    if N <= 8:
+        print('warning: match sift features failed, not enough matching')
+        return None, [], None, []
+
+    pts1 = np.zeros((N, 2))
+    pts2 = np.zeros((N, 2))
+    for i in range(N):
+        idx1, idx2 = good[i].queryIdx, good[i].trainIdx  # query is from the first image
+        pts1[i] = keypiont1[idx1].pt
+        pts2[i] = keypoint2[idx2].pt
+
+    # step 2: apply homography constraint
+    # inlier index from homography estimation
+
+    homography, _ = cv.findHomography(srcPoints=pts1, dstPoints=pts2,
+                                      ransacReprojThreshold=1.0, method=cv.FM_RANSAC)
+
+    return homography
+
+
 def detect_harris_corner_grid(gray_img, row, column):
     """
     :param gray_img:
@@ -382,31 +421,6 @@ def good_homography(h):
     if N3 > 0.003:
         return False
     return True
-
-
-def run_ransac(points1, points2, index):
-    """
-    Old version of RANSAC. Use homography_ransac instead.
-    :param points1: points set 1 [n, 2]
-    :param points2: points set 2 [n, 2]
-    :param index: global ray index [n]
-    :return: ransac inner keypoints [n, 2], inliers global index, outliers global indexes.
-    """
-    ransac_mask = np.ndarray([len(points1)])
-    homo, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
-                                          ransacReprojThreshold=0.5, method=cv.FM_RANSAC, mask=ransac_mask)
-    inner_kp = np.ndarray([0, 2])
-    inner_index = np.ndarray([0])
-    outlier_index = np.ndarray([0])
-
-    for j in range(len(points1)):
-        if ransac_mask[j] == 1:
-            inner_kp = np.row_stack([inner_kp, points2[j]])
-            inner_index = np.append(inner_index, index[j])
-        else:
-            outlier_index = np.append(outlier_index, index[j])
-
-    return inner_kp, inner_index, outlier_index
 
 
 def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index, visualize=False):
