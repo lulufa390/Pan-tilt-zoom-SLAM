@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 from image_process import *
 
+
 def get_projection_matrix_with_camera(camera):
     """
     :param camera: len = 9 array(principle point, f, Rx, Ry, Rz, Cx, Cy, Cz)
@@ -28,7 +29,6 @@ def get_projection_matrix_with_camera(camera):
     cc[0][3] = -camera[6]
     cc[1][3] = -camera[7]
     cc[2][3] = -camera[8]
-
 
     project_mat = np.dot(k, np.dot(rotation, cc))
     return project_mat
@@ -109,6 +109,32 @@ def add_gauss(points, var, max_width, max_height):
             noise_points[i, 1] = 0
 
     return noise_points
+
+
+def add_gauss_cv_keypoints(points, var, max_width, max_height):
+    """
+    Add Gaussian noise to 2D points.
+    :param points: list of OpenCV keypoints
+    :param var: variance for Gauss distribution
+    :return: list of OpenCV keypoints with noise
+    """
+    for i in range(len(points)):
+        new_x = points[i].pt[0] + random.gauss(0, var)
+        new_y = points[i].pt[0] + random.gauss(0, var)
+
+        if new_x > max_width:
+            new_x = max_width
+
+        if new_x < 0:
+            new_x = 0
+
+        if new_y > max_height:
+            new_y = max_height
+
+        if new_y < 0:
+            new_y = 0
+        points[i].pt = (new_x, new_y)
+    return points
 
 
 def draw_camera_plot(ground_truth_pan, ground_truth_tilt, ground_truth_f,
@@ -194,7 +220,7 @@ def load_camera_pose(path):
     """
     camera_pos = sio.loadmat(path)
     ptz = camera_pos['ptz']
-    pan, tilt, focal_length = ptz[:,0], ptz[:,1], ptz[:, 2]
+    pan, tilt, focal_length = ptz[:, 0], ptz[:, 1], ptz[:, 2]
 
     return pan, tilt, focal_length
 

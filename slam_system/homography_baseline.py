@@ -30,6 +30,9 @@ class HomographyTracking:
         kp1, des1 = detect_compute_sift(self.current_frame, 0)
         kp2, des2 = detect_compute_sift(next_frame, 0)
 
+        kp1 = add_gauss_cv_keypoints(kp1, 2, 1280, 720)
+        kp2 = add_gauss_cv_keypoints(kp2, 2, 1280, 720)
+
         self.current_frame = next_frame
 
         homography = compute_homography(kp1, des1, kp2, des2)
