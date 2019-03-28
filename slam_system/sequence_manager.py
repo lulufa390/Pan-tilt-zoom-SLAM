@@ -57,20 +57,19 @@ class SequenceManager:
         """
 
         if dataset_type == 0:
-            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
+            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", cv.IMREAD_GRAYSCALE)
         elif dataset_type == 1:
-            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
+            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg", cv.IMREAD_GRAYSCALE)
             # img = cv.imread(self.image_path + "/0" + str(index + 500) + ".jpg")
         elif dataset_type == 2:
-            img = cv.imread(self.image_path + "/" + str(index) + ".jpg")
+            img = cv.imread(self.image_path + "/" + str(index) + ".jpg", cv.IMREAD_GRAYSCALE)
         else:
             print("Unknown dataset!")
             return None
 
-        img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        assert isinstance(img_gray, np.ndarray)
+        assert isinstance(img, np.ndarray)
 
-        return img_gray
+        return img
 
     def get_image(self, index, dataset_type=0):
         """
@@ -80,17 +79,16 @@ class SequenceManager:
         """
 
         if dataset_type == 0:
-            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", 1)
+            img = cv.imread(self.image_path + "/000" + str(index + 84000) + ".jpg", cv.IMREAD_COLOR)
         elif dataset_type == 1:
-            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg")
+            img = cv.imread(self.image_path + "/00000" + str(index + 515) + ".jpg", cv.IMREAD_COLOR)
         elif dataset_type == 2:
-            img = cv.imread(self.image_path + "/" + str(index) + ".jpg")
+            img = cv.imread(self.image_path + "/" + str(index) + ".jpg", cv.IMREAD_COLOR)
         else:
             print("Unknown dataset!")
             return None
 
         assert isinstance(img, np.ndarray)
-
         return img
 
     def get_bounding_box_mask(self, index, threshold=0.6):

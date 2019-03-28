@@ -11,47 +11,46 @@ from math import *
 from sequence_manager import SequenceManager
 
 
-class Visualize:
-    def __init__(self, model_path, annotation_path, image_path):
-        """
-        :param model_path: court model path
-        :param annotation_path: annotation file path
-        :param image_path: image folder path
-        """
-        soccer_model = sio.loadmat(model_path)
-        self.line_index = soccer_model['line_segment_index']
-        self.points = soccer_model['points']
+def load_model(path):
+    """
+    Simple function to load a model .mat file
+    :param path: model file path
+    :return: the line_index and points
+    """
+    model = sio.loadmat(path)
+    line_index = model['line_segment_index']
+    points = model['points']
+    return line_index, points
 
-        self.sequence = SequenceManager(annotation_path, image_path)
 
-    def draw_line(self, img, p, t, f):
-        """
-        :param img: color image of this frame
-        :param p: camera pose pan
-        :param t: camera pose tilt
-        :param f: camera pose focal length
-        """
-        k = np.array([[f, 0, self.sequence.u], [0, f, self.sequence.v], [0, 0, 1]])
-        pan = radians(p)
-        tilt = radians(t)
-        rotation = np.dot(np.array([[1, 0, 0],
-                                    [0, cos(tilt), sin(tilt)],
-                                    [0, -sin(tilt), cos(tilt)]]),
-                          np.array([[cos(pan), 0, -sin(pan)],
-                                    [0, 1, 0],
-                                    [sin(pan), 0, cos(pan)]]))
-        rotation = np.dot(rotation, self.sequence.base_rotation)
-        image_points = np.ndarray([len(self.points), 2])
-        for j in range(len(self.points)):
-            p = np.array([self.points[j][0], self.points[j][1], 0])
-            p = np.dot(k, np.dot(rotation, p - self.sequence.c))
-            image_points[j][0] = p[0] / p[2]
-            image_points[j][1] = p[1] / p[2]
-        for j in range(len(self.line_index)):
-            begin = int(self.line_index[j][0])
-            end = int(self.line_index[j][1])
-            cv.line(img, (int(image_points[begin][0]), int(image_points[begin][1])),
-                    (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 10)
+def project_with_homography(matrix, model_points, model_line_segment, rgb_image):
+    """
+    :param matrix: 3*4 projection matrix
+    :param model_points: N x 2 matrix, model world coordinate in meter
+    :param model_line_segment: int segment index, start from 0
+    :param rgb_image: an RGB image
+    :return: RGB image with model lines
+    """
+    assert matrix.shape == (3, 4)
+    assert model_points.shape[1] == 2
+    assert model_line_segment.shape[1] == 2
+
+    N = model_points.shape[0]
+    image_points = np.zeros((N, 2))
+    for i in range(N):
+        p = np.array([model_points[i][0], model_points[i][1], 0, 1])
+        p = np.dot(matrix, p)
+        if p[2] != 0.0:
+            image_points[i][0] = p[0] / p[2]
+            image_points[i][1] = p[1] / p[2]
+    import copy
+    vis_image = copy.deepcopy(rgb_image)
+    for i in range(len(model_line_segment)):
+        begin = int(model_line_segment[i][0])
+        end = int(model_line_segment[i][1])
+        cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
+                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
+    return vis_image
 
 
 def project_model(camera, model_points, model_line_segment, rgb_image):
@@ -60,7 +59,7 @@ def project_model(camera, model_points, model_line_segment, rgb_image):
     :param camera: 9 camera parameters, (u, v, focal_length, Rx, Rx, Rz, Cx, Cy, Cz)
                     (Rx, Rx, Rz): is Rodrigues angle, (Cx, Cy, Cz) unit in meter
     :param model_points: N x 2 matrix, model world coordinate in meter
-    :param model_line_segment: ine segment index, start from 0
+    :param model_line_segment: int segment index, start from 0
     :param rgb_image: an RGB image
     :return:
     % example:
