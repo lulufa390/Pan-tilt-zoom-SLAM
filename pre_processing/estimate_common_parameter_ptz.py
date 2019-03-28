@@ -14,11 +14,22 @@ model_pts[:, 0:2] = points
 model_pts[:,2] = 0.0
 rows, cols = model_pts.shape
 
-folder = '/Users/jimmy/Desktop/sample5/'
-frame_numbers = ['00048656', '00048818', '00049278', '00049916', '00050125']
+folder = '/Users/jimmy/Desktop/per_30_frames/'
+
+import os
+def get_immediate_subdirectories(a_dir):
+    return [name for name in os.listdir(a_dir)
+            if os.path.isdir(os.path.join(a_dir, name))]
+frame_numbers = get_immediate_subdirectories(folder)
+frame_numbers.sort()
+
+#frame_numbers = frame_numbers[0:20]
+print(frame_numbers)
 N = len(frame_numbers)
 
-image_names = [folder + v + '.jpg' for v in frame_numbers]
+image_folder = '/Users/jimmy/Code/ptz_slam/dataset/hockey/UBC_2017/images/'
+image_names = [image_folder + v + '.jpg' for v in frame_numbers]
+
 
 init_cameras = np.zeros((N, 9))
 
@@ -38,6 +49,7 @@ init_commont_rotation[0][0] = 1.0
 init_commont_rotation[1][2] = -1.0
 init_commont_rotation[2][1] = 1.0
 
+
 import cv2 as cv
 rod = np.zeros((3, 1))
 cv.Rodrigues(init_commont_rotation, rod)
@@ -54,17 +66,36 @@ from cvx_opt import optimize_ptz_cameras
 opt_cameras, opt_ptzs, common_center, common_rotation = optimize_ptz_cameras(model_pts, init_cameras, rod)
 print('opt_cameras :{}'.format(opt_cameras.shape))
 print('opt_ptzs :{}'.format(opt_ptzs.shape))
-print('common_center :{}'.format(common_center))
-print('common rotation: {}'.format(common_rotation))
-
+print('common_center :{}'.format(common_center.shape))
+print('common rotation: {}'.format(common_rotation.shape))
 
 
 import scipy.io as sio
 
-
 locations = init_cameras[:, 6:9]
 location_ptzs = np.hstack((locations, opt_ptzs))
 
+cameras = init_cameras
+ptzs = opt_ptzs
+cc = common_center
+base_rotation = common_rotation
+image_name = np.zeros((N), dtype=np.object)
+for i in range(N):
+    image_name[i] = '{}.jpg'.format(frame_numbers[i])
+
+
+sio.savemat('UBC_hockey_ground_truth.mat',
+            {'camera':cameras,
+             'ptz':ptzs,
+             'cc':cc,
+             'base_rotation':base_rotation,
+              'image_name':image_name})
+
+
+
+
+
+"""
 import sys
 sys.path.append('../slam_system')
 from visualize import project_model, broadcast_ptz_camera_project_model
@@ -99,7 +130,7 @@ for i in range(N):
     cv.imshow('init camera', im1)
     cv.imshow('refined camera', im2)
     cv.waitKey()
-
+"""
 
 
 

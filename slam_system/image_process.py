@@ -675,14 +675,17 @@ def ut_match_sift_features():
     # im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
     # im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
-    im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
-    im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
+    #im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    #im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
 
     # im1 = cv.imread("./seq3_blur/00000733.jpg")
     # im2 = cv.imread("./seq3_blur/00000800.jpg")
 
-    kp1, des1 = detect_compute_sift(im1, 200, True)
-    kp2, des2 = detect_compute_sift(im2, 200, True)
+    im1 = cv.imread("../../dataset/hockey/UBC_2017/images/00048600.jpg")
+    im2 = cv.imread("../../dataset/hockey/UBC_2017/images/00048601.jpg")
+
+    kp1, des1 = detect_compute_sift(im1, 2000, True)
+    kp2, des2 = detect_compute_sift(im2, 2000, True)
 
     print(type(des1[0]))
     print(des1[0].shape)
@@ -817,6 +820,7 @@ if __name__ == "__main__":
     # ut_blur_sub_image()
     # ut_orb()
 
+    """
     im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
     im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
 
@@ -851,5 +855,5 @@ if __name__ == "__main__":
 
     end = time.time()
     print(end - start)
-
-    # ut_match_sift_features()
+    """
+    ut_match_sift_features()
