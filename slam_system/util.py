@@ -96,14 +96,14 @@ def add_gauss(points, var, max_width, max_height):
         noise_points[i, 0] = points[i, 0] + random.gauss(0, var)
         noise_points[i, 1] = points[i, 1] + random.gauss(0, var)
 
-        if noise_points[i, 0] > max_width:
-            noise_points[i, 0] = max_width
+        if noise_points[i, 0] >= max_width:
+            noise_points[i, 0] = max_width - 1
 
         if noise_points[i, 0] < 0:
             noise_points[i, 0] = 0
 
-        if noise_points[i, 1] > max_height:
-            noise_points[i, 1] = max_height
+        if noise_points[i, 1] >= max_height:
+            noise_points[i, 1] = max_height - 1
 
         if noise_points[i, 1] < 0:
             noise_points[i, 1] = 0
@@ -122,14 +122,14 @@ def add_gauss_cv_keypoints(points, var, max_width, max_height):
         new_x = points[i].pt[0] + random.gauss(0, var)
         new_y = points[i].pt[0] + random.gauss(0, var)
 
-        if new_x > max_width:
-            new_x = max_width
+        if new_x >= max_width:
+            new_x = max_width - 1
 
         if new_x < 0:
             new_x = 0
 
-        if new_y > max_height:
-            new_y = max_height
+        if new_y >= max_height:
+            new_y = max_height - 1
 
         if new_y < 0:
             new_y = 0
