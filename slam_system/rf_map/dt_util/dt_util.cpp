@@ -199,6 +199,19 @@ namespace dt {
         }
     }
     
+    template <typename T>
+    vector<size_t> sortIndices(const vector<T> &v) {
+        // initialize original index locations
+        vector<size_t> idx(v.size());
+        for (size_t i = 0; i != idx.size(); ++i){
+            idx[i] = i;
+        }
+        // sort indexes based on comparing values in v
+        sort(idx.begin(), idx.end(), [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+        
+        return idx;
+    }
+    
     template vector<int> randomDimension(int dim, int num);
     
     template void meanStd(const vector<Eigen::VectorXd> & labels, Eigen::VectorXd & mean, Eigen::VectorXd & sigma);
@@ -221,6 +234,9 @@ namespace dt {
     
     template
     void meanMedianError(const vector<Eigen::VectorXd> & errors, Eigen::VectorXd & mean, Eigen::VectorXd & median);
+    
+    template
+    vector<size_t> sortIndices(const vector<float> &v);
 }
 
 

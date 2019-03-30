@@ -10,7 +10,7 @@
 #include <string>
 #include "bt_dtr_node.h"
 #include "yael_io.h"
-#include "cvx_util.hpp"
+#include "dt_util.hpp"
 
 using std::string;
 
@@ -83,7 +83,7 @@ bool BTDTRegressor::predict(const Eigen::VectorXf & feature,
     assert(unordered_predictions.size() == unordered_dists.size());
     
     // Step 2: ordered by local patch feature distance
-    vector<size_t> sortIndexes = CvxUtil::sortIndices<float>(unordered_dists);
+    vector<size_t> sortIndexes = dt::sortIndices<float>(unordered_dists);
     for (int i = 0; i<sortIndexes.size(); i++) {
         predictions.push_back(unordered_predictions[sortIndexes[i]]);
         dists.push_back(unordered_dists[sortIndexes[i]]);
@@ -119,7 +119,7 @@ bool BTDTRegressor::predict(const Eigen::VectorXf & feature,
     assert(unordered_predictions.size() == unordered_dists.size());
     
     // Step 2: ordered by local patch feature distance
-    vector<size_t> sortIndexes = CvxUtil::sortIndices<float>(unordered_dists);
+    vector<size_t> sortIndexes = dt::sortIndices<float>(unordered_dists);
     for (int i = 0; i<sortIndexes.size(); i++) {
         predictions.push_back(unordered_predictions[sortIndexes[i]]);
         dists.push_back(unordered_dists[sortIndexes[i]]);

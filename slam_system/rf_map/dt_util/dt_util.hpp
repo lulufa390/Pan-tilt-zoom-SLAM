@@ -65,6 +65,9 @@ namespace dt {
     template <class VectorType>
     void meanMedianError(const vector<VectorType> & errors, VectorType & mean, VectorType & median);
     
+    template <typename T>
+    vector<size_t> sortIndices(const vector<T> &v);
+    
 }  // namespace
 
 class DTUtil
