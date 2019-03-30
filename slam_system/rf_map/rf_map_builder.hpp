@@ -45,13 +45,9 @@ public:
     // feature_label_files: new added files
     // model_file_name: output, new model
     bool addTree(BTDTRegressor& model,
-                const vector<string> & init_feature_label_files,
+                const vector<string> & prev_feature_label_files,
                 const vector<string> & feature_label_files,
                 const char *model_file_name);
-                 
-    
-   
-    
     
 private:    
     bool validationError(const BTDTRegressor & model,

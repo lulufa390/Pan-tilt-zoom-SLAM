@@ -7,11 +7,11 @@ class RFMap:
     def __init__(self, rf_file_name):
         self.rf_file_name = rf_file_name
 
-    def createMap(self):
+    def createMap(self, tree_param_file, feature_label_files):
         pass
 
-    def updateMap(self):
+    def updateMap(self, prev_feature_label_files, feature_label_files):
         pass
 
-    def relocalization(self):
+    def relocalization(self, feature_file):
         pass

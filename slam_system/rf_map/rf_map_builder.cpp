@@ -108,11 +108,11 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
 }
 
 bool RFMapBuilder::addTree(BTDTRegressor& model,
-                           const vector<string> & init_feature_label_files,
+                           const vector<string> & prev_feature_label_files,
                            const vector<string> & feature_label_files,
                            const char *model_file_name)
 {
-    assert(init_feature_label_files.size() > 0);
+    assert(prev_feature_label_files.size() > 0);
     assert(feature_label_files.size() > 0);
     
     tree_param_.base_tree_param_.tree_num_ += 1;
@@ -120,12 +120,12 @@ bool RFMapBuilder::addTree(BTDTRegressor& model,
     assert(sampled_frame_num >= 0);
     
     const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
-    vector<string> sampled_files = feature_label_files;
+    vector<string> sampled_files = prev_feature_label_files;
     
     // randomly sample frames from previous frames
     for (int j = 0; j<sampled_frame_num; j++) {
-        int index = rand()%init_feature_label_files.size();
-        sampled_files.push_back(init_feature_label_files[index]);
+        int index = rand()%prev_feature_label_files.size();
+        sampled_files.push_back(prev_feature_label_files[index]);
     }
     
     printf("training from %lu frames\n", sampled_files.size());
@@ -182,7 +182,7 @@ bool RFMapBuilder::addTree(BTDTRegressor& model,
         printf("saved %s\n", model_file_name);
     }
     
-    this->validationError(model, init_feature_label_files, 4);
+    this->validationError(model, prev_feature_label_files, 4);
     return true;
 }
 
