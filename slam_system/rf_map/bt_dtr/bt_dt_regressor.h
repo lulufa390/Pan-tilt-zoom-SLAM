@@ -14,7 +14,7 @@ using std::vector;
 class BTDTRegressor
 {
     friend class BTDTRegressorBuilder;
-    friend class BTDTRPTZBuilder;
+    friend class RFMapBuilder;
 private:
     
     vector<BTDTRTree* > trees_;
