@@ -27,15 +27,20 @@ class HomographyTracking:
         self.each_homography = [None, ]
 
     def tracking(self, next_frame):
-        kp1, des1 = detect_compute_sift(self.current_frame, 0)
-        kp2, des2 = detect_compute_sift(next_frame, 0)
+        kp1 = detect_sift(self.current_frame, 0)
 
-        kp1 = add_gauss_cv_keypoints(kp1, 2, 1280, 720)
-        kp2 = add_gauss_cv_keypoints(kp2, 2, 1280, 720)
+        kp1 = add_gauss(kp1, 20, 1280, 720)
+
+        local_index, kp2 = optical_flow_matching(self.current_frame, next_frame, kp1)
+
+        # kp2, des2 = detect_compute_sift(next_frame, 0)
+        kp1 = kp1[local_index]
+
+        kp2 = add_gauss(kp2, 20, 1280, 720)
 
         self.current_frame = next_frame
-
-        homography = compute_homography(kp1, des1, kp2, des2)
+        _, homography = homography_ransac(kp1, kp2, return_matrix=True)
+        # homography = compute_homography(kp1, des1, kp2, des2)
 
         self.each_homography.append(homography)
         self.accumulate_matrix.append(np.dot(homography, self.accumulate_matrix[-1]))

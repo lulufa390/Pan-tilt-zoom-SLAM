@@ -281,7 +281,7 @@ def match_latch_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose
 
 def compute_homography(keypiont1, descriptor1, keypoint2, descriptor2):
     """
-    Get the estimated homography matrix from two sets of keypoints
+    Get the estimated homography matrix from two sets of keypoints with descriptor.
     :param keypiont1:
     :param descriptor1:
     :param keypoint2:
@@ -384,24 +384,31 @@ def optical_flow_matching(img, next_img, points, ssd_threshold=20):
     return matched_index, next_points
 
 
-def homography_ransac(points1, points2, reprojection_threshold=0.5):
+def homography_ransac(points1, points2, reprojection_threshold=0.5, return_matrix=False):
     """
-    :param points1: N x 2 matched points
-    :param points2:
-    :return: list, matched index in original points, [0, 3, 4...]
+    Homography based RANSAC.
+    Try to find the homography matrix and RANSAC inliers index.
+    :param points1: [N, 2] matched points
+    :param points2: [N, 2] matched points
+    :param reprojection_threshold:
+    :param return_matrix: True for get homography matrix with RANSAC inlier index
+    :return: RANSAC inlier index, e.g. matched index in original points, [0, 3, 4...]
+            and the homography matrix if return_matrix is True
     """
-    # chenck parameter
+    # check parameter
     assert points1.shape[0] == points2.shape[0]
     assert points1.shape[0] >= 4
     ransac_mask = np.ndarray([len(points1)])
-    _, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
-                                       ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC,
-                                       mask=ransac_mask)
-    inner_kp = np.ndarray([0, 2])
-    inner_index = np.ndarray([0])
+    homography, ransac_mask = cv.findHomography(srcPoints=points1, dstPoints=points2,
+                                                ransacReprojThreshold=reprojection_threshold, method=cv.FM_RANSAC,
+                                                mask=ransac_mask)
 
     index = [i for i in range(len(ransac_mask)) if ransac_mask[i] == 1]
-    return index
+
+    if return_matrix:
+        return index, homography
+    else:
+        return index
 
 
 def good_homography(h):
@@ -425,12 +432,12 @@ def good_homography(h):
 
 def matching_and_ransac(img1, img2, img1_keypoints, img1_keypoints_index, visualize=False):
     """
-    matching with sparse optical flow and run ransac.
+    matching with sparse optical flow and run ransac to get homography based inliers.
     :param img1: image 1
     :param img2: image 2
     :param img1_keypoints: keypoints in image 1 [n, 2]
     :param img1_keypoints_index: keypoints corresponding global indexes
-    :return: inliers in current frame, inliers global indexes, outliers global indexes
+    :return: inliers in current frame(img2), inliers global indexes, outliers global indexes
     """
 
     # local_matched_index is matched index in img1_keypoints (or current_keypoints)
@@ -689,8 +696,8 @@ def ut_match_sift_features():
     # im1 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084000.jpg', 1)
     # im2 = cv.imread('/Users/jimmy/Desktop/ptz_slam_dataset/basketball/images/00084660.jpg', 1)
 
-    #im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
-    #im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
+    # im1 = cv.imread("./basketball/basketball/images/00084711.jpg")
+    # im2 = cv.imread("./basketball/basketball/images/00084734.jpg")
 
     # im1 = cv.imread("./seq3_blur/00000733.jpg")
     # im2 = cv.imread("./seq3_blur/00000800.jpg")
