@@ -84,12 +84,10 @@ target_link_libraries(rf_map matio flann)
 
 
 # for python interface
-#include_directories (./python_package)
-#set(SOURCE_CVX_OPT_PYTHON ./python_package/cvx_opt_python.cpp)
-#add_library(cvx_opt_python SHARED ${SOURCE_CVX_GL}
-#		${SOURCE_CVX_PGL}
-#		${SOURCE_CVX_OPT}
-#		${SOURCE_CVX_OPT_PYTHON} )
+include_directories (./python_package)
+set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map_python.cpp)
+add_library(rf_map_python SHARED ${SOURCE_CODE})
+target_link_libraries(rf_map_python matio flann)
 
 
 
