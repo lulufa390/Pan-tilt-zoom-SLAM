@@ -37,7 +37,7 @@ def ut_create_map():
     rf_map = RFMap('debug.txt')
     tree_param_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/ptz_tree_param.txt'
     featue_label_files = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/train_feature_file.txt'
-    rf_map.createMap(tree_param_file, featue_label_files)
+    rf_map.createMap(featue_label_files, tree_param_file)
 
 if __name__ == '__main__':
     ut_create_map()
