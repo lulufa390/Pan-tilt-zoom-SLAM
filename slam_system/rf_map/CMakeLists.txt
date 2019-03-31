@@ -14,8 +14,6 @@ set (rf_map_lib_MINOR 0)
 
 set (USE_ANACONDA 1)
 
-# add the binary tree to the search path for include files
-# so that we will find TutorialConfig.h
 include_directories("${PROJECT_BINARY_DIR}")
 
 set(ANACONDA_DIR /Users/jimmy/anaconda3)
@@ -32,7 +30,7 @@ include_directories (${CONDA_HEAD})
 link_directories (${CONDA_LIB})
 
 # add directory files for head files?
-include_directories (./bt_dtr ./cvx_gl ./cvx_pgl
+include_directories (./ ./bt_dtr ./cvx_gl ./cvx_pgl
                      ./dt_util ./util)
 
 
@@ -86,7 +84,7 @@ target_link_libraries(rf_map matio flann)
 # for python interface
 include_directories (./python_package)
 set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map_python.cpp)
-add_library(rf_map_python SHARED ${SOURCE_CODE})
+add_library(rf_map_python SHARED ${SOURCE_CODE} ${SOURCE_RF_MAP_PYTHON})
 target_link_libraries(rf_map_python matio flann)
 
 

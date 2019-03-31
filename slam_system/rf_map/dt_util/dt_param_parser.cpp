@@ -48,7 +48,7 @@ namespace dt {
             else if(symbol == 'F')
             {
                 // float sequence data
-                char buf[1024] = {NULL};
+                char buf[1024] = {'\0'};
                 int num = 0;
                 ret_num = fscanf(pf, "%s %d", buf, &num);
                 assert(ret_num == 2);
@@ -67,7 +67,7 @@ namespace dt {
             else if (symbol == 'I')
             {
                 // integer sequence data
-                char buf[1024] = {NULL};
+                char buf[1024] = {'\0'};
                 int num = 0;
                 ret_num = fscanf(pf, "%s %d", buf, &num);
                 assert(ret_num == 2);
@@ -241,7 +241,7 @@ namespace dt {
             else if(symbol == 'F')
             {
                 // float sequence data
-                char buf[1024] = {NULL};
+                char buf[1024] = {'\0'};
                 int num = 0;
                 ret_num = fscanf(pf, "%s %d", buf, &num);
                 assert(ret_num == 2);
@@ -260,7 +260,7 @@ namespace dt {
             else if (symbol == 'I')
             {
                 // integer sequence data
-                char buf[1024] = {NULL};
+                char buf[1024] = {'\0'};
                 int num = 0;
                 ret_num = fscanf(pf, "%s %d", buf, &num);
                 assert(ret_num == 2);

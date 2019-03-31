@@ -59,6 +59,5 @@ extern "C" {
                           double* pan_tilt_zoom)
     {
         
-    }
-    
+    }    
 }
