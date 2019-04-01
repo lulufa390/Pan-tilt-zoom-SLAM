@@ -26,7 +26,7 @@ extern "C" {
     // pan_tilt_zoom: output
     void relocalizeCamera(const char* model_name,
                          const char* parameter_file,
-                          double* pan_tilt_zoom);    
+                         double* pan_tilt_zoom);
 }
 
 #endif /* rf_map_python_hpp */
