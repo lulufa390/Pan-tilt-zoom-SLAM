@@ -86,7 +86,7 @@ def get_overlap_index(index1, index2):
 
 def add_gauss(points, var, max_width, max_height):
     """
-    Add Gaussian noise to 2D points.
+    Add Gaussian noise to 2D points (NumPy ndarray).
     :param points: array [N, 2]
     :param var: variance for Gauss distribution
     :return: array [N, 2] with noise
@@ -113,7 +113,7 @@ def add_gauss(points, var, max_width, max_height):
 
 def add_gauss_cv_keypoints(points, var, max_width, max_height):
     """
-    Add Gaussian noise to 2D points.
+    Add Gaussian noise to 2D points (OpenCV keypoints type).
     :param points: list of OpenCV keypoints
     :param var: variance for Gauss distribution
     :return: list of OpenCV keypoints with noise
@@ -135,6 +135,26 @@ def add_gauss_cv_keypoints(points, var, max_width, max_height):
             new_y = 0
         points[i].pt = (new_x, new_y)
     return points
+
+
+def uniform_point_sample_on_field(x_max, y_max, x_num, y_num):
+    """
+    Uniformly get point samples on play field.
+    the origin point is the left-down corner.
+    :param x_max: the max x of point (field length)
+    :param y_max: the max y of point (field width)
+    :param x_num: number of points on x direction
+    :param y_num: number of points on y direction
+    :return: ndarray of [N, 2], N is determined by length(width) and its step.
+    """
+
+    point_list = []
+
+    for x in np.linspace(0, x_max, x_num):
+        for y in np.linspace(0, y_max, y_num):
+            point_list.append([x, y, 0])
+
+    return np.array(point_list)
 
 
 def draw_camera_plot(ground_truth_pan, ground_truth_tilt, ground_truth_f,
@@ -263,7 +283,9 @@ if __name__ == '__main__':
     #     "/hdd/luke/hockey_data/Chicago Blackhawks VS Toronto Maple Leafs 15-01-2016  FULL.mp4",
     #     "/hdd/luke/hockey_data/Chicago_Toronto/images/", 1112500, 30, 1800)
 
-    video_capture(
-        "/hdd/luke/hockey_data/Ice Hockey - Sweden 0 - 3 Canada - Men's Full Gold M"
-        "edal Match _ Sochi 2014 Winter Olympics.mp4",
-        "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
+    # video_capture(
+    #     "/hdd/luke/hockey_data/Ice Hockey - Sweden 0 - 3 Canada - Men's Full Gold M"
+    #     "edal Match _ Sochi 2014 Winter Olympics.mp4",
+    #     "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
+
+    pass

@@ -134,6 +134,7 @@ class PtzSlam:
         # step 1: detect keypoints from image
         # first_img_kp = detect_sift(img, 500)
         first_img_kp = detect_orb(img, 300)
+        # first_img_kp = add_gauss(first_img_kp, 50, 1280, 720)
 
         # remove keypoints on players if bounding box mask is provided
         if bounding_box is not None:
@@ -289,6 +290,7 @@ class PtzSlam:
 
         # new_keypoints = detect_sift(img, 500)
         new_keypoints = detect_orb(img, 300)
+        # new_keypoints = add_gauss(new_keypoints, 50, 1280, 720)
 
         # remove keypoints in player bounding boxes
         if bounding_box is not None:
@@ -335,6 +337,8 @@ class PtzSlam:
 
         inlier_keypoints, inlier_index, outlier_index = matching_and_ransac(
             self.previous_img, next_img, self.previous_keypoints, self.previous_keypoints_index)
+
+        # inlier_keypoints = add_gauss(inlier_keypoints, 50, 1280, 720)
 
         # compute inlier percentage as the measurement for tracking quality
         tracking_percentage = len(inlier_index) / len(self.previous_keypoints) * 100

@@ -53,6 +53,35 @@ def project_with_homography(matrix, model_points, model_line_segment, rgb_image)
     return vis_image
 
 
+def project_with_PTZCamera(camera, model_points, model_line_segment, rgb_image):
+    """
+    :param camera: PTZCamera object
+    :param model_points: N x 2 matrix, model world coordinate in meter
+    :param model_line_segment: int segment index, start from 0
+    :param rgb_image: an RGB image
+    :return: RGB image with model lines
+    """
+    assert model_points.shape[1] == 2
+    assert model_line_segment.shape[1] == 2
+
+    N = model_points.shape[0]
+    image_points = np.zeros((N, 2))
+    for i in range(N):
+        p = np.array([model_points[i][0], model_points[i][1], 0])
+        image_pt = camera.project_3d_point(p)
+        image_points[i][0] = image_pt[0]
+        image_points[i][1] = image_pt[1]
+
+    import copy
+    vis_image = copy.deepcopy(rgb_image)
+    for i in range(len(model_line_segment)):
+        begin = int(model_line_segment[i][0])
+        end = int(model_line_segment[i][1])
+        cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
+                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
+    return vis_image
+
+
 def project_model(camera, model_points, model_line_segment, rgb_image):
     """
     project a 2D field model to the image space

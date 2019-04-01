@@ -10,6 +10,7 @@ import math
 import cv2 as cv
 
 import scipy.io as sio
+from scipy.optimize import least_squares
 
 
 class PTZCamera:
@@ -324,6 +325,65 @@ class PTZCamera:
         return rays
 
 
+def compute_residual(pose, points3d, point2d, camera):
+    """
+    :param pose: pan, tilt, zoom pose
+    :param points3d: [M, 3] 3d model points
+    :param point2d: [M, 2] 2d image points computed by homography
+    :param camera: PTZCamera object
+    :return: residual 1-d array, [N*2]
+    """
+
+    principal_point = camera.principal_point
+    width = principal_point[0] * 2
+    height = principal_point[1] * 2
+    camera.set_ptz(pose)
+
+    project_points2d, index = camera.project_3d_points(points3d, height, width)
+
+    index = index.astype(np.int32)
+    residual = project_points2d - point2d[index]
+    residual = residual.reshape(-1)
+
+    return residual
+
+
+def estimate_camera_from_homography(homography, camera, points3d_on_field):
+    """
+    :param homography: [3, 4] projection matrix from model to image
+    :param camera: PTZ camera object
+    :param points3d_on_field: sample points on play field. [N, 3]
+    :return: corresponding pan, tilt, zoom
+    """
+
+    N = len(points3d_on_field)
+
+    width = camera.principal_point[0] * 2
+    height = camera.principal_point[1] * 2
+
+    points2d = np.zeros([N, 2])
+
+    in_image_index = []
+    for i in range(N):
+        p = np.array([points3d_on_field[i][0], points3d_on_field[i][1], 0, 1])
+        p = np.dot(homography, p)
+        if p[2] != 0.0:
+            points2d[i][0] = p[0] / p[2]
+            points2d[i][1] = p[1] / p[2]
+
+            if 0 < points2d[i][0] < width and 0 < points2d[i][1] < height:
+                in_image_index.append(i)
+
+    points2d = points2d[in_image_index]
+
+    pose = camera.get_ptz()
+
+    optimized_pose = least_squares(compute_residual, pose, verbose=2, x_scale='jac', ftol=1e-5, method='trf',
+                                   args=(points3d_on_field[in_image_index], points2d, camera))
+
+    return optimized_pose.x
+
+
 def ut_broadcast_camera_model():
     hockey_model = sio.loadmat("../../ice_hockey_1/ice_hockey_model.mat")
     points = hockey_model['points']
@@ -350,7 +410,6 @@ def ut_broadcast_camera_model():
             p = np.array([points[j][0], points[j][1], 0])
 
             image_points[j][0], image_points[j][1] = camera.project_3d_point(p)
-
 
             # ray = np.ndarray(2)
             # p = p - shared_parameters[0:3, 0]

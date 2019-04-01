@@ -32,7 +32,7 @@ class SequenceManager:
             cv.Rodrigues(meta[0][0]["base_rotation"][0], base_rotation)
             c = meta[0][0]["cc"][0]
 
-            self.camera = PTZCamera((u, v), c, base_rotation)
+            self.camera = PTZCamera(np.array([u, v]), c, base_rotation)
 
         # image folder path
         if image_path is not None:
