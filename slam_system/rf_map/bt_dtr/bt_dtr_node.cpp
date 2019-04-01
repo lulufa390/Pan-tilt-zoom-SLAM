@@ -62,11 +62,11 @@ bool BTDTRNode::readTree(const char *fileName, NodePtr & root, int & leafNodeNum
     assert(ret == 1);
     
     // remove '\n' at the end of the line
-    char dummy_line_buf[1024] = {NULL};
+    char dummy_line_buf[1024] = {'\0'};
     fgets(dummy_line_buf, sizeof(dummy_line_buf), pf);
     
     //read marking line
-    char line_buf[1024] = {NULL};
+    char line_buf[1024] = {'\0'};
     fgets(line_buf, sizeof(line_buf), pf);
     printf("%s\n", line_buf);
    
@@ -77,7 +77,7 @@ bool BTDTRNode::readTree(const char *fileName, NodePtr & root, int & leafNodeNum
 
 void BTDTRNode::readNode(FILE *pf, NodePtr & node)
 {
-    char lineBuf[1024] = {NULL};
+    char lineBuf[1024] = {'\0'};
     char *ret = fgets(lineBuf, sizeof(lineBuf), pf);
     if (!ret) {
         node = NULL;
@@ -133,7 +133,7 @@ void BTDTRNode::readNode(FILE *pf, NodePtr & node)
             stddev[i] = val;
         }
         // remove '\n' at the end of the line
-        char dummy_line_buf[1024] = {NULL};
+        char dummy_line_buf[1024] = {'\0'};
         fgets(dummy_line_buf, sizeof(dummy_line_buf), pf);
         node->label_mean_ = mean;
         node->label_stddev_ = stddev;

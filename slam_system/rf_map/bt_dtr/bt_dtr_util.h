@@ -78,7 +78,7 @@ public:
         std::unordered_map<std::string, double> imap;
         for(int i = 0; i<param_num; i++)
         {
-            char s[1024] = {NULL};
+            char s[1024] = {'\0'};
             double val = 0;
             int ret = fscanf(pf, "%s %lf", s, &val);
             if (ret != 2) {

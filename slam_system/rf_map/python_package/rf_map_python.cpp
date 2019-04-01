@@ -57,8 +57,12 @@ extern "C" {
     void relocalizeCamera(const char* model_name,
                           const char* parameter_file,
                           double* pan_tilt_zoom)
-    {
+    {   // read model
+        BTDTRegressor model;
+        bool is_read = model.load(model_name);
+        assert(is_read);
+        
+        // read testing parameter
         
     }
-    
 }

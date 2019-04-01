@@ -350,7 +350,7 @@ bool DTUtil_IO::read_files(const char *file_name, vector<string> & files)
     }
     assert(pf);
     while (1) {
-        char line[1024] = {NULL};
+        char line[1024] = {'\0'};
         int ret = fscanf(pf, "%s", line);
         if (ret != 1) {
             break;

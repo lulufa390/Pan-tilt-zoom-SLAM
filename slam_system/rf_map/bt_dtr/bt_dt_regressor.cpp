@@ -143,7 +143,7 @@ bool BTDTRegressor::saveModel(const char *file_name) const
     string baseName = string(file_name);
     baseName = baseName.substr(0, baseName.size()-4);
     for (int i = 0; i<trees_.size(); i++) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         sprintf(buf, "_%08d", i);
         string fileName = baseName + string(buf) + string(".txt");
         fprintf(pf, "%s\n", fileName.c_str());
@@ -153,7 +153,7 @@ bool BTDTRegressor::saveModel(const char *file_name) const
     // leaf node feature
     vector<string> leaf_node_files;
     for (int i = 0; i<trees_.size(); i++) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         sprintf(buf, "_%08d", i);
         string fileName = baseName + string(buf) + string(".fvec");
         fprintf(pf, "%s\n", fileName.c_str());
@@ -196,7 +196,7 @@ bool BTDTRegressor::load(const char *fileName)
     // read tree file
     vector<string> treeFiles;
     for (int i = 0; i<reg_tree_param_.tree_num_; i++) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         fscanf(pf, "%s", buf);
         treeFiles.push_back(string(buf));
     }
@@ -204,7 +204,7 @@ bool BTDTRegressor::load(const char *fileName)
     // read leaf node descriptor file
     vector<string> leaf_node_files;
     for (int i = 0; i<reg_tree_param_.tree_num_; i++) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         fscanf(pf, "%s", buf);
         leaf_node_files.push_back(string(buf));
     }

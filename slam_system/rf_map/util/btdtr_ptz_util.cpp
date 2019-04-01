@@ -34,7 +34,7 @@ bool  PTZTreeParameter::readFromFile(FILE *pf)
     unordered_map<std::string, int> imap;
     for(int i = 0; i<param_num; i++)
     {
-        char s[1024] = {NULL};
+        char s[1024] = {'\0'};
         int val = 0;
         int ret = fscanf(pf, "%s %d", s, &val);
         if (ret != 2) {
@@ -207,12 +207,12 @@ void readSequenceData(const char * sequence_file_name,
     }
     // skip three rows;
     for (int i = 0; i<3; i++) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         fgets(buf, sizeof(buf), pf);
         printf("%s", buf);
     }
     while (1) {
-        char buf[1024] = {NULL};
+        char buf[1024] = {'\0'};
         Eigen::Vector3f ptz;
         double pan = 0, tilt = 0, fl = 0;
         int ret = fscanf(pf, "%s %lf %lf %lf", buf, &pan, &tilt, &fl);
