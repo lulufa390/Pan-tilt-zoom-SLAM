@@ -27,16 +27,16 @@ class HomographyTracking:
         self.each_homography = [None, ]
 
     def tracking(self, next_frame):
-        kp1 = detect_sift(self.current_frame, 0)
+        kp1 = detect_sift(self.current_frame, 300)
 
-        # kp1 = add_gauss(kp1, 20, 1280, 720)
+        kp1 = add_gauss(kp1, 2, 1280, 720)
 
         local_index, kp2 = optical_flow_matching(self.current_frame, next_frame, kp1)
 
         # kp2, des2 = detect_compute_sift(next_frame, 0)
         kp1 = kp1[local_index]
 
-        # kp2 = add_gauss(kp2, 20, 1280, 720)
+        kp2 = add_gauss(kp2, 2, 1280, 720)
 
         self.current_frame = next_frame
         _, homography = homography_ransac(kp1, kp2, return_matrix=True)
@@ -74,28 +74,39 @@ if __name__ == "__main__":
 
     points3d_on_field = uniform_point_sample_on_field(118, 70, 50, 25)
 
+    pan = [first_frame_ptz[0]]
+    tilt = [first_frame_ptz[1]]
+    f = [first_frame_ptz[2]]
+
     for i in range(1, sequence.length):
         next_frame = sequence.get_image_gray(index=i, dataset_type=1)
         tracking_obj.tracking(next_frame)
 
-        img = project_with_homography(tracking_obj.accumulate_matrix[-1], points, line_index, next_frame)
+        # img = project_with_homography(tracking_obj.accumulate_matrix[-1], points, line_index, next_frame)
 
         # compute ptz
 
-        first_camera.set_ptz((sequence.ground_truth_pan[i], sequence.ground_truth_tilt[i], sequence.ground_truth_f[i]))
+        first_camera.set_ptz((pan[-1], tilt[-1], f[-1]))
         pose = estimate_camera_from_homography(tracking_obj.accumulate_matrix[-1], first_camera, points3d_on_field)
 
         print("-----" + str(i) + "--------")
 
         print(pose)
 
-        first_camera.set_ptz(pose)
-        img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
+        # first_camera.set_ptz(pose)
+        # img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
 
         print("%f" % (pose[0] - sequence.ground_truth_pan[i]))
         print("%f" % (pose[1] - sequence.ground_truth_tilt[i]))
         print("%f" % (pose[2] - sequence.ground_truth_f[i]))
 
-        cv.imshow("image", img)
-        cv.imshow("image2", img2)
-        cv.waitKey(0)
+        pan.append(pose[0])
+        tilt.append(pose[1])
+        f.append(pose[2])
+
+        # cv.imshow("image", img)
+        # cv.imshow("image2", img2)
+        # cv.waitKey(0)
+
+    save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
+                     "C:/graduate_design/experiment_result/baseline2/2-gauss.mat")

@@ -214,7 +214,7 @@ def draw_camera_plot(ground_truth_pan, ground_truth_tilt, ground_truth_f,
     plt.show()
 
 
-def save_camera_pose(pan, tilt, f, path, file_name):
+def save_camera_pose(pan, tilt, f, path):
     """
     This function saves camera pose to .mat file.
     Assume the length of sequence is n.
@@ -228,9 +228,7 @@ def save_camera_pose(pan, tilt, f, path, file_name):
     camera_pose['tilt'] = tilt
     camera_pose['f'] = f
 
-    print(path + '/' + file_name)
-
-    sio.savemat(path + '/' + file_name, mdict=camera_pose)
+    sio.savemat(path, mdict=camera_pose)
 
 
 def load_camera_pose(path):

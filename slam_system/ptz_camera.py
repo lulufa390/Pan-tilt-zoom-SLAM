@@ -334,15 +334,15 @@ def compute_residual(pose, points3d, point2d, camera):
     :return: residual 1-d array, [N*2]
     """
 
-    principal_point = camera.principal_point
-    width = principal_point[0] * 2
-    height = principal_point[1] * 2
+    # principal_point = camera.principal_point
+    # width = principal_point[0] * 2
+    # height = principal_point[1] * 2
     camera.set_ptz(pose)
 
-    project_points2d, index = camera.project_3d_points(points3d, height, width)
+    project_points2d, _ = camera.project_3d_points(points3d)
 
-    index = index.astype(np.int32)
-    residual = project_points2d - point2d[index]
+    # index = index.astype(np.int32)
+    residual = project_points2d - point2d
     residual = residual.reshape(-1)
 
     return residual
@@ -378,7 +378,7 @@ def estimate_camera_from_homography(homography, camera, points3d_on_field):
 
     pose = camera.get_ptz()
 
-    optimized_pose = least_squares(compute_residual, pose, verbose=2, x_scale='jac', ftol=1e-5, method='trf',
+    optimized_pose = least_squares(compute_residual, pose, verbose=0, x_scale='jac', ftol=1e-5, method='trf',
                                    args=(points3d_on_field[in_image_index], points2d, camera))
 
     return optimized_pose.x
