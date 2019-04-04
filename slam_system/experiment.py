@@ -301,7 +301,7 @@ def baseline_keyframe_based_homography_matching_soccer3():
 
 if __name__ == "__main__":
     # ut_basketball()
-    # ut_soccer3()
+    ut_soccer3()
     # baseline_keyframe_based_homography_matching_basketball()
-    baseline_keyframe_based_homography_matching_soccer3()
+    # baseline_keyframe_based_homography_matching_soccer3()
     # ut_UBC_hockey()
