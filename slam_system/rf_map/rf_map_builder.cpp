@@ -57,7 +57,7 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
         vector<VectorXf> features;
         vector<VectorXf> labels;
         for (int j = 0; j<sampled_files.size(); j++) {
-            vector<btdtr_ptz_util::PTZSample> samples;
+            vector<btdtr_ptz_util::PTZTrainingSample> samples;
             Eigen::Vector3f dummy_ptz;  // not used
             btdtr_ptz_util::generatePTZSampleWithFeature(sampled_files[j].c_str(), pp, dummy_ptz, samples);
             for (int k = 0; k< samples.size(); k++) {
@@ -133,7 +133,7 @@ bool RFMapBuilder::addTree(BTDTRegressor& model,
     vector<VectorXf> features;
     vector<VectorXf> labels;
     for (int j = 0; j<sampled_files.size(); j++) {
-        vector<btdtr_ptz_util::PTZSample> samples;
+        vector<btdtr_ptz_util::PTZTrainingSample> samples;
         Eigen::Vector3f dummy_ptz;  // not used
         btdtr_ptz_util::generatePTZSampleWithFeature(sampled_files[j].c_str(), pp, dummy_ptz, samples);
         for (int k = 0; k< samples.size(); k++) {
@@ -197,7 +197,7 @@ bool RFMapBuilder::validationError(const BTDTRegressor & model,
     for (int i = 0; i<sample_frame_num; i++) {
         int index = rand()%sample_frame_num;
         string feature_file_name = ptz_keypoint_descriptor_files[index];
-        vector<btdtr_ptz_util::PTZSample> samples;
+        vector<btdtr_ptz_util::PTZTrainingSample> samples;
         Eigen::Vector3f dummy_ptz;
         btdtr_ptz_util::generatePTZSampleWithFeature(feature_file_name.c_str(), pp, dummy_ptz, samples);
         
