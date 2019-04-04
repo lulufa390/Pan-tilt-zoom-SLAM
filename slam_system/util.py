@@ -7,9 +7,15 @@ Create by Jimmy, 2018.9
 import math
 import numpy as np
 import scipy.io as sio
-import matplotlib.pyplot as plt
 import cv2 as cv
-from image_process import *
+import random
+
+import matplotlib
+
+matplotlib.use('Qt4Agg')
+import matplotlib.pyplot as plt
+
+from image_process import blur_sub_image
 
 
 def get_projection_matrix_with_camera(camera):
@@ -231,14 +237,23 @@ def save_camera_pose(pan, tilt, f, path):
     sio.savemat(path, mdict=camera_pose)
 
 
-def load_camera_pose(path):
+def load_camera_pose(path, separate=False):
     """
     :param path: file path for .mat
+    :param separate: the pan-tilt-zoom pose saved in one array or separate(3) arrays
     :return: 3 arrays (pan, tilt, zoom) each of size [n]. (n is length of sequence)
     """
+
     camera_pos = sio.loadmat(path)
-    ptz = camera_pos['ptz']
-    pan, tilt, focal_length = ptz[:, 0], ptz[:, 1], ptz[:, 2]
+
+    if separate:
+        pan = camera_pos['pan'].squeeze()
+        tilt = camera_pos['tilt'].squeeze()
+        focal_length = camera_pos['f'].squeeze()
+
+    else:
+        ptz = camera_pos['ptz']
+        pan, tilt, focal_length = ptz[:, 0], ptz[:, 1], ptz[:, 2]
 
     return pan, tilt, focal_length
 
