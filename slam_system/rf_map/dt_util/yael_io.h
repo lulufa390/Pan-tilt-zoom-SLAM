@@ -9,6 +9,11 @@
 #ifndef OLNN_yael_io_h
 #define OLNN_yael_io_h
 
+// posix_memalign function in linux should be changed to windows' _aligned_malloc
+#ifdef _WIN32
+	#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
+#endif
+
 // file IO for http://corpus-texmex.irisa.fr/
 
 #include <stdio.h>

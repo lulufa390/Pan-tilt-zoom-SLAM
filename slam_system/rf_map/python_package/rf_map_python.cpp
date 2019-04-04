@@ -15,10 +15,11 @@
 #include "btdtr_ptz_util.h"
 #include "ptz_pose_estimation.h"
 
+
 using namespace::std;
 extern "C" {
     // Create a model from a list of feature_label files
-    void createMap(const char * feature_label_file,
+	EXPORTIT void createMap(const char * feature_label_file,
                    const char * model_parameter_file,
                    const char * model_name)
     {
@@ -45,7 +46,7 @@ extern "C" {
     }
     // Extend the map by add a new tree
     // the new tree is built from feature_label files
-    void extendMap(const char* model_name,
+	EXPORTIT void extendMap(const char* model_name,
                    const char* prev_feature_label_file,
                    const char* feature_label_file)
     {
@@ -55,7 +56,7 @@ extern "C" {
     // relocalize a camera using the model
     // parameter_file: testing parameter
     // pan_tilt_zoom: output
-    void relocalizeCamera(const char* model_name,
+	EXPORTIT void relocalizeCamera(const char* model_name,
                           const char* feature_location_file_name,
                           const char* test_parameter_file,
                           double* pan_tilt_zoom)
