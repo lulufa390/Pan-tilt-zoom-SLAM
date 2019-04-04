@@ -4,9 +4,15 @@ from ctypes import cdll
 from ctypes import c_int
 from ctypes import c_void_p
 from ctypes import c_char_p
+import platform
+
+system = platform.system()
 
 #@todo hardcode library
-lib = cdll.LoadLibrary('/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/slam_system/rf_map/build/librf_map_python.dylib')
+if system == "Windows":
+    lib = cdll.LoadLibrary('C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/rf_map/build/x64/Debug/rf_map_python.dll')
+else:
+    lib = cdll.LoadLibrary('/Users/jimmy/Code/ptz_slam/Pan-tilt-zoom-SLAM/slam_system/rf_map/build/librf_map_python.dylib')
 
 class RFMap:
     """
@@ -53,8 +59,14 @@ class RFMap:
 
 def ut_create_map():
     rf_map = RFMap('debug.txt')
-    tree_param_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/ptz_tree_param.txt'
-    featue_label_files = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/train_feature_file.txt'
+
+    if system == "Windows":
+        tree_param_file = 'C:/graduate_design/random_forest/two_point_method_world_cup_dataset/ptz_tree_param.txt'
+        featue_label_files = 'C:/graduate_design/random_forest/two_point_method_world_cup_dataset/train_feature_file.txt'
+    else:
+        tree_param_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/ptz_tree_param.txt'
+        featue_label_files = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/train_feature_file.txt'
+
     rf_map.createMap(featue_label_files, tree_param_file)
 
 def ut_relocalization():
