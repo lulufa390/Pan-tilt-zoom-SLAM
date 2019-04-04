@@ -26,14 +26,21 @@ class PTZSample
 {
 public:
     Eigen::Vector2f  loc_;     // 2D location (x, y)
-    Eigen::VectorXf  pan_tilt_;       //  Pan, tilt parameter in world coordinate, label
     Eigen::VectorXf  descriptor_; // image patch descriptor, feature
     
     PTZSample() {
-        pan_tilt_ = Eigen::VectorXf::Zero(2, 1);
+        
     }
-    
 };
+    
+    class PTZTrainingSample : public PTZSample {
+    public:
+        Eigen::VectorXf  pan_tilt_;       //  Pan, tilt parameter in world coordinate, label
+        
+        PTZTrainingSample() {
+            pan_tilt_ = Eigen::VectorXf::Zero(2, 1);
+        }
+    };
 
 class PTZTreeParameter
 {
@@ -57,17 +64,23 @@ public:
     // pp: principal point
     // ptz: pan, tilt and focal length of the image
     // samples: sample data, has No feature descriptor
-void generatePTZSample(const char* feature_file_name,
+void generatePTZTSample(const char* feature_file_name,
                        const Eigen::Vector2f& pp,
                        const Eigen::Vector3f& ptz,
-                       vector<PTZSample>& samples);
+                       vector<PTZTrainingSample>& samples);
     
     //feature_ptz_file_name: .mat file
     // contains: im_name (str), camera (9x1), ptz (3x1), keypoint (nx2), descriptor (nx128)
 void generatePTZSampleWithFeature(const char * feature_ptz_file_name,
                                   const Eigen::Vector2f& pp,
                                   Eigen::Vector3f & ptz,
-                                  vector<PTZSample> & samples);
+                                  vector<PTZTrainingSample> & samples);
+    
+    //feature_ptz_file_name: .mat file
+    // contains: im_name (str), keypoint (nx2), descriptor (nx128)
+    void generatePTZSampleWithFeature(const char * feature_location_file_name,
+                                      const Eigen::Vector2f& pp,
+                                      vector<PTZSample> & samples);
 
 void readSequenceData(const char * sequence_file_name,
                       const char * sequence_base_directory,

@@ -25,7 +25,8 @@ extern "C" {
     // parameter_file: testing parameter
     // pan_tilt_zoom: output
     void relocalizeCamera(const char* model_name,
-                         const char* parameter_file,
+                         const char* feature_location_file_name,
+                         const char* test_parameter_file,
                          double* pan_tilt_zoom);
 }
 
