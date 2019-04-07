@@ -91,7 +91,12 @@ bool YaelIO::read_fvecs_file(const char *file_name, Eigen::Matrix<float, Eigen::
             data(i, j) = v[i*d + j];
         }
     }
-    free(v);
+
+#ifdef _WIN32
+    _aligned_free(v);
+#else
+	free(v)
+#endif
     return true;
 }
 
@@ -125,18 +130,42 @@ bool YaelIO::read_ivecs_file(const char *file_name, Eigen::Matrix<int, Eigen::Dy
 bool YaelIO::write_fvecs_file(const char *file_name, const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> & data)
 {
     assert(file_name);
-    FILE *pf = fopen(file_name, "w");
-    if (!pf) {
-        perror ("ivecs_write");
-        return false;
-    }
+
+#ifdef _WIN32
+	int d = (int)data.cols();
+	int n = (int)data.rows();
+	const float * v = data.data();
+	std::ofstream os(file_name, std::ios::binary);
+	for (int i = 0; i < n; i++)
+	{
+		int ret;
+		os.write((const char*)&d, 4);
+		Eigen::VectorXf vx = data.row(i);
+		int size = vx.size();
+
+		for (int j = 0; j < size; j++)
+		{
+			float result = vx[j];
+			os.write((const char*)&result, 4);
+		}
+	}
+	os.close();
+
+#else
+	FILE *pf = fopen(file_name, "w");
+	if (!pf) {
+	    perror ("ivecs_write");
+	    return false;
+	}
+
+	int d = (int)data.cols();
+	int n = (int)data.rows();
+	const float * v = data.data();
+	fvecs_fwrite (pf, d, n, v);
+	fclose(pf);
+
+#endif
     
-    int d = (int)data.cols();
-    int n = (int)data.rows();
-    const float * v = data.data();
-    fvecs_fwrite (pf, d, n, v);
-    
-    fclose(pf);    
     return true;
 }
 
@@ -188,13 +217,31 @@ long YaelIO::lvecs_fsize (const char * fname, int *d_out, int *n_out)
 
 int YaelIO::fvecs_read (const char *fname, int d, int n, float *a)
 {
-    FILE *f = fopen (fname, "r");
-    if (!f) {
-        fprintf (stderr, "fvecs_read: could not open %s\n", fname);
-        perror ("");
-        return -1;
-    }
-    
+
+#ifdef _WIN32
+	std::ifstream is(fname, std::ios::binary);
+
+	long i;
+	for (i = 0; i < n; i++) {
+		int new_d;
+		is.read((char*)&new_d, 4);
+		if (new_d != d) {
+			fprintf(stderr, "fvecs_read error 2: unexpected vector dimension\n");
+			is.close();
+			return -1;
+		}
+		float *loc = (a + d * (long)i);
+		is.read((char*)loc, d * 4);
+	}
+	is.close();
+
+#else
+	FILE *f = fopen (fname, "r");
+	if (!f) {
+	    fprintf (stderr, "fvecs_read: could not open %s\n", fname);
+	    perror ("");
+	    return -1;
+	}
     long i;
     for (i = 0; i < n; i++) {
         int new_d;
@@ -222,6 +269,7 @@ int YaelIO::fvecs_read (const char *fname, int d, int n, float *a)
         }
     }
     fclose (f);
+#endif
     return (int)i;
 }
 

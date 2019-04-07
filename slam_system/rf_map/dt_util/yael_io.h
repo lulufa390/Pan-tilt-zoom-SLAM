@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <Eigen/Dense>
 #include <assert.h>
+#include <fstream>
 
 using Eigen::MatrixXf;
 using Eigen::Matrix;

@@ -71,7 +71,10 @@ def ut_create_map():
 
 def ut_relocalization():
     rf_map = RFMap('debug.txt')
-    feature_location_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/test/bra_mex/17.mat'
+    if system == "Windows":
+        feature_location_file = 'C:/graduate_design/random_forest/two_point_method_world_cup_dataset/test/bra_mex/17.mat'
+    else:
+        feature_location_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/test/bra_mex/17.mat'
     estimated_ptz = rf_map.relocalization(feature_location_file)
     print('estimated ptz is {}'.format(estimated_ptz))
 
