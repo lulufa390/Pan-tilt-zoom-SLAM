@@ -1,14 +1,18 @@
 """
-Key frame class.
+Keyframe class.
 
 Created by Luke, 2018.9
 """
 
 import scipy.io as sio
+import numpy as np
+import cv2 as cv
+from image_process import detect_compute_sift_array
 
 
 class KeyFrame:
     """This is a class for keyframe in mapping."""
+
     def __init__(self, img, img_index, center, rotation, u, v, pan, tilt, f):
         """
         :param img: image array for keyframe
@@ -54,31 +58,28 @@ class KeyFrame:
 
     def save_to_mat(self, path):
         """
+        save as the format required by random forest.
         :param path: save path for key frame
         """
         keyframe_data = dict()
-        keyframe_data['img_index'] = self.img_index
-        # keyframe_data['feature_pts'] = self.feature_pts
-        # keyframe_data['feature_des'] = self.feature_des
-        # keyframe_data['landmark_index'] = self.landmark_index
-        keyframe_data['camera_pose'] = self.pan, self.tilt, self.f
-        keyframe_data['center'] = self.center
-        keyframe_data['base_rotation'] = self.base_rotation
-        keyframe_data['u'] = self.u
-        keyframe_data['v'] = self.v
-        sio.savemat(path, mdict=keyframe_data)
+        keyframe_data['im_name'] = str(self.img_index) + ".jpg"
 
-    def load_mat(self, path):
-        """
-        :param path: load path for .mat file
-        """
-        keyframe_data = sio.loadmat(path)
-        self.img_index = keyframe_data['img_index'].squeeze(1)
-        self.feature_pts = keyframe_data['feature_pts'].squeeze(1)
-        self.feature_des = keyframe_data['feature_des'].squeeze(1)
-        self.landmark_index = keyframe_data['landmark_index'].squeeze(1)
-        self.pan, self.tilt, self.f = keyframe_data['camera_pose'].squeeze(1)
-        self.center = keyframe_data['center'].squeeze(1)
-        self.base_rotation = keyframe_data['base_rotation'].squeeze(1)
-        self.u = keyframe_data['u'].squeeze(1)
-        self.v = keyframe_data['v'].squeeze(1)
+        kp, des = detect_compute_sift_array(self.img, 1500)
+
+        keyframe_data['keypoint'] = kp
+        keyframe_data['descriptor'] = des
+
+        # convert the base rotation to (3, 1)
+        save_br = np.ndarray([3, 1])
+        if self.base_rotation.shape == (3, 3):
+            save_br, _ = cv.Rodrigues(self.base_rotation, save_br)
+        else:
+            save_br = self.base_rotation
+        save_br = save_br.ravel()
+
+        keyframe_data['camera'] = np.array([self.u, self.v, self.f, save_br[0], save_br[1], save_br[2],
+                                            self.center[0], self.center[1], self.center[2]]).reshape(-1, 1)
+
+        keyframe_data['ptz'] = np.array([self.pan, self.tilt, self.f]).reshape(-1, 1)
+
+        sio.savemat(path, mdict=keyframe_data)
