@@ -12,6 +12,7 @@ from key_frame import KeyFrame
 from util import overlap_pan_angle
 from bundle_adjustment import bundle_adjustment
 from sequence_manager import SequenceManager
+from rf_map.python_package.rf_map import RFMap
 
 
 class Map:
@@ -165,6 +166,77 @@ class Map:
 
         keyframe_data['keyframes'] = keyframes
         sio.savemat(path, mdict=keyframe_data)
+
+
+class RandomForestMap:
+    def __init__(self):
+        self.keyframe_location = "C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/keyframes/"
+        self.mat_path_file = "C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/train_feature_file.txt"
+        self.tree_param_file = "C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/ptz_tree_param.txt"
+        self.map_file = "C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/rf_save/debug.txt"
+        self.relocalize_file = 'C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/relocalize.mat'
+
+    def add_keyframe(self, keyframe):
+        mat_path = self.keyframe_location + str(keyframe.img_index) + ".mat"
+
+        f = open(self.mat_path_file, 'a')
+        f.write(mat_path + "\n")
+        f.close()
+
+        keyframe.save_to_mat(mat_path)
+        rf_map = RFMap(self.map_file)
+        rf_map.createMap(self.mat_path_file, self.tree_param_file)
+
+    def add_keyframes(self, keyframe_list):
+        for keyframe in keyframe_list:
+            mat_path = self.keyframe_location + str(keyframe.img_index) + ".mat"
+            f = open(self.mat_path_file, 'a')
+            f.write(mat_path + "\n")
+            f.close()
+            keyframe.save_to_mat(mat_path)
+
+        rf_map = RFMap(self.map_file)
+        rf_map.createMap(self.mat_path_file, self.tree_param_file)
+
+    def relocalize(self, relocalize_frame):
+        rf_map = RFMap(self.map_file)
+
+        relocalize_frame.save_to_mat(self.relocalize_file)
+
+        estimated_ptz = rf_map.relocalization(self.relocalize_file)
+
+        estimated_ptz = estimated_ptz.ravel()
+
+        return estimated_ptz
+
+    def good_keyframe(self, ptz, threshold1=5, threshold2=20, im_width=1280, verbose=False):
+        # check parameter
+        assert ptz.shape[0] == 3
+
+        with open(self.mat_path_file, 'r') as f:
+            keyframe_list = f.read().splitlines()
+
+        N = len(keyframe_list)
+        if N == 0:
+            print("Warning: Not existing keyframes")
+
+        map_ptzs = np.zeros((N, 3))
+        for i, keyframe in enumerate(keyframe_list):
+            data = sio.loadmat(keyframe)
+            gt_ptz = data['ptz']
+            gt_ptz = gt_ptz.ravel()
+            map_ptzs[i][0:3] = gt_ptz
+
+        pan_angle_overlaps = np.zeros(N)
+        for i in range(N):
+            pan_angle_overlaps[i] = overlap_pan_angle(ptz[2], ptz[0], map_ptzs[i][2], map_ptzs[i][0], im_width)
+
+        if verbose:
+            print('candidate key frame overlap: ', pan_angle_overlaps)
+
+        max_overlap = max(pan_angle_overlaps)
+        print("overlap", max_overlap)
+        return max_overlap > threshold1 and max_overlap < threshold2
 
 
 def ut_add_first_key_frame():
