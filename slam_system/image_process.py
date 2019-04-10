@@ -76,6 +76,29 @@ def detect_compute_sift(im, nfeatures, verbose=False):
     return key_point, descriptor
 
 
+def detect_compute_sift_array(im, nfeatures, norm=True):
+    """
+    an option for SIFT keypoints detection if arrays are needed.
+    :param im: RGB or gray image
+    :param nfeatures: number of SIFT keypoints
+    :return: two numpy array of shape (N, 2) and (N, 128)
+    """
+    keyframe_kp, keyframe_des = detect_compute_sift(im, nfeatures)
+
+    array_pts = np.zeros((len(keyframe_kp), 2), dtype=np.float64)
+    for i in range(len(keyframe_kp)):
+        array_pts[i][0] = keyframe_kp[i].pt[0]
+        array_pts[i][1] = keyframe_kp[i].pt[1]
+
+    if norm:
+        norm = np.linalg.norm(keyframe_des, axis=1).reshape(-1, 1)
+        array_des = np.divide(keyframe_des, norm).astype(np.float64)
+    else:
+        array_des = keyframe_des.astype(np.float64)
+
+    return array_pts, array_des
+
+
 def detect_compute_orb(im, nfeatures=1000, verbose=False):
     """
     :param im: gray or color image
