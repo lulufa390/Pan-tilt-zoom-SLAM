@@ -258,6 +258,23 @@ def load_camera_pose(path, separate=False):
     return pan, tilt, focal_length
 
 
+def compute_error_data(ptz, ground_truth):
+    """
+    :param ptz: tuple (3) of pan, tilt, f array
+    :param ground_truth: tuple (3) of pan, tilt, f array (gt)
+    :return: mean errors
+    """
+
+    test_p, test_t, test_f = ptz
+    gt_p, gt_t, gt_f = ground_truth
+
+    error_p = np.mean(test_p - gt_p)
+    error_t = np.mean(test_t - gt_t)
+    error_f = np.mean(test_f - gt_f)
+
+    return error_p, error_t, error_f
+
+
 def video_capture(file_path, save_path, begin_time, rate, length):
     """
     function to capture video into images.
@@ -301,4 +318,9 @@ if __name__ == '__main__':
     #     "edal Match _ Sochi 2014 Winter Olympics.mp4",
     #     "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
 
-    pass
+    gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
+    test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
+
+    error = compute_error_data(test, gt)
+
+    print(error)
