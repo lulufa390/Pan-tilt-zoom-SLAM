@@ -51,7 +51,8 @@ class BTDTRTree
     
 public:
     BTDTRTree();
-    ~BTDTRTree(){;}
+    
+    ~BTDTRTree();
     
     BTDTRTree(const BTDTRTree & other);
     

@@ -57,6 +57,9 @@ public:
         index_ = -1;
     }
     
+    ~BTDTRNode();
+    
+    
     static bool writeTree(const char *fileName, const NodePtr root, const int leafNodeNum);
     static bool readTree(const char *fileName, NodePtr & root, int &leafNodeNum);
     

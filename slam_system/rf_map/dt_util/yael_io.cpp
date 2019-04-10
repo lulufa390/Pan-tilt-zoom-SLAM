@@ -95,7 +95,7 @@ bool YaelIO::read_fvecs_file(const char *file_name, Eigen::Matrix<float, Eigen::
 #ifdef _WIN32
     _aligned_free(v);
 #else
-	free(v)
+    free(v);
 #endif
     return true;
 }

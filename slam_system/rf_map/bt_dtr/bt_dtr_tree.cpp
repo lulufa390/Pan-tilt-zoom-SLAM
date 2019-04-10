@@ -14,11 +14,18 @@
 using std::cout;
 using std::endl;
 
-
 BTDTRTree::BTDTRTree()
 {
     root_ = NULL;
     leaf_node_num_ = 0;
+}
+
+BTDTRTree::~BTDTRTree()
+{
+    if(root_ != NULL) {
+        delete root_;
+        root_ = NULL;
+    }
 }
 
 BTDTRTree::BTDTRTree(const BTDTRTree & other)

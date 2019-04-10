@@ -4,6 +4,17 @@
 
 #include "bt_dtr_node.h"
 
+BTDTRNode::~BTDTRNode()
+{
+    if (left_child_ != NULL) {
+        delete left_child_;
+        left_child_ = NULL;
+    }
+    if (right_child_ != NULL) {
+        delete right_child_;
+        right_child_ = NULL;
+    }    
+}
 void BTDTRNode::writeNode(FILE *pf, const NodePtr node)
 {
     if (!node) {

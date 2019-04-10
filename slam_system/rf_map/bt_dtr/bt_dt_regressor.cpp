@@ -14,6 +14,15 @@
 
 using std::string;
 
+BTDTRegressor::~BTDTRegressor()
+{
+    for (int i = 0; i<trees_.size(); i++) {
+        if (trees_[i] != NULL) {
+            delete trees_[i];
+            trees_[i] = NULL;
+        }
+    }
+}
 bool BTDTRegressor::predict(const Eigen::VectorXf & feature,
                             const int maxCheck,
                             Eigen::VectorXf & pred) const

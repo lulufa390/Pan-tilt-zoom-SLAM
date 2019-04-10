@@ -67,7 +67,8 @@ def ut_create_map():
         tree_param_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/ptz_tree_param.txt'
         featue_label_files = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/train_feature_file.txt'
 
-    rf_map.createMap(featue_label_files, tree_param_file)
+    for i in range(1):
+        rf_map.createMap(featue_label_files, tree_param_file)
 
 def ut_relocalization():
     rf_map = RFMap('debug.txt')
