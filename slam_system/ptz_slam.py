@@ -9,12 +9,13 @@ import cv2 as cv
 import copy
 
 from sequence_manager import SequenceManager
-from scene_map import Map
+from scene_map import Map, RandomForestMap
 from key_frame import KeyFrame
 from relocalization import relocalization_camera
 from ptz_camera import PTZCamera
 from image_process import *
 from util import *
+
 
 
 class PtzSlam:
@@ -39,6 +40,8 @@ class PtzSlam:
 
         # map
         self.keyframe_map = Map('sift')
+
+        self.rf_map = RandomForestMap()
 
         # a camera list for whole sequence.
         self.cameras = []
@@ -132,8 +135,8 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        # first_img_kp = detect_sift(img, 500)
-        first_img_kp = detect_orb(img, 300)
+        first_img_kp = detect_sift(img, 300)
+        # first_img_kp = detect_orb(img, 300)
         # first_img_kp = add_gauss(first_img_kp, 50, 1280, 720)
 
         # remove keypoints on players if bounding box mask is provided
@@ -288,8 +291,8 @@ class PtzSlam:
         keypoints, keypoints_index = self.current_camera.project_rays(
             self.rays, height, width)
 
-        # new_keypoints = detect_sift(img, 500)
-        new_keypoints = detect_orb(img, 300)
+        new_keypoints = detect_sift(img, 300)
+        # new_keypoints = detect_orb(img, 300)
         # new_keypoints = add_gauss(new_keypoints, 50, 1280, 720)
 
         # remove keypoints in player bounding boxes
@@ -345,7 +348,7 @@ class PtzSlam:
         if tracking_percentage < bad_tracking_percentage:
             self.bad_tracking_cnt += 1
 
-        if self.bad_tracking_cnt > 3:
+        if self.bad_tracking_cnt > 2:
             self.tracking_lost = True
         """
         ===============================
@@ -395,26 +398,42 @@ class PtzSlam:
             if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
                 self.new_keyframe = True
 
-    def relocalize(self, img, camera):
+            # if self.rf_map.good_keyframe(self.current_camera.get_ptz(), 10, 15):
+            #     self.new_keyframe = True
+
+    def relocalize(self, img, camera, enable_rf=False):
         """
         :param img: image to relocalize
         :param camera: lost camera to relocaize
         :return: camera after relocalize
         """
 
-        if len(self.keyframe_map.keyframe_list) > 1:
-            lost_pose = camera.pan, camera.tilt, camera.focal_length
-            relocalize_pose = relocalization_camera(self.keyframe_map, img, lost_pose)
-            camera.set_ptz(relocalize_pose)
+        if enable_rf:
+            c = camera.camera_center
+            r = camera.base_rotation
+            u = camera.principal_point[0]
+            v = camera.principal_point[1]
+            pan = camera.pan
+            tilt = camera.tilt
+            focal_length = camera.focal_length
+            relocalize_frame = KeyFrame(img, -1, c, r, u, v, pan, tilt, focal_length)
+            ptz = self.rf_map.relocalize(relocalize_frame)
+            camera.set_ptz(ptz)
+
         else:
-            print("Warning: Not enough keyframes for relocalization.")
+            if len(self.keyframe_map.keyframe_list) > 1:
+                lost_pose = camera.pan, camera.tilt, camera.focal_length
+                relocalize_pose = relocalization_camera(self.keyframe_map, img, lost_pose)
+                camera.set_ptz(relocalize_pose)
+            else:
+                print("Warning: Not enough keyframes for relocalization.")
 
         self.bad_tracking_cnt = 0
         self.tracking_lost = False
 
         return camera
 
-    def add_keyframe(self, img, camera, frame_index):
+    def add_keyframe(self, img, camera, frame_index, enable_rf=False):
         """
         add new key frame.
         @todo now have not changed the KeyFrame's parameter to camera object.
@@ -433,8 +452,13 @@ class PtzSlam:
 
         new_keyframe = KeyFrame(img, frame_index, c, r, u, v, pan, tilt, focal_length)
 
-        if frame_index == 0:
-            self.keyframe_map.add_first_keyframe(new_keyframe, verbose=True)
-        else:
-            self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
+        if enable_rf:
+            self.rf_map.add_keyframe(new_keyframe)
             self.new_keyframe = False
+
+        else:
+            if frame_index == 0:
+                self.keyframe_map.add_first_keyframe(new_keyframe, verbose=True)
+            else:
+                self.keyframe_map.add_keyframe_with_ba(new_keyframe, "./bundle_result/", verbose=True)
+                self.new_keyframe = False
