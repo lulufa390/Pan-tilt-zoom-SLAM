@@ -38,6 +38,10 @@ public:
                  vector<Eigen::VectorXf> & predictions) const;
     
     // return every prediction and distance from every tree
+    // feature: e.g. sift feature discriptor
+    // maxCheck: 4, hyper-parameter
+    // predictions: predictions in each tree
+    // dists: feature space distance in each tree, in non-decrease order
     bool predict(const Eigen::VectorXf & feature,
                  const int maxCheck,
                  vector<Eigen::VectorXf> & predictions,

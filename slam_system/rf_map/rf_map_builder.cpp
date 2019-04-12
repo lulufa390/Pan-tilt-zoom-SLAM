@@ -108,55 +108,45 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
 }
 
 bool RFMapBuilder::addTree(BTDTRegressor& model,
-                           const vector<string> & prev_feature_label_files,
                            const vector<string> & feature_label_files,
                            const char *model_file_name)
 {
-    assert(prev_feature_label_files.size() > 0);
     assert(feature_label_files.size() > 0);
     
     tree_param_.base_tree_param_.tree_num_ += 1;
-    const int sampled_frame_num = tree_param_.sampled_frame_num_ - (int)feature_label_files.size();
-    assert(sampled_frame_num >= 0);
-    
     const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
-    vector<string> sampled_files = prev_feature_label_files;
+    float feature_dist_threshold = 0.05;
+    float out_of_bag_error_threshold = 0.05;
     
-    // randomly sample frames from previous frames
-    for (int j = 0; j<sampled_frame_num; j++) {
-        int index = rand()%prev_feature_label_files.size();
-        sampled_files.push_back(prev_feature_label_files[index]);
-    }
-    
-    printf("training from %lu frames\n", sampled_files.size());
     // sample from selected frames
     vector<VectorXf> features;
     vector<VectorXf> labels;
-    for (int j = 0; j<sampled_files.size(); j++) {
+    for (int j = 0; j<feature_label_files.size(); j++) {
         vector<btdtr_ptz_util::PTZTrainingSample> samples;
         Eigen::Vector3f dummy_ptz;  // not used
-        btdtr_ptz_util::generatePTZSampleWithFeature(sampled_files[j].c_str(), pp, dummy_ptz, samples);
+        btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_files[j].c_str(), pp, dummy_ptz, samples);
         for (int k = 0; k< samples.size(); k++) {
             features.push_back(samples[k].descriptor_);
             labels.push_back(samples[k].pan_tilt_);
         }
     }
+    
     assert(features.size() == labels.size());
     
+    vector<unsigned int> indices;
+    this->outOfBagSampling(model, features, labels, indices,
+                           feature_dist_threshold, out_of_bag_error_threshold);
     printf("training sample number is %lu\n", features.size());
-    
+        
     model.feature_dim_ = (int)features[0].size();
     model.label_dim_   = (int)labels[0].size();
-    
-    vector<unsigned int> indices = DTUtil::range<unsigned int>(0, (int)features.size(), 1);
-    assert(indices.size() == features.size());
     
     TreePtr pTree = new TreeType();
     assert(pTree);
     double tt = clock();
     pTree->buildTree(features, labels, indices, tree_param_.base_tree_param_);
     printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
-    
+        
     // training error
     vector<Eigen::VectorXf> errors;
     for (int k = 0; k< features.size(); k++) {
@@ -182,7 +172,7 @@ bool RFMapBuilder::addTree(BTDTRegressor& model,
         printf("saved %s\n", model_file_name);
     }
     
-    this->validationError(model, prev_feature_label_files, 4);
+    this->validationError(model, feature_label_files, 1);
     return true;
 }
 
@@ -229,4 +219,40 @@ bool RFMapBuilder::validationError(const BTDTRegressor & model,
         cout<<"Validation median feature distance is "<<distance[distance.size()/2]<<endl<<endl;
     }    
     return true;
+}
+
+void RFMapBuilder::outOfBagSampling(const BTDTRegressor & model,
+                                     vector<VectorXf>& features,
+                                     vector<VectorXf>& labels,
+                                     vector<unsigned int> & selected_indices,
+                                     float feature_dist_threshold,
+                                     float out_of_bag_error_threshold)
+{
+    assert(features.size() == labels.size());
+    assert(selected_indices.size() == 0);
+    
+    // use a pre-trained the model to select new examples
+    // if the prediction error is smaller than a threshold, then the new example is discarded
+    
+    const int max_check = 4;
+    for (int i = 0; i<features.size(); i++) {        
+        vector<VectorXf> preds;
+        vector<float> dists;
+        
+        bool is_pred = model.predict(features[i], max_check, preds, dists);
+        assert(is_pred);
+        
+        VectorXf dif = labels[i] - preds[0];
+        float pred_error = dif.norm();
+        
+        if (dists[0] < feature_dist_threshold &&
+            pred_error < out_of_bag_error_threshold) {
+            continue;
+        }
+        selected_indices.push_back(i);
+    }
+    printf("select %lu from %lu, about %f\n of dada \n",
+           selected_indices.size(),
+           features.size(),
+           1.0*selected_indices.size()/features.size());    
 }

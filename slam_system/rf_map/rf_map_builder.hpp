@@ -40,12 +40,10 @@ public:
     
     // Add one tree to the init model
     // using files from all feature_label_files and part of init_feature_label_files
-    // model: input and output
-    // init_feature_label_files: files that are already used to train model
+    // model: input and output   
     // feature_label_files: new added files
     // model_file_name: output, new model
     bool addTree(BTDTRegressor& model,
-                const vector<string> & prev_feature_label_files,
                 const vector<string> & feature_label_files,
                 const char *model_file_name);
     
@@ -53,6 +51,15 @@ private:
     bool validationError(const BTDTRegressor & model,
                          const vector<string> & ptz_keypoint_descriptor_files,
                          const int sample_frame_num = 10) const;
+    
+    // output: selected_indices, examples used to create a new tree
+    // selected examples that have large out-of-bag errors
+    void outOfBagSampling(const BTDTRegressor & model,
+                           vector<VectorXf>& features,
+                           vector<VectorXf>& labels,
+                           vector<unsigned int> & selected_indices,
+                           float feature_dist_threshold = 0.05,
+                           float out_of_bag_error_threshold = 0.02);
 
     
 };
