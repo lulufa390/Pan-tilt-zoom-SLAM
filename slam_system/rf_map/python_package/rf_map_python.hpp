@@ -25,12 +25,22 @@ extern "C" {
                    const char * model_parameter_file,
                    const char * model_name);
     
-    // Extend the map by add a new tree
+    // Extend the map by adding a new tree
     // the new tree is built from feature_label files
 	EXPORTIT void extendMap(const char* pre_model_name,
                                       const char * model_parameter_file,
                                       const char* feature_label_file,
                                       const char * model_name);
+    
+    
+    // Extend the map by updating a new tree
+    // the new tree is built from feature_label files
+    EXPORTIT void updateMap(const char* pre_model_name,
+                            const char * model_parameter_file,
+                            const char* feature_label_file,
+                            const char * model_name);
+    
+    
     
     // relocalize a camera using the model
     // parameter_file: testing parameter

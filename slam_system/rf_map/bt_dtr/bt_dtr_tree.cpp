@@ -64,6 +64,31 @@ bool BTDTRTree::buildTree(const vector<VectorXf> & features,
     return true;
 }
 
+bool BTDTRTree::updateTree(const vector<VectorXf> & features,
+                           const vector<VectorXf> & labels,
+                           const vector<unsigned int> & indices,
+                           const BTDTRTreeParameter & param)
+{
+    assert(features.size() == labels.size());
+    assert(indices.size() <= features.size());
+    
+    tree_param_ = param;
+    leaf_node_num_ = 0;
+    
+    dims_.clear();
+    for (unsigned int i = 0; i<features.front().size(); i++) {
+        dims_.push_back(i);
+    }
+    
+    // update tree
+    this->updateNode(features, labels, indices, root_, 0);
+    
+    // record leaf node
+    this->hashLeafNode();
+    
+    return true;
+}
+
 
 static bool bestSplitDimension(const vector<VectorXf> & features,
                                const vector<VectorXf> & labels,
@@ -248,6 +273,75 @@ bool BTDTRTree::configureNode(const vector<VectorXf> & features,
     return true;
 }
 
+bool BTDTRTree::updateNode(const vector<VectorXf> & features,
+                           const vector<VectorXf> & labels,
+                           const vector<unsigned int> & indices,
+                           BTDTRNode* & node,
+                           const int depth)
+{
+    const int min_leaf_node = tree_param_.min_leaf_node_;
+    const int max_depth     = tree_param_.max_tree_depth_;    
+    const int dim = (int)features[0].size();
+    const int candidate_dim_num = tree_param_.candidate_dim_num_;
+    const double min_split_stddev = tree_param_.min_split_node_std_dev_;
+    assert(candidate_dim_num <= dim);
+    
+    // leaf node
+    bool reach_leaf = false;
+    if (indices.size() < min_leaf_node || depth > max_depth) {
+        reach_leaf = true;
+    }
+    
+    // check standard deviation
+    if (reach_leaf == false && depth > max_depth/2) {
+        Eigen::VectorXf mean;
+        Eigen::VectorXf std_dev;
+        DTUtil::meanStddev<Eigen::VectorXf>(labels, indices, mean, std_dev);
+        // standard deviation in every dimension is smaller than the threshold
+        reach_leaf = (std_dev.array() < min_split_stddev).all();
+    }
+    
+    if (node != NULL && !node->is_leaf_ ) {
+        assert(indices.size() != 0);
+        // already exited internal node, split the data
+        // split the data to left and right node
+        vector<unsigned int> left_indices;
+        vector<unsigned int> right_indices;
+        int split_dim = node->split_param_.split_dim_;
+        float split_threshold = node->split_param_.split_threshold_;
+        for (auto index: indices) {
+            float v = features[index][split_dim];
+            if (v<split_threshold) {
+                left_indices.push_back(index);
+            }
+            else {
+                right_indices.push_back(index);
+            }
+        }
+        this->updateNode(features, labels, left_indices, node->left_child_, depth+1);
+        this->updateNode(features, labels, right_indices, node->right_child_, depth+1);
+        return true;
+    }
+    else if(node != NULL && node->is_leaf_) {
+        // a leaf node
+        if (reach_leaf) {
+            this->setLeafNode(features, labels, indices, node);
+            return true;
+        }
+        else {
+            // change a leaf node to a non-leaf node
+            node->is_leaf_ = false;
+            this->configureNode(features, labels, indices, node);
+        }
+    }
+    else {
+        // a new node just as a new tree
+        node = new BTDTRNode(depth);
+        this->configureNode(features, labels, indices, node);
+    }
+    
+    return true;
+}
 void BTDTRTree::setLeafNode(const vector<VectorXf> & features,
                             const vector<VectorXf> & labels,
                             const vector<unsigned int> & indices,
@@ -256,6 +350,7 @@ void BTDTRTree::setLeafNode(const vector<VectorXf> & features,
     assert(node);
     
     node->is_leaf_ = true;
+    node->index_ = -1;
     DTUtil::meanStddev<Eigen::VectorXf>(labels, indices, node->label_mean_, node->label_stddev_);
     node->sample_num_ = (int)indices.size();
     node->feat_mean_ = DTUtil::mean(features, indices);

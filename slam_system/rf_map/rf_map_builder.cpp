@@ -176,6 +176,48 @@ bool RFMapBuilder::addTree(BTDTRegressor& model,
     return true;
 }
 
+bool RFMapBuilder::updateTree(BTDTRegressor& model,
+                              const vector<string> & feature_label_files,
+                              const char *model_file_name)
+{
+    assert(feature_label_files.size() > 0);
+    assert(model.trees_.size() > 0);
+    
+    tree_param_.base_tree_param_.tree_num_ += 1;
+    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
+    float feature_dist_threshold = 0.05;
+    float out_of_bag_error_threshold = 0.05;
+    
+    // sample from selected frames
+    vector<VectorXf> features;
+    vector<VectorXf> labels;
+    for (int j = 0; j<feature_label_files.size(); j++) {
+        vector<btdtr_ptz_util::PTZTrainingSample> samples;
+        Eigen::Vector3f dummy_ptz;  // not used
+        btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_files[j].c_str(), pp, dummy_ptz, samples);
+        for (int k = 0; k< samples.size(); k++) {
+            features.push_back(samples[k].descriptor_);
+            labels.push_back(samples[k].pan_tilt_);
+        }
+    }
+    
+    assert(features.size() == labels.size());
+    
+    vector<unsigned int> indices = DTUtil::range<unsigned int>(0, (int)features.size(), 1);
+    assert(indices.size() == features.size());   
+    
+    model.feature_dim_ = (int)features[0].size();
+    model.label_dim_   = (int)labels[0].size();
+    
+    TreePtr pTree = model.trees_.back();
+    assert(pTree);
+    double tt = clock();
+    pTree->updateTree(features, labels, indices, tree_param_.base_tree_param_);
+    printf("update a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
+    
+    return true;
+}
+
 bool RFMapBuilder::validationError(const BTDTRegressor & model,
                                    const vector<string> & ptz_keypoint_descriptor_files,
                                    const int sample_frame_num) const

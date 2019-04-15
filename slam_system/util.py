@@ -10,9 +10,18 @@ import scipy.io as sio
 import cv2 as cv
 import random
 
+from sys import platform as sys_pf
+if sys_pf == 'darwin':
+    import matplotlib
+    matplotlib.use("TkAgg")
+
 import matplotlib
 
-matplotlib.use('Qt4Agg')
+if sys_pf == 'darwin':
+    matplotlib.use("TkAgg")
+elif sys_pf == 'win32':
+    matplotlib.use('Qt4Agg')
+
 import matplotlib.pyplot as plt
 
 from image_process import blur_sub_image
@@ -303,6 +312,33 @@ def video_capture(file_path, save_path, begin_time, rate, length):
 
         # cv.waitKey(0)
 
+def ut_add_gaussian():
+    import numpy as np
+    import matplotlib
+    matplotlib.use("TkAgg")
+    import matplotlib.pyplot as plt
+    import random
+
+    #def add_gauss(points, var, max_width, max_height):
+    width, height = 1280, 720
+    N = 512
+    points = np.zeros((N, 2))
+    for i in range(N):
+        points[i][0] = random.randint(0, width-1)
+        points[i][1] = random.randint(0, height-1)
+
+    var = 5.0
+    noise_points = add_gauss(points, var, width, height)
+    dif = noise_points - points
+
+    f = plt.figure()
+    plt.plot(dif[:,0], dif[:, 1], '.')
+    plt.show()
+
+
+
+
+
 
 if __name__ == '__main__':
     # video_capture(
@@ -318,9 +354,12 @@ if __name__ == '__main__':
     #     "edal Match _ Sochi 2014 Winter Olympics.mp4",
     #     "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
 
+    
     gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
     test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
 
     error = compute_error_data(test, gt)
 
     print(error)
+
+    #ut_add_gaussian()

@@ -63,6 +63,13 @@ public:
                    const vector<VectorXf> & labels,
                    const vector<unsigned int> & indices,
                    const BTDTRTreeParameter & param);
+    // updte tree using new examples
+    // it is used for online learning in which
+    // examples come by time
+    bool updateTree(const vector<VectorXf> & features,
+                    const vector<VectorXf> & labels,
+                    const vector<unsigned int> & indices,
+                    const BTDTRTreeParameter & param);
     
     bool predict(const Eigen::VectorXf & feature,
                  const int maxCheck,
@@ -86,6 +93,13 @@ private:
                        const vector<VectorXf> & labels,
                        const vector<unsigned int> & indices,
                        BTDTRNode * node);
+    
+    // update node for online learning
+    bool updateNode(const vector<VectorXf> & features,
+                    const vector<VectorXf> & labels,
+                    const vector<unsigned int> & indices,
+                    BTDTRNode* & node,
+                    const int depth);
     
     // record leaf node in an array for O(1) access
     void hashLeafNode();

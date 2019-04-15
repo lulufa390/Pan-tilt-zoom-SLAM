@@ -40,12 +40,17 @@ public:
     
     // Add one tree to the init model
     // using files from all feature_label_files and part of init_feature_label_files
-    // model: input and output   
+    // model: input and output
     // feature_label_files: new added files
     // model_file_name: output, new model
     bool addTree(BTDTRegressor& model,
                 const vector<string> & feature_label_files,
                 const char *model_file_name);
+    
+    // update the last tree in the model
+    bool updateTree(BTDTRegressor& model,
+                    const vector<string> & feature_label_files,
+                    const char *model_file_name);
     
 private:    
     bool validationError(const BTDTRegressor & model,
