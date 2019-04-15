@@ -236,7 +236,7 @@ class HomographyEKF:
         jacobi = self.compute_h_jacobian(params, updated_ray)
 
         # get Kalman gain
-        r_k = 0.0 * np.eye(2 * num_ray)  # todo 2 is a constant value
+        r_k = 10 * np.eye(2 * num_ray)  # todo 2 is a constant value
         s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
 
         k_k = np.dot(np.dot(predicted_cov, jacobi.T), np.linalg.pinv(s_k))
@@ -486,6 +486,86 @@ def soccer3_test():
     # save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
     #                  "C:/graduate_design/experiment_result/baseline2/2-gauss.mat")
 
+def synthesized_test():
+    sequence = SequenceManager(annotation_path="../../dataset/basketball/ground_truth.mat",
+                               image_path="../../dataset/synthesized/images")
+
+    gt_pan, gt_tilt, gt_f = load_camera_pose("../../dataset/synthesized/synthesize_ground_truth.mat", separate=True)
+
+
+    line_index, points = load_model("../../dataset/basketball/basketball_model.mat")
+
+    first_frame_ptz = (gt_pan[0],
+                       gt_tilt[0],
+                       gt_f[0])
+
+    first_camera = sequence.camera
+    first_camera.set_ptz(first_frame_ptz)
+
+    # 3*4 projection matrix for 1st frame
+    first_frame_mat = first_camera.projection_matrix
+    first_frame = sequence.get_image_gray(index=0, dataset_type=2)
+    # first_bounding_box = sequence.get_bounding_box_mask(0)
+    # img = project_with_homography(first_frame_mat, points, line_index, first_frame)
+    #
+    # cv.imshow("image", img)
+    # cv.waitKey()
+
+    homography_ekf = HomographyEKF()
+
+    homography_ekf.init_system(first_frame, first_frame_mat)
+
+    # tracking_obj = HomographyTracking(first_frame, first_frame_mat)
+
+    points3d_on_field = uniform_point_sample_on_field(25, 18, 25, 18)
+
+    pan = [first_frame_ptz[0]]
+    tilt = [first_frame_ptz[1]]
+    f = [first_frame_ptz[2]]
+
+    for i in range(1, len(gt_pan)):
+        next_frame = sequence.get_image_gray(index=i, dataset_type=2)
+
+        homography_ekf.tracking(next_frame)
+
+        img = project_with_homography(
+            np.dot(homography_ekf.accumulate_homography[-1], homography_ekf.model_to_image_homography),
+            points, line_index, next_frame)
+
+        # compute ptz
+
+        first_camera.set_ptz((pan[-1], tilt[-1], f[-1]))
+
+        current_homography = np.dot(homography_ekf.accumulate_homography[-1],
+                                    homography_ekf.model_to_image_homography)
+
+        pose = estimate_camera_from_homography(current_homography, first_camera, points3d_on_field)
+
+        print("-----" + str(i) + "--------")
+
+        print("len:", len(homography_ekf.accumulate_homography))
+
+        print(pose)
+
+        first_camera.set_ptz(pose)
+        img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
+
+        print("%f" % (pose[0] - gt_pan[i]))
+        print("%f" % (pose[1] - gt_tilt[i]))
+        print("%f" % (pose[2] - gt_f[i]))
+
+        pan.append(pose[0])
+        tilt.append(pose[1])
+        f.append(pose[2])
+
+        # cv.imshow("image", img)
+        # cv.imshow("image2", img2)
+        # cv.waitKey(0)
+
+    # save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
+    #                  "C:/graduate_design/experiment_result/baseline2/2-gauss.mat")
+
 
 if __name__ == "__main__":
-    soccer3_test()
+    # soccer3_test()
+    synthesized_test()
