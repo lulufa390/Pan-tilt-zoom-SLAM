@@ -15,6 +15,7 @@ class BTDTRegressor
 {
     friend class BTDTRegressorBuilder;
     friend class RFMapBuilder;
+    friend class OnlineRFMapBuilder;
 private:
     
     vector<BTDTRTree* > trees_;

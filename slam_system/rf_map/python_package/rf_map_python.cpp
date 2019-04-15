@@ -44,33 +44,7 @@ extern "C" {
         builder.buildModel(model, feature_files, model_name);
         model.saveModel(model_name);
     }
-    
-    EXPORTIT void buildMap(const char * feature_label_file,
-                                      const char * model_parameter_file,
-                                      const char * model_name)
-    {
-        // 1. read feature label file
-        vector<string> feature_files;
-        ifstream file(feature_label_file);
-        string str;
-        while(std::getline(file, str)) {
-            feature_files.push_back(str);
-        }
-        printf("read %lu feature label files\n", feature_files.size());
-        
-        btdtr_ptz_util::PTZTreeParameter tree_param;
-        tree_param.readFromFile(model_parameter_file);
-        tree_param.printSelf();
-        
-        RFMapBuilder builder;
-        builder.setTreeParameter(tree_param);
-        
-        BTDTRegressor model;
-        builder.buildModel(model, feature_files, model_name);
-        model.saveModel(model_name);
-        return;
-    }
-    
+       
     
     // update the map by updating the last tree
     // the new tree is built from feature_label files
