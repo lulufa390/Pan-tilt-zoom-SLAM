@@ -11,9 +11,6 @@ import cv2 as cv
 import random
 
 from sys import platform as sys_pf
-if sys_pf == 'darwin':
-    import matplotlib
-    matplotlib.use("TkAgg")
 
 import matplotlib
 
@@ -135,7 +132,7 @@ def add_gauss_cv_keypoints(points, var, max_width, max_height):
     """
     for i in range(len(points)):
         new_x = points[i].pt[0] + random.gauss(0, var)
-        new_y = points[i].pt[0] + random.gauss(0, var)
+        new_y = points[i].pt[1] + random.gauss(0, var)
 
         if new_x >= max_width:
             new_x = max_width - 1
@@ -277,9 +274,9 @@ def compute_error_data(ptz, ground_truth):
     test_p, test_t, test_f = ptz
     gt_p, gt_t, gt_f = ground_truth
 
-    error_p = np.mean(test_p - gt_p)
-    error_t = np.mean(test_t - gt_t)
-    error_f = np.mean(test_f - gt_f)
+    error_p = np.mean(np.fabs(test_p - gt_p))
+    error_t = np.mean(np.fabs(test_t - gt_t))
+    error_f = np.mean(np.fabs(test_f - gt_f))
 
     return error_p, error_t, error_f
 
@@ -312,6 +309,7 @@ def video_capture(file_path, save_path, begin_time, rate, length):
 
         # cv.waitKey(0)
 
+
 def ut_add_gaussian():
     import numpy as np
     import matplotlib
@@ -319,25 +317,21 @@ def ut_add_gaussian():
     import matplotlib.pyplot as plt
     import random
 
-    #def add_gauss(points, var, max_width, max_height):
+    # def add_gauss(points, var, max_width, max_height):
     width, height = 1280, 720
     N = 512
     points = np.zeros((N, 2))
     for i in range(N):
-        points[i][0] = random.randint(0, width-1)
-        points[i][1] = random.randint(0, height-1)
+        points[i][0] = random.randint(0, width - 1)
+        points[i][1] = random.randint(0, height - 1)
 
     var = 5.0
     noise_points = add_gauss(points, var, width, height)
     dif = noise_points - points
 
     f = plt.figure()
-    plt.plot(dif[:,0], dif[:, 1], '.')
+    plt.plot(dif[:, 0], dif[:, 1], '.')
     plt.show()
-
-
-
-
 
 
 if __name__ == '__main__':
@@ -354,12 +348,15 @@ if __name__ == '__main__':
     #     "edal Match _ Sochi 2014 Winter Olympics.mp4",
     #     "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
 
-    
-    gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
-    test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
+    # gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
+    # test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
+
+    gt = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/gt2.mat", True)
+
+    test = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/30frames rf/3.mat", True)
 
     error = compute_error_data(test, gt)
 
     print(error)
 
-    #ut_add_gaussian()
+    # ut_add_gaussian()
