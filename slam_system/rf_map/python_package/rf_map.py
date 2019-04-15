@@ -44,6 +44,9 @@ class RFMap:
         :param tree_param_file:  .mat file has 'keypoint', 'descriptor' and 'ptz'
         :return:
         """
+        print('deprecated function!')
+        assert 0
+
         fl_file = feature_label_files.encode('utf-8')
         tr_file = tree_param_file.encode('utf-8')
         rf_file = self.rf_file_name.encode('utf-8')
@@ -57,6 +60,8 @@ class RFMap:
         :param feature_label_files:
         :return:
         """
+        print('deprecated function!')
+        assert 0
         #todo tree number is not updated
         fl_file = feature_label_files.encode('utf-8')
         tr_file = tree_param_file.encode('utf-8')
