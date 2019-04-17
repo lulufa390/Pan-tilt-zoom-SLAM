@@ -21,7 +21,7 @@ elif sys_pf == 'win32':
 
 import matplotlib.pyplot as plt
 
-from image_process import blur_sub_image
+from image_process import blur_sub_image, detect_sift
 
 
 def get_projection_matrix_with_camera(camera):
@@ -343,6 +343,23 @@ def video_capture(file_path, save_path, begin_time, rate, length):
         # cv.waitKey(0)
 
 
+def compute_reprojection_error(img, camera, estimated_camera):
+    points = detect_sift(img, 20)
+    N = points.shape[0]
+
+    rays = camera.back_project_to_rays(points)
+
+    pts1, _ = camera.project_rays(rays)
+    pts2, _ = estimated_camera.project_rays(rays)
+
+    reprojection_error = np.ndarray([N])
+    for i in range(N):
+        dx, dy = pts1[i] - pts2[i]
+        reprojection_error[i] = math.sqrt(dx * dx + dy * dy)
+
+    m, std = np.mean(reprojection_error), np.std(reprojection_error)
+    return m
+
 def ut_add_gaussian():
     import numpy as np
     import matplotlib
@@ -388,11 +405,13 @@ if __name__ == '__main__':
     #                       True)
     #
     # test = load_camera_pose(
-    #     "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers/50-keyframe.mat", True)
+    # "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers/50-keyframe.mat", True)
+
     gt = load_camera_pose("C:/graduate_design/dataset/synthesized/synthesize_ground_truth.mat",
                           True)
-    test = load_camera_pose(
-        "C:/graduate_design/experiment_result/baseline2/synthesized/ptz_ekf_tracking.mat", True)
+    # test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/0-rk.mat", True)
+
+    test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/ptz_ekf_tracking(2).mat", True)
     error = compute_error_data(test, gt)
 
     print(error)
