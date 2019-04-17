@@ -123,6 +123,22 @@ def add_gauss(points, var, max_width, max_height):
     return noise_points
 
 
+def add_outliers(points, var, max_width, max_height, percentage):
+    pts_with_outliers = points.copy()
+    N = points.shape[0]
+
+    sample_list = [i for i in range(N)]
+    sample_list = random.sample(sample_list, int(percentage / 100 * len(sample_list)))
+
+    for i in sample_list:
+        pts_with_outliers[i, 0] = random.uniform(0, max_width - 1)
+        pts_with_outliers[i, 1] = random.uniform(0, max_height - 1)
+
+    output = add_gauss(pts_with_outliers, var, max_width, max_height)
+
+    return output
+
+
 def add_gauss_cv_keypoints(points, var, max_width, max_height):
     """
     Add Gaussian noise to 2D points (OpenCV keypoints type).
@@ -148,6 +164,23 @@ def add_gauss_cv_keypoints(points, var, max_width, max_height):
         points[i].pt = (new_x, new_y)
     return points
 
+
+def add_outliers_cv_keypoints(points, var, max_width, max_height, percentage):
+    pts_with_outliers = points.copy()
+    N = len(points)
+
+    sample_list = [i for i in range(N)]
+    sample_list = random.sample(sample_list, int(percentage / 100 * len(sample_list)))
+
+    for i in sample_list:
+        new_x = random.uniform(0, max_width - 1)
+        new_y = random.uniform(0, max_height - 1)
+
+        pts_with_outliers[i].pt = (new_x, new_y)
+
+    output = add_gauss_cv_keypoints(pts_with_outliers, var, max_width, max_height)
+
+    return output
 
 def uniform_point_sample_on_field(x_max, y_max, x_num, y_num):
     """
@@ -350,11 +383,16 @@ if __name__ == '__main__':
 
     # gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
     # test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
-
-    gt = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/gt2.mat", True)
-
-    test = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/30frames rf/3.mat", True)
-
+    #
+    # gt = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/gt2.mat",
+    #                       True)
+    #
+    # test = load_camera_pose(
+    #     "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers/50-keyframe.mat", True)
+    gt = load_camera_pose("C:/graduate_design/dataset/synthesized/synthesize_ground_truth.mat",
+                          True)
+    test = load_camera_pose(
+        "C:/graduate_design/experiment_result/baseline2/synthesized/ptz_ekf_tracking.mat", True)
     error = compute_error_data(test, gt)
 
     print(error)
