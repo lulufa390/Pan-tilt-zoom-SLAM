@@ -82,6 +82,7 @@ def reprojection_error():
             dif = pts - projected_pts
             dif = np.square(dif)
             dif = np.sum(dif, axis=1)
+            dif = np.sqrt(dif)
             m, std = np.mean(dif), np.std(dif)
             return (m, std)
         m1, std1 = mean_std_of_reprojection_error(points, points_h)
@@ -98,14 +99,19 @@ def reprojection_error():
     plt.legend(['homography-based', 'PTZ (ours)'])
     plt.show()
 
+def vis_reprojection_error():
+    data = sio.loadmat('homography_ptz_reprojection_error.mat')
+    error_h = data['reprojection_error_h_mean_std']
+    error_ptz = data['reprojection_error_ptz_mean_std']
 
-
-
+    plt.plot(error_ptz[:,0])
+    plt.show()
 
 
 #rmse()
 #trajectory()
 reprojection_error()
+#vis_reprojection_error()
 
 
 """
