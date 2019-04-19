@@ -9,21 +9,48 @@ elif sys_pf == 'win32':
     matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
 
-data = sio.loadmat('../../dataset/synthesized/synthesize_ground_truth.mat')
+gt_file = '../../dataset/synthesized/synthesize_ground_truth.mat'
+h_file = './gt_6_sequence/merged_estimation/homography-all.mat'
+ptz_file = './gt_6_sequence/merged_estimation/ptz-all.mat'
+
+#gt_file = '../../dataset/synthesized/synthesize_ground_truth.mat'
+#h_file = './homography_vs_ptz_EKF/homography_ekf.mat'
+#ptz_file = './homography_vs_ptz_EKF/ptz_ekf_tracking.mat'
+
+#gt_file = './gt_6_sequence/0-600.mat'
+#h_file = './gt_6_sequence/estimation/homography-0.mat'
+#ptz_file = './gt_6_sequence/estimation/ptz-0.mat'
+
+data = sio.loadmat(gt_file)
 pan_gt = data['pan'].squeeze()
 tilt_gt = data['tilt'].squeeze()
 fl_gt = data['f'].squeeze()
 
-data = sio.loadmat('./homography_vs_ptz_EKF/homography_ekf.mat')
+data = sio.loadmat(h_file)
 pan_h = data['pan'].squeeze()
 tilt_h = data['tilt'].squeeze()
 fl_h = data['f'].squeeze()
 
-data = sio.loadmat('./homography_vs_ptz_EKF/ptz_ekf_tracking.mat')
+data = sio.loadmat(ptz_file)
 pan_ptz = data['pan'].squeeze()
 tilt_ptz = data['tilt'].squeeze()
 fl_ptz = data['f'].squeeze()
 
+def load_data():
+    data = sio.loadmat('../../dataset/synthesized/synthesize_ground_truth.mat')
+    pan_gt = data['pan'].squeeze()
+    tilt_gt = data['tilt'].squeeze()
+    fl_gt = data['f'].squeeze()
+
+    data = sio.loadmat('./homography_vs_ptz_EKF/homography_ekf.mat')
+    pan_h = data['pan'].squeeze()
+    tilt_h = data['tilt'].squeeze()
+    fl_h = data['f'].squeeze()
+
+    data = sio.loadmat('./homography_vs_ptz_EKF/ptz_ekf_tracking.mat')
+    pan_ptz = data['pan'].squeeze()
+    tilt_ptz = data['tilt'].squeeze()
+    fl_ptz = data['f'].squeeze()
 
 def rmse():
     from sklearn.metrics import mean_squared_error
@@ -67,7 +94,7 @@ def reprojection_error():
         camera_ptz.set_ptz((pan_ptz[i], tilt_ptz[i], fl_ptz[i]))
 
         im_w, im_h = 1280, 720
-        point_num = 50
+        point_num = 100
         points = np.zeros((point_num, 2))
         for j in range(point_num):
             points[j][0] = random.randint(0, im_w-1)
@@ -99,19 +126,93 @@ def reprojection_error():
     plt.legend(['homography-based', 'PTZ (ours)'])
     plt.show()
 
-def vis_reprojection_error():
+def vis_reprojection_error_area():
     data = sio.loadmat('homography_ptz_reprojection_error.mat')
-    error_h = data['reprojection_error_h_mean_std']
-    error_ptz = data['reprojection_error_ptz_mean_std']
+    error_h = data['reprojection_error_h_mean_std'][0:600,:]
+    error_ptz = data['reprojection_error_ptz_mean_std'][0:600,:]
 
-    plt.plot(error_ptz[:,0])
+    error_upper = error_h[:,0] + error_h[:,1]
+    error_lower = error_h[:,0] - error_h[:,1]
+
+
+    x = error_h[:,0].tolist()
+    y1 = error_lower.tolist()
+    y2 = error_upper.tolist()
+    print('{} {} {}'.format(len(x), len(y1), len(y2)))
+
+    print('{} {} {}'.format(len(x), len(y1), len(y2)))
+    # Shade the area between y1 and y2
+
+    plt.fill_between(range(600), y1, y2,
+                     facecolor="orange",  # The fill color
+                     color='blue',  # The outline color
+                     alpha=0.2)  # Transparency of the fill
+    plt.plot(x, '-')
+    plt.show()
+
+def vis_reprojection_error_multiple_sequence():
+    data = sio.loadmat('homography_ptz_reprojection_error.mat')
+    error_h = data['reprojection_error_h_mean_std'][:, 0]
+    error_ptz = data['reprojection_error_ptz_mean_std'][:, 0]
+
+    print(error_h.shape)
+    sequence_id = [0, 3,  5]
+    f = plt.figure()
+    colors = ['b', 'g', 'r', 'c', 'm', 'y']
+    for i in range(len(sequence_id)):
+        start_index = sequence_id[i] * 600
+        end_index = start_index + 600
+        error1 = error_h[start_index:end_index]
+        error2 = error_ptz[start_index:end_index]
+
+        plt.plot(error1, '-', color=colors[i])
+        plt.plot(error2, '-.', color=colors[i], dashes=(5, 10))
+
+    plt.legend(['H-s1', 'PTZ-s1 (ours)','H-s2', 'PTZ-s2 (ours)','H-s3', 'PTZ-s3 (ours)'])
+    plt.xlim([0, 600])
+    plt.ylim([0, 10])
+    plt.xlabel('Frame number')
+    plt.ylabel('Reprojection error (pixels)')
+    plt.show()
+
+def vis_reprojection_error_multiple_sequence_subplot():
+    data = sio.loadmat('homography_ptz_reprojection_error.mat')
+    error_h = data['reprojection_error_h_mean_std'][:, 0]
+    error_ptz = data['reprojection_error_ptz_mean_std'][:, 0]
+
+    print(error_h.shape)
+    sequence_id = [0, 1, 2, 3, 4, 5]
+    f = plt.figure(figsize=(12, 6))
+
+    for i in range(6):
+        plt.subplot(2, 3, i+1)
+
+        start_index = sequence_id[i] * 600
+        end_index = start_index + 600
+        error1 = error_h[start_index:end_index]
+        error2 = error_ptz[start_index:end_index]
+
+        plt.plot(error1, color='b')
+        plt.plot(error2, color='r')
+
+        plt.xlim([0, 600])
+        plt.ylim([0, 3])
+        plt.legend(['Homography-based', 'PTZ (ours)'])
+        plt.xlabel('Frame number')
+        if i == 0 or i == 3:
+            plt.ylabel('Reprojection error (pixels)')
+
+    plt.subplots_adjust(hspace=0.25)
+    plt.savefig('homography_vs_ptz_synthetic.pdf', bbox_inches='tight')
     plt.show()
 
 
 #rmse()
 #trajectory()
-reprojection_error()
-#vis_reprojection_error()
+#reprojection_error()
+#vis_reprojection_error_area()
+#vis_reprojection_error_multiple_sequence()
+vis_reprojection_error_multiple_sequence_subplot()
 
 
 """
