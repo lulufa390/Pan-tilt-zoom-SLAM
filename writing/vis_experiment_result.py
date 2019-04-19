@@ -10,8 +10,8 @@ elif sys_pf == 'win32':
 import matplotlib.pyplot as plt
 
 gt_file = '../../dataset/synthesized/synthesize_ground_truth.mat'
-h_file = './gt_6_sequence/merged_estimation/homography-all.mat'
-ptz_file = './gt_6_sequence/merged_estimation/ptz-all.mat'
+h_file = './synthetic/homography_vs_ptz/homography-all.mat'
+ptz_file = './synthetic/homography_vs_ptz/ptz-all.mat'
 
 #gt_file = '../../dataset/synthesized/synthesize_ground_truth.mat'
 #h_file = './homography_vs_ptz_EKF/homography_ekf.mat'
@@ -69,6 +69,15 @@ def trajectory():
     plt.legend(['ground truth', 'homography', 'PTZ'])
     plt.show()
 
+
+def mean_std_of_reprojection_error(pts, projected_pts):
+    dif = pts - projected_pts
+    dif = np.square(dif)
+    dif = np.sum(dif, axis=1)
+    dif = np.sqrt(dif)
+    m, std = np.mean(dif), np.std(dif)
+    return (m, std)
+
 def reprojection_error():
     import sys
     sys.path
@@ -105,13 +114,7 @@ def reprojection_error():
         points_h, _ = camera_h.project_rays(rays)
         points_ptz, _ = camera_ptz.project_rays(rays)
 
-        def mean_std_of_reprojection_error(pts, projected_pts):
-            dif = pts - projected_pts
-            dif = np.square(dif)
-            dif = np.sum(dif, axis=1)
-            dif = np.sqrt(dif)
-            m, std = np.mean(dif), np.std(dif)
-            return (m, std)
+
         m1, std1 = mean_std_of_reprojection_error(points, points_h)
         m2, std2 = mean_std_of_reprojection_error(points, points_ptz)
         #print('{} {} {} {}'.format(m1, std1, m2, std2))
@@ -207,12 +210,137 @@ def vis_reprojection_error_multiple_sequence_subplot():
     plt.show()
 
 
+def compute_relocalization_projection_error():
+    import sys
+    sys.path
+    sys.path.append('../slam_system')
+    import copy
+    import random
+    from sequence_manager import SequenceManager
+    sequence = SequenceManager(annotation_path="../../dataset/basketball/synthetic/ground_truth.mat",
+                               image_path="../../dataset/synthesized/images")
+    base_camera = sequence.camera
+
+    data_folder = './synthetic/relocalization/'
+    keyframe_names = ['keyframe-{}.mat'.format(i) for i in range(10, 60, 10)]
+    rf_names = ['rf-{}.mat'.format(i) for i in range(10, 60, 10)]
+
+    def load_ptz(file_name):
+        data = sio.loadmat(file_name)
+        pan = data['pan'].squeeze()
+        tilt = data['tilt'].squeeze()
+        fl = data['f'].squeeze()
+
+        pan = np.reshape(pan, (-1, 1))
+        tilt = np.reshape(tilt, (-1, 1))
+        fl = np.reshape(fl, (-1, 1))
+        return np.hstack((pan, tilt, fl))
+
+    gt_ptz = load_ptz(data_folder + 'relocalization_gt.mat')
+    n = len(keyframe_names)
+
+    def compute_angular_error(gt_ptz, pred_ptz):
+        dif = gt_ptz - pred_ptz
+        dif = dif[:, 0:2]
+        dif = np.square(dif)
+        dif = np.sum(dif, axis=1)
+        errors = np.sqrt(dif)
+        return errors
+
+    threshold = 2.0
+
+    for i in range(n):
+        # for each outlier level
+        keyframe_ptz = load_ptz(data_folder + keyframe_names[i])
+        rf_ptz = load_ptz(data_folder + rf_names[i])
+
+        num_camera = gt_ptz.shape[0]
+
+        keyframe_angular_errors = compute_angular_error(gt_ptz, keyframe_ptz)
+        rf_angular_errors = compute_angular_error(gt_ptz, rf_ptz)
+        #print(np.where(keyframe_angular_errors < threshold)[0].shape[0])
+        p1 = np.where(keyframe_angular_errors < threshold)[0].shape[0] /num_camera
+        p2 = np.where(rf_angular_errors < threshold)[0].shape[0] /num_camera
+
+
+        camera_gt = copy.deepcopy(base_camera)
+        camera_keyframe = copy.deepcopy(base_camera)
+        camera_rf = copy.deepcopy(base_camera)
+
+        # sample rays from image space
+        im_w, im_h = 1280, 720
+        point_num = 50
+
+
+        keyframe_reprojection_error = np.zeros(num_camera)
+        ours_reprojection_error = np.zeros(num_camera)
+        for j in range(num_camera):
+            cur_gt_ptz = gt_ptz[j]
+            cur_keyframe_ptz = keyframe_ptz[j]
+            cur_rf_ptz = rf_ptz[j]
+            #print('PTZ parameter: {} {} {}'.format(cur_gt_ptz, cur_keyframe_ptz, cur_rf_ptz))
+
+            camera_gt.set_ptz((cur_gt_ptz[0], cur_gt_ptz[1], cur_gt_ptz[2]))
+            camera_keyframe.set_ptz((cur_keyframe_ptz[0], cur_keyframe_ptz[1], cur_keyframe_ptz[2]))
+            camera_rf.set_ptz((cur_rf_ptz[0], cur_rf_ptz[1], cur_rf_ptz[2]))
+
+            points = np.zeros((point_num, 2))
+            for k in range(point_num):
+                points[k][0] = random.randint(0, im_w - 1)
+                points[k][1] = random.randint(0, im_h - 1)
+
+            rays = camera_gt.back_project_to_rays(points)
+
+            points_keyframe, _ = camera_keyframe.project_rays(rays)
+            points_rf, _ = camera_rf.project_rays(rays)
+
+            m1, std1 = mean_std_of_reprojection_error(points, points_keyframe)
+            m2, std2 = mean_std_of_reprojection_error(points, points_rf)
+            keyframe_reprojection_error[j] = m1
+            ours_reprojection_error[j] = m2
+
+        print('outlier percentage: {}'.format((i+1)*10))
+        print('mean: keyframe: {}, ours: {}'.format(np.mean(keyframe_reprojection_error), np.mean(ours_reprojection_error)))
+        print('std: keyframe: {}, ours: {}'.format(np.std(keyframe_reprojection_error),
+                                                    np.std(ours_reprojection_error)))
+        print('correct relocalization: keyframe: {}, ours: {}'.format(p1, p2))
+        #print('std {} {}'.format(np.std(keyframe_reprojection_error_mean), np.std(ours_reprojection_error_mean)))
+
+
+
+
+
+
+
+
+
 #rmse()
 #trajectory()
 #reprojection_error()
 #vis_reprojection_error_area()
 #vis_reprojection_error_multiple_sequence()
-vis_reprojection_error_multiple_sequence_subplot()
+#vis_reprojection_error_multiple_sequence_subplot()
+
+"""
+data_folder = './synthetic/relocalization/'
+
+data = sio.loadmat(data_folder + 'keyframe-10.mat')
+pan1 = data['pan']
+
+data = sio.loadmat(data_folder + 'rf-10.mat')
+pan2 = data['pan']
+
+data = sio.loadmat(data_folder + 'relocalization_gt.mat')
+pan3 = data['pan']
+
+dif1 = pan3 - pan1
+dif2 = pan3 - pan2
+print(dif1.shape)
+print(np.mean(np.abs(dif1)))
+"""
+
+
+compute_relocalization_projection_error()
 
 
 """
