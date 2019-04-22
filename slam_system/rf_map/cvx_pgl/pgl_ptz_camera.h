@@ -80,6 +80,11 @@ namespace cvx_pgl {
     // pan, tilt: degree
     Eigen::Matrix3d matrixFromPanYTiltX(double pan, double tilt);
     
+    Eigen::Matrix3d matrixFromPanY(double pan);
+    
+    Eigen::Matrix3d matrixFromTiltX(double tilt);
+    
+    // ptz: ptz of the camera
     Eigen::Vector2d point2PanTilt(const Eigen::Vector2d& pp,
                                   const Eigen::Vector3d& ptz,
                                   const Eigen::Vector2d& point);

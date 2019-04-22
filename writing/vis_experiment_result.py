@@ -25,6 +25,8 @@ data = sio.loadmat(gt_file)
 pan_gt = data['pan'].squeeze()
 tilt_gt = data['tilt'].squeeze()
 fl_gt = data['f'].squeeze()
+ptz_gt = np.hstack((pan_gt.reshape(-1, 1), tilt_gt.reshape(-1, 1), fl_gt.reshape(-1, 1)))
+
 
 data = sio.loadmat(h_file)
 pan_h = data['pan'].squeeze()
@@ -35,6 +37,7 @@ data = sio.loadmat(ptz_file)
 pan_ptz = data['pan'].squeeze()
 tilt_ptz = data['tilt'].squeeze()
 fl_ptz = data['f'].squeeze()
+
 
 def load_data():
     data = sio.loadmat('../../dataset/synthesized/synthesize_ground_truth.mat')
@@ -77,6 +80,41 @@ def mean_std_of_reprojection_error(pts, projected_pts):
     dif = np.sqrt(dif)
     m, std = np.mean(dif), np.std(dif)
     return (m, std)
+
+def compute_velocity(ptz):
+    # approximate angle from pan and tilt
+    pan_tilt = ptz[:,0:2]
+    pan_tilt = np.square(pan_tilt)
+    pan_tilt = np.sum(pan_tilt, axis=1)
+    angles = np.sqrt(pan_tilt)
+    velocity = np.diff(angles)
+    velocity = np.abs(velocity)
+    m1, m2 = np.mean(velocity), np.median(velocity)
+    return m1, m2
+
+def computer_ground_truth_velocity():
+    def compute_velocity(ptz):
+        # approximate angle from pan and tilt
+        pan_tilt = ptz[:,0:2]
+        pan_tilt = np.square(pan_tilt)
+        pan_tilt = np.sum(pan_tilt, axis=1)
+        angles = np.sqrt(pan_tilt)
+        velocity = np.diff(angles)
+        velocity = np.abs(velocity)
+        m1, m2 = np.mean(velocity), np.median(velocity)
+        return m1, m2
+
+    #pan_ptz = data['pan'].squeeze()
+    #tilt_ptz = data['tilt'].squeeze()
+    #fl_ptz = data['f'].squeeze()
+    for i in range(6):
+        start_index = i * 600
+        end_index = start_index + 600
+        cur_ptz = ptz_gt[start_index:end_index]
+        m1, m2 = compute_velocity(cur_ptz)
+        print('velocity {} {}'.format(m1*60, m2*60))
+
+
 
 def reprojection_error():
     import sys
@@ -188,12 +226,24 @@ def vis_reprojection_error_multiple_sequence_subplot():
     f = plt.figure(figsize=(12, 6))
 
     for i in range(6):
+
+
+        start_index = i * 600
+        end_index = start_index + 600
+        cur_ptz = ptz_gt[start_index:end_index]
+        m1, m2 = compute_velocity(cur_ptz)
+        print('velocity {}'.format(m1 * 60))
+
         plt.subplot(2, 3, i+1)
 
         start_index = sequence_id[i] * 600
         end_index = start_index + 600
         error1 = error_h[start_index:end_index]
         error2 = error_ptz[start_index:end_index]
+
+        print('reprojeciton error, mean median max :')
+        print('homography-based {} {} {}'.format(np.mean(error1), np.median(error1), np.max(error1)))
+        print('ours             {} {} {}'.format(np.mean(error2), np.median(error2), np.max(error2)))
 
         plt.plot(error1, color='b')
         plt.plot(error2, color='r')
@@ -247,12 +297,15 @@ def compute_relocalization_projection_error():
         errors = np.sqrt(dif)
         return errors
 
+
     threshold = 2.0
 
     for i in range(n):
+
         # for each outlier level
         keyframe_ptz = load_ptz(data_folder + keyframe_names[i])
         rf_ptz = load_ptz(data_folder + rf_names[i])
+
 
         num_camera = gt_ptz.shape[0]
 
@@ -304,14 +357,18 @@ def compute_relocalization_projection_error():
         print('std: keyframe: {}, ours: {}'.format(np.std(keyframe_reprojection_error),
                                                     np.std(ours_reprojection_error)))
         print('correct relocalization: keyframe: {}, ours: {}'.format(p1, p2))
-        #print('std {} {}'.format(np.std(keyframe_reprojection_error_mean), np.std(ours_reprojection_error_mean)))
 
 
+def plot_gt_ptz():
+    f = plt.figure()
 
-
-
-
-
+    plt.plot(pan_ptz)
+    #plt.plot(tilt_gt)
+    plt.xlabel('Frame numbers')
+    plt.ylabel('Pan angle (degrees)')
+    plt.xlim([0,3600])
+    plt.savefig('pan_pred.pdf', bbox_inches='tight')
+    plt.show()
 
 
 #rmse()
@@ -321,26 +378,11 @@ def compute_relocalization_projection_error():
 #vis_reprojection_error_multiple_sequence()
 #vis_reprojection_error_multiple_sequence_subplot()
 
-"""
-data_folder = './synthetic/relocalization/'
 
-data = sio.loadmat(data_folder + 'keyframe-10.mat')
-pan1 = data['pan']
+#computer_ground_truth_velocity()
 
-data = sio.loadmat(data_folder + 'rf-10.mat')
-pan2 = data['pan']
-
-data = sio.loadmat(data_folder + 'relocalization_gt.mat')
-pan3 = data['pan']
-
-dif1 = pan3 - pan1
-dif2 = pan3 - pan2
-print(dif1.shape)
-print(np.mean(np.abs(dif1)))
-"""
-
-
-compute_relocalization_projection_error()
+#compute_relocalization_projection_error()
+plot_gt_ptz()
 
 
 """

@@ -31,15 +31,18 @@ namespace EigenX {
     // point_pan_tilt: pan and tilt of this point
     // assumption: the image is from a PTZ camera
     // O(1)
+    /*
     void pointPanTilt(const Eigen::Vector2f& pp,
                       const Eigen::Vector3f& pan_tilt_focal_length,
                       const Eigen::Vector2f& point,
                       Eigen::Vector2f& point_pan_tilt);
     
+    
     void pointPanTilt(const Eigen::Vector2d& pp,
                       const Eigen::Vector3d& pan_tilt_focal_length,
                       const Eigen::Vector2d& point,
                       Eigen::Vector2d& point_pan_tilt);
+     */
     
     
     // calculate pan, tilt and focal length from two (estimated) pan, tilt and zooms

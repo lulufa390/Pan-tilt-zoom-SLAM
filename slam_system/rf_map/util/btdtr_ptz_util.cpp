@@ -9,6 +9,7 @@
 #include "btdtr_ptz_util.h"
 #include "mat_io.hpp"
 #include "eigen_geometry_util.h"
+#include "pgl_ptz_camera.h"
 
 namespace btdtr_ptz_util {
 PTZTreeParameter::PTZTreeParameter()
@@ -173,7 +174,8 @@ static bool readSIFTLocationAndDescriptors(const char *mat_file,
         assert(locations.size() == descriptors.size());
         return true;
     }
-    
+
+    /*
 void generatePTZTraingSample(const char* feature_file_name,
                        const Eigen::Vector2f& pp,
                        const Eigen::Vector3f& ptz,
@@ -197,6 +199,7 @@ void generatePTZTraingSample(const char* feature_file_name,
         samples.push_back(s);
     }
 }
+     */
     
     void generatePTZSampleWithFeature(const char * feature_ptz_file_name,
                                       const Eigen::Vector2f& pp,
@@ -210,10 +213,19 @@ void generatePTZTraingSample(const char* feature_file_name,
         readPTZFeatureLocationAndDescriptors(feature_ptz_file_name, ptz, locations, features);
         for (int i = 0; i<locations.size(); i++) {
             PTZTrainingSample s;
-            Eigen::Vector2f pan_tilt;
+            
             s.loc_[0] = locations[i][0];
             s.loc_[1] = locations[i][1];
-            EigenX::pointPanTilt(pp, ptz, s.loc_, pan_tilt);
+            //EigenX::pointPanTilt(pp, ptz, s.loc_, pan_tilt);
+            /*
+            Eigen::Vector2d point2PanTilt(const Eigen::Vector2d& pp,
+                                          const Eigen::Vector3d& ptz,
+                                          const Eigen::Vector2d& point);
+             */
+            Eigen::Vector2d pan_tilt = cvx_pgl::point2PanTilt(pp.cast<double>(),
+                                                              ptz.cast<double>(),
+                                                              s.loc_.cast<double>());
+            
             s.pan_tilt_[0] = pan_tilt[0];
             s.pan_tilt_[1] = pan_tilt[1];
             s.descriptor_ = features[i];

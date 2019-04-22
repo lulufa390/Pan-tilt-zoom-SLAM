@@ -69,6 +69,7 @@ namespace EigenX {
         return true;
     }
     
+    /*
     void pointPanTilt(const Eigen::Vector2f& pp,
                       const Eigen::Vector3f& ptz,
                       const Eigen::Vector2f& point,
@@ -83,6 +84,7 @@ namespace EigenX {
         point_pan_tilt[1] = ptz[1] - delta_tilt; // oppositive direction of y
     }
     
+        
     void pointPanTilt(const Eigen::Vector2d& pp,
                       const Eigen::Vector3d& ptz,
                       const Eigen::Vector2d& point,
@@ -96,6 +98,7 @@ namespace EigenX {
         point_pan_tilt[0] = ptz[0] + delta_pan;
         point_pan_tilt[1] = ptz[1] - delta_tilt; // oppositive direction of y        
     }
+     */
 
     static Eigen::Matrix3f matrixFromPanYTiltX(double pan, double tilt)
     {

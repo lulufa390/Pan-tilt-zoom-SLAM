@@ -261,23 +261,30 @@ namespace cvx_pgl  {
     
     Eigen::Matrix3d matrixFromPanYTiltX(double pan, double tilt)
     {
-        Eigen::Matrix3d m;
+        Eigen::Matrix3d r_pan = matrixFromPanY(pan);
+        Eigen::Matrix3d r_tilt = matrixFromTiltX(tilt);
         
-        pan  *= M_PI / 180.0;
-        tilt *= M_PI / 180.0;
-        
-        Eigen::Matrix3d R_tilt;
-        R_tilt(0 ,0) = 1;   R_tilt(0, 1) = 0;          R_tilt(0, 2) = 0;
-        R_tilt(1, 0) = 0;   R_tilt(1, 1) = cos(tilt);  R_tilt(1, 2) = sin(tilt);
-        R_tilt(2, 0) = 0;   R_tilt(2, 1) = -sin(tilt);  R_tilt(2, 2) = cos(tilt);
-        
+        return r_tilt * r_pan;
+    }
+    
+    Eigen::Matrix3d matrixFromPanY(double pan)
+    {
         Eigen::Matrix3d R_pan;
+        pan  *= M_PI / 180.0;
         R_pan(0, 0) = cos(pan);   R_pan(0, 1) = 0;   R_pan(0, 2) = -sin(pan);
         R_pan(1, 0) = 0;          R_pan(1, 1) = 1;   R_pan(1, 2) = 0;
         R_pan(2, 0) = sin(pan);   R_pan(2, 1) = 0;   R_pan(2, 2) = cos(pan);
-        
-        m = R_tilt * R_pan;
-        return m;
+        return R_pan;
+    }
+    
+    Eigen::Matrix3d matrixFromTiltX(double tilt)
+    {
+        Eigen::Matrix3d R_tilt;
+        tilt *= M_PI / 180.0;
+        R_tilt(0 ,0) = 1;   R_tilt(0, 1) = 0;          R_tilt(0, 2) = 0;
+        R_tilt(1, 0) = 0;   R_tilt(1, 1) = cos(tilt);  R_tilt(1, 2) = sin(tilt);
+        R_tilt(2, 0) = 0;   R_tilt(2, 1) = -sin(tilt);  R_tilt(2, 2) = cos(tilt);
+        return R_tilt;
     }
     
     Eigen::Vector2d point2PanTilt(const Eigen::Vector2d& pp,
@@ -285,6 +292,7 @@ namespace cvx_pgl  {
                                   const Eigen::Vector2d& point)
     
     {
+        /*
         Eigen::Vector2d point_pan_tilt;
         double dx = point.x() - pp.x();
         double dy = point.y() - pp.y();
@@ -294,12 +302,37 @@ namespace cvx_pgl  {
         point_pan_tilt[0] = ptz[0] + delta_pan;
         point_pan_tilt[1] = ptz[1] - delta_tilt; // oppositive direction of y
         return point_pan_tilt;
+         */
+        Eigen::Vector2d point_pan_tilt;
+        double pan = ptz[0];
+        double tilt = ptz[1];
+        double fl = ptz[2];
+        
+        Eigen::Matrix3d K;
+        K.setIdentity();
+        K(0 ,0) = K(1, 1) = fl;
+        K(0, 2) = pp[0];
+        K(1, 2) = pp[1];
+        Eigen::Matrix3d K_inv = K.inverse();
+        Eigen::Matrix3d r_pan_inv = matrixFromPanY(pan).inverse();
+        Eigen::Matrix3d r_tilt_inv = matrixFromTiltX(tilt).inverse();
+        Eigen::Vector3d p(point[0], point[1], 1);
+        p = r_pan_inv * r_tilt_inv * K_inv * p;
+        
+        double point_pan = atan(p[0]/p[2]);
+        double point_tilt = atan(-p[1]/sqrt(p[0]*p[0] + p[2]*p[2]));
+        
+        point_pan_tilt[0] = point_pan * 180.0 /M_PI;
+        point_pan_tilt[1] = point_tilt * 180.0/M_PI;
+        
+        return point_pan_tilt;
     }
     
     Eigen::Vector2d panTilt2Point(const Eigen::Vector2d& pp,
                                   const Eigen::Vector3d& ptz,
                                   const Eigen::Vector2d& point_pan_tilt)
     {
+        /*
         double delta_pan  = (point_pan_tilt[0] - ptz[0]) * M_PI/180.0;
         double delta_tilt = (point_pan_tilt[1] - ptz[1]) * M_PI/180.0;
         double fl = ptz[2];
@@ -307,6 +340,31 @@ namespace cvx_pgl  {
         double delta_y = fl * tan(delta_tilt);
         
         Eigen::Vector2d point(pp.x() + delta_x, pp.y() - delta_y); // oppositive direction of y
+         */
+        Eigen::Vector2d point;
+        double pan = ptz[0];
+        double tilt = ptz[1];
+        double fl = ptz[2];
+        
+        Eigen::Matrix3d K;
+        K.setIdentity();
+        K(0 ,0) = K(1, 1) = fl;
+        K(0, 2) = pp[0];
+        K(1, 2) = pp[1];
+        Eigen::Matrix3d r_pan = matrixFromPanY(pan);
+        Eigen::Matrix3d r_tilt = matrixFromTiltX(tilt);
+        
+        pan *= M_PI / 180.0;
+        tilt *= M_PI/180.0;
+        Eigen::Vector3d p;
+        p[0] = tan(pan);
+        p[1] = -tan(tilt)/sqrt(p[0] * p[0] + 1);
+        p[2] = 1;
+        
+        p = K * r_tilt * r_pan * p;
+        assert(p[2] != 0);
+        point[0] = p[0]/p[2];
+        point[1] = p[1]/p[2];
         return point;
     }
     
