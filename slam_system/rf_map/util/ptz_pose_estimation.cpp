@@ -112,9 +112,9 @@ namespace ptz_pose_opt {
         
         // step 1: sample hyperthesis
         vector<Hypothesis> hypotheses;
-        //Hypothesis hp;
-        //hp.ptz_ = ptz;
-        //hypotheses.push_back(hp);
+        Hypothesis hp;
+        hp.ptz_ = ptz;
+        hypotheses.push_back(hp);
         for (int i = 0; i<num_iteration; i++) {
             int k1 = 0;
             int k2 = 0;
