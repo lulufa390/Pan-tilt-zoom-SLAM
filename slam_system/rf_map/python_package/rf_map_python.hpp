@@ -44,7 +44,7 @@ extern "C" {
     
     // relocalize a camera using the model
     // parameter_file: testing parameter
-    // pan_tilt_zoom: output
+    // pan_tilt_zoom: input and output, input as intial camera pose
 	EXPORTIT void relocalizeCamera(const char* model_name,
                                    const char* feature_location_file_name,
                                    const char* test_parameter_file,

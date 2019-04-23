@@ -133,9 +133,25 @@ def ut_relocalization():
     gt_ptz = data['ptz']
     print('ground truth ptz is {}'.format(gt_ptz))
 
+def rf_debug():
+    rf_map = RFMap('debug.txt')
+
+    if system == "Windows":
+        tree_param_file = 'C:/graduate_design/random_forest/two_point_method_world_cup_dataset/ptz_tree_param.txt'
+        featue_label_files = 'C:/graduate_design/random_forest/two_point_method_world_cup_dataset/train_feature_file.txt'
+    else:
+        tree_param_file = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/ptz_tree_param.txt'
+        featue_label_files = '/Users/jimmy/Code/ptz_slam/dataset/two_point_method_world_cup_dataset/train_feature_file.txt'
+
+    for i in range(1):
+        rf_map.createMap(featue_label_files, tree_param_file)
+
+
+
 if __name__ == '__main__':
     #ut_create_map()
     #ut_relocalization()
 
-    ut_build_map()
+    #ut_build_map()
+    rf_debug()
 

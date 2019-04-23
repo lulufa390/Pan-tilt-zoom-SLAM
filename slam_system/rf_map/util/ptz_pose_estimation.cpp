@@ -79,8 +79,13 @@ namespace ptz_pose_opt {
     {
         vector<vector<Eigen::Vector2d> > image_pts(input_pan_tilt.size());
         for (int i = 0; i<input_pan_tilt.size(); i++) {
+            
             for (int j = 0; j<input_pan_tilt[i].size(); j++) {
                 Eigen::Vector2d point = cvx_pgl::panTilt2Point(pp, ptz, input_pan_tilt[i][j]);
+                if (j == 0) {
+                    //cout<<"pan tilt    is "<<input_pan_tilt[i][0].transpose()<<endl;
+                    //cout<<"projection is "<<point.transpose()<<endl;
+                }
                 image_pts[i].push_back(point);
             }
         }
@@ -99,7 +104,7 @@ namespace ptz_pose_opt {
             return false;
         }
         
-        const int num_iteration = 1024;
+        const int num_iteration = 1024; // 1024
         const int K = 512;
         const int N = (int)image_points.size();
         const int B = param.sample_number_;
@@ -107,6 +112,9 @@ namespace ptz_pose_opt {
         
         // step 1: sample hyperthesis
         vector<Hypothesis> hypotheses;
+        //Hypothesis hp;
+        //hp.ptz_ = ptz;
+        //hypotheses.push_back(hp);
         for (int i = 0; i<num_iteration; i++) {
             int k1 = 0;
             int k2 = 0;
@@ -119,13 +127,12 @@ namespace ptz_pose_opt {
             const Eigen::Vector2d pan_tilt2 = candidate_pan_tilt[k2][0];
             const Eigen::Vector2d point1 = image_points[k1];
             const Eigen::Vector2d point2 = image_points[k2];
-            Eigen::Vector3d ptz;            
+            Eigen::Vector3d cur_ptz;
             
-            
-            bool is_valid = EigenX::ptzFromTwoPoints(pan_tilt1, pan_tilt2, point1, point2, pp, ptz);
+            bool is_valid = EigenX::ptzFromTwoPoints(pan_tilt1, pan_tilt2, point1, point2, pp, cur_ptz);
             if (is_valid) {
                 Hypothesis hp;
-                hp.ptz_ = ptz;
+                hp.ptz_ = cur_ptz;
                 hypotheses.push_back(hp);
             }
             else {
@@ -146,8 +153,8 @@ namespace ptz_pose_opt {
         }
         
         if (hypotheses.size() < K/4) {
-            printf("Error: not enough hypotheses %lu vs %d.\n", hypotheses.size(), K/4);
-            return false;
+            printf("Warning: not enough hypotheses %lu vs %d.\n", hypotheses.size(), K/4);
+            //return false;
         }
         
         // step 2: optimize pan, tilt, focal length
@@ -170,11 +177,13 @@ namespace ptz_pose_opt {
                 
                 // check minimum distance from projected points to image coordinate
                 for (int j = 0; j<projected_pan_tilt.size(); j++) {
+                    //cout<<"projected location "<<projected_pan_tilt[j][0].transpose()<<endl;
                     double min_dis = threshold * 2;
                     int min_index = -1;
                     for (int k = 0; k<projected_pan_tilt[j].size(); k++) {
                         Eigen::Vector2d dif = sampled_image_pts[j] - projected_pan_tilt[j][k];
                         double dis = dif.norm();
+                        //printf("distance is %lf\n", dis);
                         if (dis < min_dis) {
                             min_dis = dis;
                             min_index = k;
@@ -217,6 +226,9 @@ namespace ptz_pose_opt {
                     if (hypotheses.size() == 1 && verbose) {
                         printf("hypotheses rank %lu, reprojection error %f pixels\n", hypotheses.size(), reprojection_error);
                     }
+                }
+                else {
+                    //printf("Warning: inlier number is too small %lu \n", hypotheses[i].inlier_indices_.size());
                 }
             }
         }

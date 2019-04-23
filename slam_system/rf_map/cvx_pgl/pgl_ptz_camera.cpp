@@ -341,31 +341,32 @@ namespace cvx_pgl  {
         
         Eigen::Vector2d point(pp.x() + delta_x, pp.y() - delta_y); // oppositive direction of y
          */
-        Eigen::Vector2d point;
+        Eigen::Vector2d out_point;
+        Eigen::Vector3d p;
+        double point_pan = point_pan_tilt[0];
+        double point_tilt = point_pan_tilt[1];
+        point_pan *= M_PI / 180.0;
+        point_tilt *= M_PI/180.0;
+        p[0] = tan(point_pan);
+        p[1] = -tan(point_tilt)/sqrt(p[0] * p[0] + 1);
+        p[2] = 1;
+        
         double pan = ptz[0];
         double tilt = ptz[1];
         double fl = ptz[2];
-        
         Eigen::Matrix3d K;
         K.setIdentity();
         K(0 ,0) = K(1, 1) = fl;
         K(0, 2) = pp[0];
         K(1, 2) = pp[1];
         Eigen::Matrix3d r_pan = matrixFromPanY(pan);
-        Eigen::Matrix3d r_tilt = matrixFromTiltX(tilt);
-        
-        pan *= M_PI / 180.0;
-        tilt *= M_PI/180.0;
-        Eigen::Vector3d p;
-        p[0] = tan(pan);
-        p[1] = -tan(tilt)/sqrt(p[0] * p[0] + 1);
-        p[2] = 1;
+        Eigen::Matrix3d r_tilt = matrixFromTiltX(tilt);        
         
         p = K * r_tilt * r_pan * p;
         assert(p[2] != 0);
-        point[0] = p[0]/p[2];
-        point[1] = p[1]/p[2];
-        return point;
+        out_point[0] = p[0]/p[2];
+        out_point[1] = p[1]/p[2];
+        return out_point;
     }
     
     struct SphericalPanTiltFunctor

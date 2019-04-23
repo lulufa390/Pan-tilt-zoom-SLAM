@@ -136,7 +136,7 @@ extern "C" {
         
         vector<Eigen::Vector2d> image_points;
         vector<vector<Eigen::Vector2d> > candidate_pan_tilt;
-        Eigen::Vector3d estimated_ptz(0, 0, 0);        
+        Eigen::Vector3d estimated_ptz(pan_tilt_zoom[0], pan_tilt_zoom[1], pan_tilt_zoom[2]);
         // predict from observation (descriptors)
         double tt = clock();
         for (int j = 0; j<samples.size(); j++) {
@@ -157,11 +157,14 @@ extern "C" {
                         cur_candidate.push_back(Eigen::Vector2d(cur_predictions[k][0], cur_predictions[k][1]));
                     }
                 }
+                //printf("min feature distance is %lf\n", cur_dists[0]);
                 candidate_pan_tilt.push_back(cur_candidate);
             }
         }
+        printf("candidate point number %lu\n", candidate_pan_tilt.size());
         // estimate camera pose
-        bool is_opt = ptz_pose_opt::preemptiveRANSACOneToMany(image_points, candidate_pan_tilt, pp.cast<double>(),
+        bool is_opt = ptz_pose_opt::preemptiveRANSACOneToMany(image_points, candidate_pan_tilt,
+                                                              pp.cast<double>(),
                                                               ransac_param, estimated_ptz, false);
         printf("Prediction and camera pose estimation cost time: %f seconds.\n", (clock() - tt)/CLOCKS_PER_SEC);
         if (!is_opt) {

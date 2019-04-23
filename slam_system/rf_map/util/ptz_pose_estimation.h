@@ -36,7 +36,7 @@ namespace ptz_pose_opt {
     // candidate_pan_tilt: corresonding pan, tilt in camera coordinate, have outliers, multiple choices
     // param: RANSAC parameter
     // principal_point: image center
-    // ptz: output, camera pan, tilt and focal length
+    // ptz: input and output, camera pan, tilt and focal length
     bool preemptiveRANSACOneToMany(const vector<Eigen::Vector2d> & image_points,
                                    const vector<vector<Eigen::Vector2d> > & candidate_pan_tilt,
                                    const Eigen::Vector2d& principal_point,

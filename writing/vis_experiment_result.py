@@ -222,17 +222,15 @@ def vis_reprojection_error_multiple_sequence_subplot():
     error_ptz = data['reprojection_error_ptz_mean_std'][:, 0]
 
     print(error_h.shape)
-    sequence_id = [0, 1, 2, 3, 4, 5]
+    #sequence_id = [0, 1, 2, 3, 4, 5]
+    sequence_id = [2, 3, 1, 0, 5, 4]
+
     f = plt.figure(figsize=(12, 6))
 
     for i in range(6):
 
-
-        start_index = i * 600
-        end_index = start_index + 600
-        cur_ptz = ptz_gt[start_index:end_index]
-        m1, m2 = compute_velocity(cur_ptz)
-        print('velocity {}'.format(m1 * 60))
+        #start_index = i * 600
+        #end_index = start_index + 600
 
         plt.subplot(2, 3, i+1)
 
@@ -251,12 +249,13 @@ def vis_reprojection_error_multiple_sequence_subplot():
         plt.xlim([0, 600])
         plt.ylim([0, 3])
         plt.legend(['Homography-based', 'PTZ (ours)'])
-        plt.xlabel('Frame number')
+        if i == 3 or i == 4 or i == 5:
+            plt.xlabel('Frame number')
         if i == 0 or i == 3:
             plt.ylabel('Reprojection error (pixels)')
 
     plt.subplots_adjust(hspace=0.25)
-    plt.savefig('homography_vs_ptz_synthetic.pdf', bbox_inches='tight')
+    plt.savefig('homography_vs_ptz_synthetic_2.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -370,6 +369,23 @@ def plot_gt_ptz():
     plt.savefig('pan_pred.pdf', bbox_inches='tight')
     plt.show()
 
+def vis_rf_keyframe():
+    import PIL.Image as Image
+    data = sio.loadmat('/Users/jimmy/Desktop/basketball_standard_rf/keyframes/682.mat')
+    print(data.keys())
+
+
+    im_name = '/Users/jimmy/Code/ptz_slam/dataset/basketball/seq1/images/00084682.jpg'
+    im = Image.open(im_name)
+
+    points = data['keypoint']
+    print(points.shape)
+
+    f = plt.figure()
+    plt.imshow(im)
+    plt.plot(points[:, 0], points[:, 1], '*')
+    plt.show()
+
 
 #rmse()
 #trajectory()
@@ -378,11 +394,12 @@ def plot_gt_ptz():
 #vis_reprojection_error_multiple_sequence()
 #vis_reprojection_error_multiple_sequence_subplot()
 
-
 #computer_ground_truth_velocity()
 
 #compute_relocalization_projection_error()
-plot_gt_ptz()
+#plot_gt_ptz()
+
+vis_rf_keyframe()
 
 
 """
