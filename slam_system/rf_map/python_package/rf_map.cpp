@@ -116,6 +116,14 @@ EXPORTIT void RFMap_delete(RFMap* rf_map)
     rf_map = nullptr;
 }
 
+EXPORTIT void relocalizeCamera(RFMap* rf_map,
+                              const char* feature_location_file_name,
+                              const char* test_parameter_file,
+                              double* pan_tilt_zoom)
+{
+    rf_map->relocalizeCamera(feature_location_file_name, test_parameter_file, pan_tilt_zoom);
+}
+
 EXPORTIT void createMap(RFMap* rf_map,
                         const char * feature_label_file,
                         const char * model_parameter_file,

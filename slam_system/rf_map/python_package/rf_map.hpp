@@ -40,14 +40,17 @@ public:
 extern "C" {
     EXPORTIT RFMap* RFMap_new();
     
-    
     EXPORTIT void RFMap_delete(RFMap* rf_map);
-    
-    
+
     EXPORTIT void createMap(RFMap* rf_map,
                             const char * feature_label_file,
                             const char * model_parameter_file,
-                            const char * model_name);   
+                            const char * model_name);
+    
+    EXPORTIT void relocalizeCamera(RFMap* rf_map,
+                                 const char* feature_location_file_name,
+                                 const char* test_parameter_file,
+                                 double* pan_tilt_zoom);  
 }
 
 
