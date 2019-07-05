@@ -118,7 +118,6 @@ def computer_ground_truth_velocity():
 
 def reprojection_error():
     import sys
-    sys.path
     sys.path.append('../slam_system')
     import copy
     import random
@@ -223,16 +222,17 @@ def vis_reprojection_error_multiple_sequence_subplot():
 
     print(error_h.shape)
     #sequence_id = [0, 1, 2, 3, 4, 5]
-    sequence_id = [2, 3, 1, 0, 5, 4]
+    #sequence_id = [2, 3, 1, 0, 5, 4]
+    sequence_id = [2, 0, 3, 5]
 
     f = plt.figure(figsize=(12, 6))
 
-    for i in range(6):
+    for i in range(4):
 
         #start_index = i * 600
         #end_index = start_index + 600
 
-        plt.subplot(2, 3, i+1)
+        plt.subplot(2, 2, i+1)
 
         start_index = sequence_id[i] * 600
         end_index = start_index + 600
@@ -249,13 +249,13 @@ def vis_reprojection_error_multiple_sequence_subplot():
         plt.xlim([0, 600])
         plt.ylim([0, 3])
         plt.legend(['Homography-based', 'PTZ (ours)'])
-        if i == 3 or i == 4 or i == 5:
-            plt.xlabel('Frame number')
-        if i == 0 or i == 3:
+
+        plt.xlabel('Frame number \n Sequence {}'.format(i+1))
+        if i == 0 or i == 2:
             plt.ylabel('Reprojection error (pixels)')
 
-    plt.subplots_adjust(hspace=0.25)
-    plt.savefig('homography_vs_ptz_synthetic_2.pdf', bbox_inches='tight')
+    plt.subplots_adjust(hspace=0.32)
+    plt.savefig('homography_vs_ptz_synthetic_4.pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -392,14 +392,14 @@ def vis_rf_keyframe():
 #reprojection_error()
 #vis_reprojection_error_area()
 #vis_reprojection_error_multiple_sequence()
-#vis_reprojection_error_multiple_sequence_subplot()
+vis_reprojection_error_multiple_sequence_subplot()
 
 #computer_ground_truth_velocity()
 
 #compute_relocalization_projection_error()
 #plot_gt_ptz()
 
-vis_rf_keyframe()
+#vis_rf_keyframe()
 
 
 """

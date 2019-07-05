@@ -30,6 +30,7 @@ namespace cvx_pgl  {
         camera_center_ = camera.get_camera_center();
         R_ = camera.get_rotation();
         recompute_matrix();
+        recompute_KQR();
         
         perspective_camera estimatedCamera;
         bool isEsimated = ptz_camera::estimatePTZWithFixedBasePositionRotation(wld_pts, img_pts, camera,
@@ -63,6 +64,7 @@ namespace cvx_pgl  {
         camera_center_ = camera.get_camera_center();
         R_ = camera.get_rotation();
         recompute_matrix();
+        recompute_KQR();
         return true;
     }
     
@@ -74,13 +76,36 @@ namespace cvx_pgl  {
         K_ = cvx_pgl::calibration_matrix(focal_length(), pp_);
         R_ = cvx_gl::rotation_3d(R);
         recompute_matrix();
+        recompute_KQR();
         return true;
     }
     
-    
-    Eigen::Vector2d ptz_camera::project(double pan, double tilt) const
+    void ptz_camera::recompute_KQR()
     {
-        return panTilt2Point(pp_, ptz_, Eigen::Vector2d(pan, tilt));
+        double pan = ptz_[0];
+        double tilt = ptz_[1];
+        
+        Eigen::Matrix3d r_pan = matrixFromPanY(pan);
+        Eigen::Matrix3d r_tilt = matrixFromTiltX(tilt);
+        KR_tilt_R_pan_ = K_.get_matrix() * r_tilt * r_pan;
+    }
+    
+    Eigen::Vector2d ptz_camera::project(double point_pan, double point_tilt) const
+    {
+        //return panTilt2Point(pp_, ptz_, Eigen::Vector2d(pan, tilt));
+        Eigen::Vector2d out_point;
+        Eigen::Vector3d p;      
+        point_pan *= M_PI / 180.0;
+        point_tilt *= M_PI/180.0;
+        p[0] = tan(point_pan);
+        p[1] = -tan(point_tilt)/sqrt(p[0] * p[0] + 1);
+        p[2] = 1;
+        
+        p = KR_tilt_R_pan_ * p;
+        assert(p[2] != 0);
+        out_point[0] = p[0]/p[2];
+        out_point[1] = p[1]/p[2];
+        return out_point;
     }
     
     Eigen::Vector2d ptz_camera::back_project(double x, double y) const
@@ -476,6 +501,173 @@ namespace cvx_pgl  {
         //printf("reprojection error before: %lf\n", error);
         
         return error;
+    }
+    struct PTZBAFunctor
+    {
+        struct Observation {
+            int camera_index_;
+            vector<int> landmark_indices_;
+            vector<Eigen::Vector2d> image_points_;
+        };
+        
+        typedef double Scalar;
+        
+        typedef Eigen::VectorXd InputType;
+        typedef Eigen::VectorXd ValueType;
+        typedef Eigen::Matrix<Scalar,Eigen::Dynamic,Eigen::Dynamic> JacobianType;
+        
+        enum {
+            InputsAtCompileTime = Eigen::Dynamic,
+            ValuesAtCompileTime = Eigen::Dynamic
+        };
+       
+        const vector<Observation> image_observations_;      // observations in each images
+        const vector<Eigen::Vector2d> reference_landmarks_; // known landmarks
+        const ptz_camera base_camera_;   // camera with location and base rotation
+        const int num_camera_;     // unknown
+        const int num_landmark_;  // unknown
+        
+        int m_inputs;
+        int m_values;
+        
+        PTZBAFunctor(const vector<Observation>& image_observations,
+                     const vector<Eigen::Vector2d>& reference_landmarks,
+                     const ptz_camera& camera,
+                     const int num_camera,
+                     const int num_landmark):
+        image_observations_(image_observations),
+        reference_landmarks_(reference_landmarks),
+        base_camera_(camera),
+        num_camera_(num_camera),
+        num_landmark_(num_landmark)
+        {
+            m_inputs = 3 * num_camera + 2 * num_landmark;
+            m_values = 0;
+            for (int i = 0; i<image_observations_.size(); i++) {
+                assert(image_observations_[i].landmark_indices_.size() ==
+                       image_observations_[i].image_points_.size());
+                m_values += image_observations_[i].landmark_indices_.size() * 2;
+            }
+            
+            assert(m_values >= m_inputs);
+        }
+        
+        int operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fx) const
+        {
+            assert(x.size() == 3 * num_camera_ + 2 * num_landmark_);
+            // step 1: generate ptz from x
+            vector<ptz_camera> cameras(num_camera_);
+            for(int i = 0; i<num_camera_; i++) {
+                cameras[i] = base_camera_;
+                double pan = x[i*3+0];
+                double tilt = x[i*3+1];
+                double fl = x[i*3+2];
+                Vector3d cur_ptz(pan, tilt, fl);
+                cameras[i].set_ptz(cur_ptz);
+            }
+            
+            // step 2: get all landmarks
+            const int start_index = 3 * num_camera_;
+            vector<Eigen::Vector2d> landmarks = reference_landmarks_;
+            for(int i = 0; i<num_landmark_; i++) {
+                int j = start_index + i*2;
+                Eigen::Vector2d m(x[j], x[j+1]);
+                landmarks.push_back(m);
+            }
+            
+            // step 3: reprojection error
+            int index = 0;
+            for(int i = 0; i<image_observations_.size(); i++) {
+                const Observation& obs = image_observations_[i];
+                const ptz_camera& camera = cameras[obs.camera_index_];
+                const vector<int>& landmark_indices = obs.landmark_indices_;
+                const vector<Eigen::Vector2d> & image_points = obs.image_points_;
+                for(int j = 0; j<landmark_indices.size(); j++) {
+                    Eigen::Vector2d lanmark = landmarks[landmark_indices[j]];
+                    Eigen::Vector2d p = image_points[j];
+                    Eigen::Vector2d q = camera.project(lanmark[0], lanmark[1]);
+                    
+                    fx[2*index + 0] = p.x() - q.x();
+                    fx[2*index + 1] = p.y() - q.y();
+                    index++;
+                }
+            }
+            assert(index == m_values);
+            return 0;
+        }
+        
+        int inputs() const { return m_inputs; }// inputs is the dimension of x.
+        int values() const { return m_values; } // "values" is the number of f_i and
+    };
+    
+    bool bundleAdjustment(const vector<Eigen::Vector2d> & keypoints,
+                          const vector<int>& camera_index,
+                          const vector<int>& keypoint_index,
+                          const vector<int>& landmark_index,
+                          const vector<ptz_camera> & init_ptzs,
+                          const vector<Eigen::Vector2d> & init_landmarks,
+                          const vector<Eigen::Vector2d>& reference_landmarks,
+                          vector<ptz_camera>& refined_ptzs,
+                          vector<Eigen::Vector2d>& refined_landmmarks)
+    {
+        assert(camera_index.size() == keypoint_index.size());
+        assert(camera_index.size() == landmark_index.size());
+        assert(init_ptzs.size() > 0);
+       
+        ptz_camera base_camera = init_ptzs[0];
+        int num_camera = (int)init_ptzs.size();
+        int num_landmark = (int)init_landmarks.size();
+       
+        // step 1: prepare observation
+        vector<PTZBAFunctor::Observation> image_observations(num_camera);
+        for (int i = 0; i<num_camera; i++) {
+            image_observations[i].camera_index_ = i;
+        }
+        for (int i = 0; i<camera_index.size(); i++) {
+            const int c_idx = camera_index[i];
+            const int l_idx = landmark_index[i];
+            const int k_idx = keypoint_index[i];
+            image_observations[c_idx].landmark_indices_.push_back(l_idx);
+            image_observations[c_idx].image_points_.push_back(keypoints[k_idx]);
+        }
+        for (const auto& item: image_observations) {
+            assert(item.landmark_indices_.size() == item.image_points_.size());
+            assert(item.landmark_indices_.size() > 0);
+        }
+        
+        
+        Eigen::VectorXd x(num_camera*3 + num_landmark*2);
+        for (auto i = 0; i<init_ptzs.size(); i++) {
+            x[i*3+0] = init_ptzs[i].pan();
+            x[i*3+1] = init_ptzs[i].tilt();
+            x[i*3+2] = init_ptzs[i].focal_length();
+        }
+        const int start_index = num_camera*3;
+        for (auto i = 0; i<init_landmarks.size(); i++) {
+            int j = start_index + 2*i;
+            x[j] = init_landmarks[i][0];
+            x[j+1] = init_landmarks[i][1];
+        }
+        /*
+         const vector<Observation>& image_observations,
+         const vector<Eigen::Vector2d>& reference_landmarks,
+         const ptz_camera& camera,
+         const int num_camera,
+         const int num_landmark)
+         */
+        PTZBAFunctor opt_functor(image_observations, reference_landmarks, base_camera,
+                                 num_camera, num_landmark);
+        Eigen::NumericalDiff<PTZBAFunctor> dif_functor(opt_functor);
+        Eigen::LevenbergMarquardt<Eigen::NumericalDiff<PTZBAFunctor>, double> lm(dif_functor);
+        lm.parameters.ftol = 1e-6;
+        lm.parameters.xtol = 1e-6;
+        lm.parameters.maxfev = 500;
+        
+        Eigen::LevenbergMarquardtSpace::Status status = lm.minimize(x);
+        //printf("LMQ status %d\n", status);
+        
+       
+        return true;
     }
 
 }

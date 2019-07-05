@@ -83,7 +83,7 @@ target_link_libraries(rf_map matio flann)
 
 # for python interface
 include_directories (./python_package)
-set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map_python.cpp)
+set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map.cpp)
 add_library(rf_map_python SHARED ${SOURCE_CODE} ${SOURCE_RF_MAP_PYTHON})
 target_link_libraries(rf_map_python matio flann)
 

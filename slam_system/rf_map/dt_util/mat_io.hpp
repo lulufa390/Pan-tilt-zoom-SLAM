@@ -14,6 +14,7 @@
 #include <Eigen/Dense>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 
 namespace matio {
@@ -21,6 +22,10 @@ namespace matio {
     // suppport Eigen::MatrixXd, Eigen::MatrixXf and Eigen::MatrixXi
     template<class matrixT>
     bool readMatrix(const char *file_name, const char *var_name, matrixT & data, bool verbose = true);
+    
+    template<class matrixT>
+    bool readMultipleMatrix(const char *file_name, const std::vector<std::string>& var_names,
+                            std::unordered_map<std::string, matrixT> & data, bool verbose = true);
     
     
     // support Eigen::MatrixXd, Eigen::MatrixXf

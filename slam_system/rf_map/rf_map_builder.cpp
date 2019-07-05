@@ -30,11 +30,16 @@ void RFMapBuilder::setTreeParameter(const TreeParameter& param)
 
 bool  RFMapBuilder::buildModel(BTDTRegressor& model,
                              const vector<string> & feature_label_files,
-                             const char *model_file_name) const
+                             const char *model_file_name,
+                               bool verbose) const
 {
+    //printf("1 \n");
+    //printf("feature label file number %lu\n", feature_label_files.size());
     assert(feature_label_files.size() > 0);
     
+    //printf("tree number %lu \n 2 \n", model.trees_.size());
     model.trees_.clear();
+    //printf("3 \n");
     
     tree_param_.printSelf();
     model.reg_tree_param_ = tree_param_.base_tree_param_;
@@ -52,7 +57,9 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
             sampled_files.push_back(feature_label_files[index]);
         }
         
-        printf("training from %lu frames\n", sampled_files.size());
+        if (verbose) {
+            printf("training from %lu frames\n", sampled_files.size());
+        }
         // sample from selected frames
         vector<VectorXf> features;
         vector<VectorXf> labels;
@@ -67,7 +74,9 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
         }
         assert(features.size() == labels.size());
         
-        printf("training sample number is %lu\n", features.size());
+        if (verbose) {
+            printf("training sample number is %lu\n", features.size());
+        }
         
         model.feature_dim_ = (int)features[0].size();
         model.label_dim_   = (int)labels[0].size();
@@ -79,7 +88,9 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
         assert(pTree);
         double tt = clock();
         pTree->buildTree(features, labels, indices, tree_param_.base_tree_param_);
-        printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
+        if (verbose) {
+            printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
+        }       
         
         // test training error
         vector<Eigen::VectorXf> errors;
@@ -93,16 +104,18 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
         }
         Eigen::VectorXf q1_error, q2_error, q3_error;
         DTUtil::quartileError(errors, q1_error, q2_error, q3_error);
-        cout<<"Training first quartile error: \n"<<q1_error.transpose()<<endl;
-        cout<<"Training second quartile (median) error: \n"<<q2_error.transpose()<<endl;
-        cout<<"Training third quartile error: \n"<<q3_error.transpose()<<endl<<endl;
+        if (verbose) {
+            cout<<"Training first quartile error: \n"<<q1_error.transpose()<<endl;
+            cout<<"Training second quartile (median) error: \n"<<q2_error.transpose()<<endl;
+            cout<<"Training third quartile error: \n"<<q3_error.transpose()<<endl<<endl;
+        }
+        
                 
         model.trees_.push_back(pTree);
         if (model_file_name != NULL) {
-            model.saveModel(model_file_name);
-            printf("saved %s\n", model_file_name);
+            model.saveModel(model_file_name);            
         }
-        this->validationError(model, feature_label_files, std::min(4, frame_num));
+        //this->validationError(model, feature_label_files, std::min(4, frame_num));
     }
     return true;
 }

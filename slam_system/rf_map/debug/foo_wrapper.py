@@ -6,6 +6,7 @@ class Foo(object):
         self.obj = lib.Foo_new()
 
     def bar(self):
+        print('type {}'.format(type(self.obj)))
         lib.Foo_bar(self.obj)
 
 f = Foo()

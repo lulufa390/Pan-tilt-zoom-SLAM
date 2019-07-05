@@ -15,6 +15,16 @@
 #include "ptz_pose_estimation.h"
 
 using namespace std;
+
+RFMap::RFMap()
+{
+    
+}
+
+RFMap::~RFMap()
+{
+    
+}
 // Create a model from a list of feature_label files
 void RFMap::createMap(const char * feature_label_file,
                         const char * model_parameter_file,
@@ -36,7 +46,9 @@ void RFMap::createMap(const char * feature_label_file,
     RFMapBuilder builder;
     builder.setTreeParameter(tree_param);
     
-    builder.buildModel(model_, feature_files, model_name);
+    //printf("start build model\n");
+    
+    builder.buildModel(model_, feature_files, model_name, false);
     model_.saveModel(model_name);
     printf("save model to file %s\n", model_name);
 }
@@ -107,7 +119,10 @@ void RFMap::relocalizeCamera(const char* feature_location_file_name,
 
 EXPORTIT RFMap* RFMap_new()
 {
-    return new RFMap();
+    RFMap* p_map = new RFMap();
+    printf("Before: address %p\n", (void*)p_map);
+    //printf("Before: value %lld\n", (long long)p_map);
+    return p_map;
 }
 
 EXPORTIT void RFMap_delete(RFMap* rf_map)
@@ -121,6 +136,7 @@ EXPORTIT void relocalizeCamera(RFMap* rf_map,
                               const char* test_parameter_file,
                               double* pan_tilt_zoom)
 {
+    printf("after 2: address %p\n", (void*)rf_map);
     rf_map->relocalizeCamera(feature_location_file_name, test_parameter_file, pan_tilt_zoom);
 }
 
@@ -129,5 +145,8 @@ EXPORTIT void createMap(RFMap* rf_map,
                         const char * model_parameter_file,
                         const char * model_name)
 {
+    printf("after 1: address %p\n", (void*)rf_map);
+    //printf("after: address %p\n", (void*)(&(rf_map->model_)));
     rf_map->createMap(feature_label_file, model_parameter_file, model_name);
+    printf("after 1 1: address %p\n", (void*)rf_map);
 }

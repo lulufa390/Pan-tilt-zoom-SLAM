@@ -43,6 +43,8 @@ namespace ptz_pose_opt {
                                    const PTZPreemptiveRANSACParameter & param,
                                    Eigen::Vector3d & ptz,
                                    bool verbose = true);
+    
+    //bool bundleAdjustment(
 }
 
 #endif /* defined(__PTZBTRF__ptz_pose_estimation__) */

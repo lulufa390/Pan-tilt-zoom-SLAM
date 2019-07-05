@@ -36,7 +36,8 @@ public:
     // feature_label_files: .mat file has ptz, keypoint location and descriptor
     bool buildModel(BTDTRegressor& model,
                     const vector<string> & feature_label_files,
-                    const char *model_file_name) const;
+                    const char *model_file_name,
+                    bool verbose = true) const;
     
     // Add one tree to the init model
     // using files from all feature_label_files and part of init_feature_label_files

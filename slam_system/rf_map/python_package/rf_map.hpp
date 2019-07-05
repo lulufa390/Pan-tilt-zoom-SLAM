@@ -19,10 +19,12 @@
 #endif
 
 class RFMap {
-private:
+public:
     BTDTRegressor model_;
     
 public:
+    RFMap();
+    ~RFMap();
     void createMap(const char * feature_label_file,
                    const char * model_parameter_file,
                    const char * model_name);

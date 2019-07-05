@@ -104,6 +104,95 @@ namespace matio {
     }
     
     template<class matrixT>
+    bool readMultipleMatrix(const char *file_name, const std::vector<std::string>& var_names,
+                            std::unordered_map<std::string, matrixT> & data, bool verbose)
+    {
+        assert(file_name);
+        assert(var_names.size() > 0);
+        assert(data.size() == 0);
+        
+        mat_t    *matfp = NULL;
+        matfp = Mat_Open(file_name, MAT_ACC_RDONLY);
+        if ( NULL == matfp ) {
+            printf("Error: opening MAT file \"%s\"!\n", file_name);
+            return false;
+        }
+        
+        for (int i = 0; i<var_names.size(); i++) {
+            bool is_read = false;
+            const char* var_name = var_names[i].c_str();
+            matrixT mat_data;
+            
+            matvar_t *matvar = Mat_VarRead(matfp, var_name);
+            if ( NULL == matvar ) {
+                printf("Error: Variable %s not found, or error reading MAT file",
+                       var_name);
+            }
+            if (matvar->rank != 2) {
+                printf("Error: Variable %s is not a matrix!\n", var_name);
+            }
+            else {
+                size_t rows = matvar->dims[0];
+                size_t cols = matvar->dims[1];
+                void *data = matvar->data;
+                assert(data);
+                matio_types data_type = matvar->data_type;
+                
+                switch (data_type) {
+                    case MAT_T_DOUBLE:
+                    {
+                        mat_data = matrixT::Zero(rows, cols);
+                        // colum wise
+                        double *pdata = (double *)data;
+                        // copy data
+                        for (int c = 0; c<cols; c++ ) {
+                            double * p = &pdata[c * rows];
+                            for (int r = 0; r<rows; r++) {
+                                mat_data(r, c) = p[r];
+                            }
+                        }
+                        is_read = true;
+                    }
+                        break;
+                        
+                    case MAT_T_SINGLE:
+                    {
+                        mat_data = matrixT::Zero(rows, cols);
+                        float *pdata = (float *)data;
+                        // copy data
+                        for (int c = 0; c<cols; c++ ) {
+                            float * p = &pdata[c * rows];
+                            for (int r = 0; r<rows; r++) {
+                                mat_data(r, c) = p[r];
+                            }
+                        }
+                        
+                        is_read = true;
+                    }
+                        break;
+                        
+                    default:
+                        printf("Error: non-supported data type\n");
+                        break;
+                }
+            }
+            // free data
+            if (matvar != NULL) {
+                Mat_VarFree(matvar);
+                matvar = NULL;
+            }
+            if (is_read && verbose) {
+                printf("read a %ld x %ld matrix named %s. \n", mat_data.rows(), mat_data.cols(), var_name);
+            }
+            data[var_names[i]] = mat_data;
+        }
+        if (matfp != NULL) {
+            Mat_Close(matfp);
+        }
+        return data.size() == var_names.size();
+    }
+    
+    template<class matrixT>
     bool writeMatrix(const char *file_name, const char *var_name, const matrixT& data)
     {
         assert(file_name);
@@ -216,6 +305,14 @@ namespace matio {
    
     template
     bool readMatrix(const char *file_name, const char *var_name, Eigen::MatrixXf& mat_data, bool verbose);
+    
+    template
+    bool readMultipleMatrix(const char *file_name, const std::vector<std::string>& var_names,
+                            std::unordered_map<std::string, Eigen::MatrixXd> & data, bool verbose);
+    
+    template
+    bool readMultipleMatrix(const char *file_name, const std::vector<std::string>& var_names,
+                            std::unordered_map<std::string, Eigen::MatrixXf> & data, bool verbose);
     
     template
     bool readMatrix(const char *file_name, const char *var_name, Eigen::MatrixXi& mat_data, bool verbose);
