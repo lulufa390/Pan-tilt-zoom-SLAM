@@ -127,16 +127,34 @@ def blending_with_avg(image_list, mask_list):
     for i in range(len(image_list)):
         assert image_list[i].shape == mask_list[i].shape
 
+    new_mask_list = []
+    for img in image_list:
+        new_mask_list.append((img > 0).astype(np.uint8))
+
     sum_img = np.zeros(image_list[0].shape, np.uint16)
     total_mask = np.zeros(mask_list[0].shape, np.float)
 
+    color = []
+    ma = []
+
+    for ppp in image_list:
+        color.append(ppp[659, 759])
+    for ppp in mask_list:
+        ma.append(ppp[659, 759])
+
+
     for i in range(len(image_list)):
-        sum_img += image_list[i]
+        sum_img += image_list[i] * mask_list[i]
         total_mask += mask_list[i]
 
     total_mask[total_mask == 0] = 1
 
+    sss = sum_img[659, 759]
+    tttt = total_mask[659, 759]
+
     panorama = (sum_img / total_mask).astype(np.uint8)
+
+    fff = panorama[659, 759]
 
     return panorama
 
@@ -155,15 +173,16 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
     for image in img_list:
         assert len(image.shape) == 3
 
-    vertical_border = 100
-    horizontal_border = 500
+    vertical_border = 400
+    horizontal_border = 1800
 
     # the pan tilt zoom angles that all images project to
     # here it is set to be the median of all pans, tilts, zooms
     standard_ptz = get_median_ptz(ptz_list)
 
     # mask = 0 if it's in the border, else mask = 1
-    mask = np.ones(img_list[0].shape, np.uint8)
+    mask = np.zeros(img_list[0].shape, np.uint8)
+    mask[5:-5, 5:-5] = 1
 
     # wrap each image in enlarged_img_list with homography matrix
     dst_img_list = []
@@ -186,6 +205,7 @@ def generate_panoramic_image(standard_camera, img_list, ptz_list):
 
         # wrap origin image and mask
         dst = cv.warpPerspective(img, matrix, dst_shape)
+
         wrap_mask = cv.warpPerspective(mask, matrix, dst_shape)
 
         dst_img_list.append(dst)
@@ -299,8 +319,50 @@ def ut_basketball_map():
     panorama = generate_panoramic_image(camera, images, ptz_list)
     cv.imshow("test", panorama)
 
-    cv.imwrite("../../map/panorama.jpg", panorama)
+    cv.imwrite("../../map/ttt.jpg", panorama)
     cv.waitKey(0)
+
+def ut_soccer_map():
+    seq = sio.loadmat("C:/graduate_design/dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
+
+    annotation = seq["annotation"]
+    meta = seq["meta"]
+
+    # the sequence to generate panorama
+    img_sequence = [0, 91, 144, 234]
+
+    # shared parameters for ptz camera
+    camera = PTZCamera(annotation[0][0]['camera'][0][0:2], meta[0][0]["cc"][0], meta[0][0]["base_rotation"][0])
+
+    # get image list
+    images = []
+    for i in img_sequence:
+        img = cv.imread("../../dataset/soccer_dataset/seq3/seq3_330/" + annotation[0][i]['image_name'][0], 1)
+        images.append(img)
+
+    # get camera pose list (corresponding to image list)
+    ptz_list = [ [53.3648337246351, -5.86620247686982, 3733.765356],
+                 [56.9062913348596,
+                 -5.988704410148857,
+                 4126.398474589448],
+                 [49.66426462006893,
+                    -6.650261607092016,
+                    4088.31720671323],
+                 [66.11304986437663,
+                    -9.008581330137321,
+                    2565.0716115739483
+                    ]]
+
+
+    # for i in img_sequence:
+    #     ptz_list.append(annotation[0][i]['ptz'][0:3].squeeze())
+
+    panorama = generate_panoramic_image(camera, images, ptz_list)
+    cv.imshow("test", panorama)
+
+    cv.imwrite("../../map/soccer2.jpg", panorama)
+    cv.waitKey(0)
+
 
 
 def ut_basketball_estimated_map():
@@ -331,7 +393,7 @@ def ut_basketball_estimated_map():
     panorama = generate_panoramic_image(camera, images, ptz_list)
     cv.imshow("test", panorama)
 
-    cv.imwrite("../../map/panorama2.jpg", panorama)
+    cv.imwrite("../../map/ttt2.jpg", panorama)
     cv.waitKey(0)
 
 
@@ -392,4 +454,5 @@ if __name__ == "__main__":
     # ut_basketball_map()
     # ut_basketball_estimated_map()
     # ut_hockey_map()
-    ut_hockey_before_optimize_map()
+    ut_soccer_map()
+    # ut_hockey_before_optimize_map()

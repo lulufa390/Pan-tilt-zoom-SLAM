@@ -7,8 +7,8 @@ Created by Luke, 2018.9
 import scipy.io as sio
 import numpy as np
 import cv2 as cv
-from image_process import detect_compute_sift_array
-
+from image_process import detect_compute_sift_array, visualize_points
+from util import *
 
 class KeyFrame:
     """This is a class for keyframe in mapping."""
@@ -31,10 +31,10 @@ class KeyFrame:
         """feature points"""
 
         # a list of key point object (the first return value of detect_compute_sift function)
-        self.feature_pts = []
+        self.feature_pts = np.ndarray(0)
 
         # a [N, 128] int array (the second return value of detect_compute_sift function)
-        self.feature_des = []
+        self.feature_des = np.ndarray(0)
 
         # a [N] int array of index for keypoint in global_ray
         self.landmark_index = []
@@ -56,6 +56,22 @@ class KeyFrame:
         """
         return len(self.feature_pts)
 
+    def convert_keypoint_to_array(self, norm=True):
+        N = len(self.feature_pts)
+        array_pts = np.zeros((N, 2), dtype=np.float64)
+        for i in range(N):
+            array_pts[i][0] = self.feature_pts[i].pt[0]
+            array_pts[i][1] = self.feature_pts[i].pt[1]
+
+        if norm:
+            norm = np.linalg.norm(self.feature_des, axis=1).reshape(-1, 1)
+            array_des = np.divide(self.feature_des, norm).astype(np.float64)
+        else:
+            array_des = self.feature_des.astype(np.float64)
+
+        self.feature_pts = array_pts
+        self.feature_des = array_des
+
     def save_to_mat(self, path):
         """
         save as the format required by random forest.
@@ -64,10 +80,16 @@ class KeyFrame:
         keyframe_data = dict()
         keyframe_data['im_name'] = str(self.img_index) + ".jpg"
 
-        kp, des = detect_compute_sift_array(self.img, 1500)
+        # kp, des = detect_compute_sift_array(self.img, 300)
 
-        keyframe_data['keypoint'] = kp
-        keyframe_data['descriptor'] = des
+        # kp = add_gauss(kp, 3, 1280, 720)
+        # kp = add_outliers(kp, 1, 1280, 720, 40)
+
+        if type(self.feature_pts) == list:
+            self.convert_keypoint_to_array()
+
+        keyframe_data['keypoint'] = self.feature_pts
+        keyframe_data['descriptor'] = self.feature_des
 
         # convert the base rotation to (3, 1)
         save_br = np.ndarray([3, 1])

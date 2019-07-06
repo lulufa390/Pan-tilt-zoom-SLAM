@@ -114,6 +114,7 @@ class SequenceManager:
                         for y in range(int(self.bounding_box[0][index][j][1]),
                                        int(self.bounding_box[0][index][j][3])):
                             tmp_mask[y, x] = 0
+
             return tmp_mask
 
     def get_ptz(self, index):
@@ -272,11 +273,7 @@ def ut_ptz_camera():
 
 if __name__ == '__main__':
     # generate_ground_truth()
-    sequence = SequenceManager("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
-                               "../../dataset/soccer_dataset/seq3/seq3_330",
-                               "../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
-                               "../../dataset/soccer_dataset/seq3/seq3_player_bounding_box.mat")
 
-    p, t, z = load_camera_pose("C:/graduate_design/experiment_result/baseline2/2-gauss.mat", True)
-    draw_camera_plot(sequence.ground_truth_pan, sequence.ground_truth_tilt, sequence.ground_truth_f, p, t, z)
-    pass
+    gt_p, gt_t, gt_f = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
+    p, t, z = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/rf-2(2).mat", True)
+    draw_camera_plot(gt_p, gt_t, gt_f, p, t, z)

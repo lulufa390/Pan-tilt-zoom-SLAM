@@ -5,11 +5,13 @@ import cv2 as cv
 import scipy.io as sio
 from math import *
 import scipy.signal as sig
-
+from slam_system.util import save_camera_pose
+from slam_system.util import load_camera_pose
 
 class ImageGenerator:
     def __init__(self):
-        s = 0.0254  """ inch to meter
+        s = 0.0254
+        """ inch to meter
         map border is 70 pixel
         1 pixel is 1 inch (1/12 foot) in map"""
         m1 = np.matrix([[1, 0, -70],
@@ -81,27 +83,42 @@ if __name__ == "__main__":
     ouput: a synthesized image"""
     generator = ImageGenerator()
 
-    seq = sio.loadmat("./basketball/basketball/basketball_anno.mat")
+    seq = sio.loadmat("../../../dataset/basketball/basketball_anno.mat")
     annotation = seq["annotation"]
 
-    court_map = cv.imread('./basketball/basketball_map.png')
+    court_map = cv.imread('../../../dataset/synthesized/basketball_map.png')
 
-    pan_arr = np.ndarray([annotation.size])
-    tilt_arr = np.ndarray([annotation.size])
-    f_arr = np.ndarray([annotation.size])
-    for i in range(annotation.size):
-        pan_arr[i], tilt_arr[i], f_arr[i] = annotation[0][i]['ptz'].squeeze()
+    # pan_arr = np.ndarray([annotation.size])
+    # tilt_arr = np.ndarray([annotation.size])
+    # f_arr = np.ndarray([annotation.size])
+    # for i in range(annotation.size):
+    #     pan_arr[i], tilt_arr[i], f_arr[i] = annotation[0][i]['ptz'].squeeze()
+    #
+    # """smooth pan, tilt and f"""
+    # pan_arr = sig.savgol_filter(pan_arr, 181, 1)
+    # tilt_arr = sig.savgol_filter(tilt_arr, 181, 1)
+    # f_arr = sig.savgol_filter(f_arr, 181, 1)
+    #
+    # p_l = []
+    # t_l = []
+    # f_l = []
+    # for i in range(3000, 3600):
+    #     p_l.append(pan_arr[i])
+    #     t_l.append(tilt_arr[i])
+    #     f_l.append(f_arr[i])
+    #
+    # save_camera_pose(p_l, t_l, f_l, "../3000-3600.mat")
 
-    """smooth pan, tilt and f"""
-    pan_arr = sig.savgol_filter(pan_arr, 181, 1)
-    tilt_arr = sig.savgol_filter(tilt_arr, 181, 1)
-    f_arr = sig.savgol_filter(f_arr, 181, 1)
+    pan_arr, tilt_arr, f_arr = load_camera_pose("C:/graduate_design/dataset/synthesized/2400-3000.mat", True)
+
 
     for i in range(annotation.size):
         pan, tilt, _ = annotation[0][i]['ptz'].squeeze()
         camera = np.array([640, 360, f_arr[i], pan_arr[i], tilt_arr[i], 13.0099, -14.8109, 6.1790])
         image = generator.generate_image(camera, court_map)
 
-        image_name = "./basketball/basketball/synthesize_images/" + str(i) + ".jpg"
+        image_name = "../../../dataset/synthesized/test/" + str(i) + ".jpg"
         cv.imwrite(image_name, image)
+
+
        

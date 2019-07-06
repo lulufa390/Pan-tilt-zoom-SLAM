@@ -97,6 +97,19 @@ class HomographyEKF:
         # speed of homography parameters
         self.velocity = np.zeros(8)
 
+        # hyper params
+        # self.homo_var = 0.01
+        self.homo_var = 0.01
+
+        # self.keypoints_var = 0.001
+        self.keypoints_var = 0.001
+
+        # self.keypoint_num = 100
+        self.keypoint_num = 500
+
+        # self.observe_var = 0.00001
+        self.observe_var = 0.00001
+
     def compute_h_jacobian(self, params, keypoints):
         """
         This function computes the jacobian matrix H for h(x).
@@ -161,7 +174,7 @@ class HomographyEKF:
         self.model_to_image_homography = first_homography
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 500)
+        first_img_kp = detect_sift(img, self.keypoint_num)
         # first_img_kp = detect_orb(img, 300)
         # first_img_kp = add_gauss(first_img_kp, 50, 1280, 720)
 
@@ -176,7 +189,8 @@ class HomographyEKF:
 
         # step 3: initialize convariance matrix of states
         # some parameters are manually selected
-        self.state_cov = 0.001 * np.eye(8 + 2 * len(self.global_keypoints))
+        self.state_cov = self.keypoints_var * np.eye(8 + 2 * len(self.global_keypoints))
+        self.state_cov[0:8, 0:8] = self.homo_var * np.eye(8)
 
         # the previous frame information
         self.previous_img = img
@@ -236,7 +250,7 @@ class HomographyEKF:
         jacobi = self.compute_h_jacobian(params, updated_ray)
 
         # get Kalman gain
-        r_k = 10 * np.eye(2 * num_ray)  # todo 2 is a constant value
+        r_k = self.observe_var * np.eye(2 * num_ray)
         s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
 
         k_k = np.dot(np.dot(predicted_cov, jacobi.T), np.linalg.pinv(s_k))
@@ -313,7 +327,7 @@ class HomographyEKF:
         keypoints, keypoints_index = global_to_image_array(self.global_keypoints, self.current_homography,
                                                            height, width)
 
-        new_keypoints = detect_sift(img, 500)
+        new_keypoints = detect_sift(img, self.keypoint_num)
         # new_keypoints = detect_orb(img, 300)
         # new_keypoints = add_gauss(new_keypoints, 50, 1280, 720)
 
@@ -325,12 +339,14 @@ class HomographyEKF:
         # remove keypoints near existing keypoints
         mask = np.ones(img.shape[0:2], np.uint8)
 
+        neigibor_size = 20
+
         for j in range(len(keypoints)):
             x, y = keypoints[j]
-            up_bound = int(max(0, y - 50))
-            low_bound = int(min(height, y + 50))
-            left_bound = int(max(0, x - 50))
-            right_bound = int(min(width, x + 50))
+            up_bound = int(max(0, y - neigibor_size))
+            low_bound = int(min(height, y + neigibor_size))
+            left_bound = int(max(0, x - neigibor_size))
+            right_bound = int(min(width, x + neigibor_size))
             mask[up_bound:low_bound, left_bound:right_bound] = 0
 
         existing_keypoints_mask_index = keypoints_masking(new_keypoints, mask)
@@ -345,8 +361,8 @@ class HomographyEKF:
                 self.global_keypoints = np.row_stack([self.global_keypoints, new_rays[j]])
                 self.state_cov = np.row_stack([self.state_cov, np.zeros([2, self.state_cov.shape[1]])])
                 self.state_cov = np.column_stack([self.state_cov, np.zeros([self.state_cov.shape[0], 2])])
-                self.state_cov[self.state_cov.shape[0] - 2, self.state_cov.shape[1] - 2] = 0.01
-                self.state_cov[self.state_cov.shape[0] - 1, self.state_cov.shape[1] - 1] = 0.01
+                self.state_cov[self.state_cov.shape[0] - 2, self.state_cov.shape[1] - 2] = self.keypoints_var
+                self.state_cov[self.state_cov.shape[0] - 1, self.state_cov.shape[1] - 1] = self.keypoints_var
                 keypoints_index = np.append(keypoints_index, len(self.global_keypoints) - 1)
 
             keypoints = np.concatenate([keypoints, new_keypoints], axis=0)
@@ -373,11 +389,11 @@ class HomographyEKF:
 
         # update camera pose with constant speed model
         self.current_homography = self.accumulate_homography[-1].copy()
+        for i in range(8):
+            self.current_homography[i // 3, i % 3] += self.velocity[i]
 
         # update p_global
-        q_k = 5 * np.diag([0.001, 0.001, 0.001,
-                           0.001, 0.001, 0.001,
-                           0.001, 0.001, ])
+        q_k = 5 * np.diag([self.homo_var for _ in range(8)])
         self.state_cov[0:8, 0:8] = self.state_cov[0:8, 0:8] + q_k
 
         """
@@ -464,7 +480,7 @@ def soccer3_test():
 
         print("-----" + str(i) + "--------")
 
-        print("len:", len(homography_ekf.accumulate_homography))
+        # print("hompgraphy:", homography_ekf.accumulate_homography)
 
         print(pose)
 
@@ -483,8 +499,88 @@ def soccer3_test():
         # cv.imshow("image2", img2)
         # cv.waitKey(0)
 
-    # save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
-    #                  "C:/graduate_design/experiment_result/baseline2/2-gauss.mat")
+    save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
+                     "./result.mat")
+
+
+def basketball_test():
+    sequence = SequenceManager("../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/images",
+                               "../../dataset/basketball/ground_truth.mat",
+                               "../../dataset/basketball/bounding_box.mat")
+
+    # line_index, points = load_model("../../dataset/soccer_dataset/highlights_soccer_model.mat")
+
+    begin_frame = 0
+
+    first_frame_ptz = (sequence.ground_truth_pan[begin_frame],
+                       sequence.ground_truth_tilt[begin_frame],
+                       sequence.ground_truth_f[begin_frame])
+
+    first_camera = sequence.camera
+    first_camera.set_ptz(first_frame_ptz)
+
+    # 3*4 projection matrix for 1st frame
+    first_frame_mat = first_camera.projection_matrix
+    first_frame = sequence.get_image_gray(index=begin_frame, dataset_type=0)
+    first_bounding_box = sequence.get_bounding_box_mask(begin_frame)
+    # img = project_with_homography(first_frame_mat, points, line_index, first_frame)
+    #
+    # cv.imshow("image", img)
+    # cv.waitKey()
+
+    homography_ekf = HomographyEKF()
+
+    homography_ekf.init_system(first_frame, first_frame_mat, first_bounding_box)
+
+    # tracking_obj = HomographyTracking(first_frame, first_frame_mat)
+
+    points3d_on_field = uniform_point_sample_on_field(25, 18, 25, 18)
+
+    pan = [first_frame_ptz[0]]
+    tilt = [first_frame_ptz[1]]
+    f = [first_frame_ptz[2]]
+
+    for i in range(1, sequence.length):
+        next_frame = sequence.get_image_gray(index=i, dataset_type=0)
+        next_bounding_box = sequence.get_bounding_box_mask(i)
+        homography_ekf.tracking(next_frame, next_bounding_box)
+
+        # img = project_with_homography(
+        #     np.dot(homography_ekf.accumulate_homography[-1], homography_ekf.model_to_image_homography),
+        #     points, line_index, next_frame)
+
+        # compute ptz
+
+        first_camera.set_ptz((pan[-1], tilt[-1], f[-1]))
+
+        current_homography = np.dot(homography_ekf.accumulate_homography[-1], homography_ekf.model_to_image_homography)
+
+        pose = estimate_camera_from_homography(current_homography, first_camera, points3d_on_field)
+
+        print("-----" + str(i) + "--------")
+
+        # print("hompgraphy:", homography_ekf.accumulate_homography)
+
+        print(pose)
+
+        # first_camera.set_ptz(pose)
+        # img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
+
+        print("%f" % (pose[0] - sequence.ground_truth_pan[i]))
+        print("%f" % (pose[1] - sequence.ground_truth_tilt[i]))
+        print("%f" % (pose[2] - sequence.ground_truth_f[i]))
+
+        pan.append(pose[0])
+        tilt.append(pose[1])
+        f.append(pose[2])
+
+        # cv.imshow("image", img)
+        # cv.imshow("image2", img2)
+        # cv.waitKey(0)
+
+    save_camera_pose(np.array(pan), np.array(tilt), np.array(f), "./bs4_result.mat")
+
 
 def synthesized_test():
     sequence = SequenceManager(annotation_path="../../dataset/basketball/ground_truth.mat",
@@ -492,24 +588,35 @@ def synthesized_test():
 
     gt_pan, gt_tilt, gt_f = load_camera_pose("../../dataset/synthesized/synthesize_ground_truth.mat", separate=True)
 
-
     line_index, points = load_model("../../dataset/basketball/basketball_model.mat")
 
-    first_frame_ptz = (gt_pan[0],
-                       gt_tilt[0],
-                       gt_f[0])
+    begin_frame = 2400
+
+    first_frame_ptz = (gt_pan[begin_frame],
+                       gt_tilt[begin_frame],
+                       gt_f[begin_frame])
 
     first_camera = sequence.camera
     first_camera.set_ptz(first_frame_ptz)
 
+    # print(first_camera.project_ray((0, 0)))
+    # print(first_camera.project_ray((10, 10)))
+    # print(first_camera.project_ray((10.1, 10)))
+
     # 3*4 projection matrix for 1st frame
     first_frame_mat = first_camera.projection_matrix
-    first_frame = sequence.get_image_gray(index=0, dataset_type=2)
+    first_frame = sequence.get_image_gray(index=begin_frame, dataset_type=2)
     # first_bounding_box = sequence.get_bounding_box_mask(0)
     # img = project_with_homography(first_frame_mat, points, line_index, first_frame)
     #
     # cv.imshow("image", img)
     # cv.waitKey()
+
+    # test_camera = copy.deepcopy(first_camera)
+    # test_camera.set_ptz((gt_pan[5],
+    #                    gt_tilt[5],
+    #                    gt_f[5]))
+    # re = compute_reprojection_error(first_frame, first_camera, test_camera)
 
     homography_ekf = HomographyEKF()
 
@@ -523,14 +630,14 @@ def synthesized_test():
     tilt = [first_frame_ptz[1]]
     f = [first_frame_ptz[2]]
 
-    for i in range(1, len(gt_pan)):
+    for i in range(2401, 3000, 1):
         next_frame = sequence.get_image_gray(index=i, dataset_type=2)
 
         homography_ekf.tracking(next_frame)
 
-        img = project_with_homography(
-            np.dot(homography_ekf.accumulate_homography[-1], homography_ekf.model_to_image_homography),
-            points, line_index, next_frame)
+        # img = project_with_homography(
+        #     np.dot(homography_ekf.accumulate_homography[-1], homography_ekf.model_to_image_homography),
+        #     points, line_index, next_frame)
 
         # compute ptz
 
@@ -543,12 +650,14 @@ def synthesized_test():
 
         print("-----" + str(i) + "--------")
 
-        print("len:", len(homography_ekf.accumulate_homography))
+        print(len(homography_ekf.previous_keypoints))
+
+        # print("homo:", homography_ekf.accumulate_homography[-1])
 
         print(pose)
 
-        first_camera.set_ptz(pose)
-        img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
+        # first_camera.set_ptz(pose)
+        # img2 = project_with_PTZCamera(first_camera, points, line_index, next_frame)
 
         print("%f" % (pose[0] - gt_pan[i]))
         print("%f" % (pose[1] - gt_tilt[i]))
@@ -562,10 +671,11 @@ def synthesized_test():
         # cv.imshow("image2", img2)
         # cv.waitKey(0)
 
-    # save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
-    #                  "C:/graduate_design/experiment_result/baseline2/2-gauss.mat")
+    save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
+                     "C:/graduate_design/experiment_result/baseline2/synthesized/new/homography-2400.mat")
 
 
 if __name__ == "__main__":
     # soccer3_test()
-    synthesized_test()
+    # synthesized_test()
+    basketball_test()

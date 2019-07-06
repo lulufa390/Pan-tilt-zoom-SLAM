@@ -22,6 +22,9 @@ def detect_sift(im, nfeatures=50):
     sift = cv.xfeatures2d.SIFT_create(nfeatures=nfeatures)
     kp = sift.detect(im, None)
 
+    if nfeatures > 0 and len(kp) > nfeatures:
+        kp = kp[:nfeatures]
+
     sift_pts = np.zeros((len(kp), 2), dtype=np.float32)
     for i in range(len(kp)):
         sift_pts[i][0] = kp[i].pt[0]
@@ -94,7 +97,7 @@ def detect_compute_sift_array(im, nfeatures, norm=True):
         norm = np.linalg.norm(keyframe_des, axis=1).reshape(-1, 1)
         array_des = np.divide(keyframe_des, norm).astype(np.float64)
     else:
-        array_des = keyframe_des.astype(np.float64)
+        array_des = keyframe_des
 
     return array_pts, array_des
 
@@ -172,7 +175,7 @@ def keypoints_masking(kp, mask):
     return inner_index
 
 
-def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose=False):
+def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, pts_array=False, verbose=False):
     # from https://opencv-python-tutroals.readthedocs.io/en
     # /latest/py_tutorials/py_feature2d/py_feature_homography/py_feature_homography.html
     """
@@ -209,8 +212,13 @@ def match_sift_features(keypiont1, descriptor1, keypoint2, descriptor2, verbose=
     for i in range(N):
         idx1, idx2 = good[i].queryIdx, good[i].trainIdx  # query is from the first image
         index1[i], index2[i] = idx1, idx2
-        pts1[i] = keypiont1[idx1].pt
-        pts2[i] = keypoint2[idx2].pt
+
+        if pts_array:
+            pts1[i] = keypiont1[idx1]
+            pts2[i] = keypoint2[idx2]
+        else:
+            pts1[i] = keypiont1[idx1].pt
+            pts2[i] = keypoint2[idx2].pt
 
     # step 2: apply homography constraint
     # inlier index from homography estimation

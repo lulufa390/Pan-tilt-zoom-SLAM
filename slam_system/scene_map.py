@@ -176,34 +176,92 @@ class RandomForestMap:
         self.map_file = "C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/rf_save/debug.txt"
         self.relocalize_file = 'C:/graduate_design/Pan-tilt-zoom-SLAM/slam_system/random_forest/relocalize.mat'
 
-    def add_keyframe(self, keyframe):
-        mat_path = self.keyframe_location + str(keyframe.img_index) + ".mat"
+        self.keyframe_list = []
+        self.feature_method = 'sift'
 
-        f = open(self.mat_path_file, 'a')
-        f.write(mat_path + "\n")
+    def add_keyframe(self, keyframe):
+
+        self.keyframe_list.append(keyframe)
+
+        if len(self.keyframe_list) > 1:
+            self.bundle_adjustment_processing()
+            # for each in self.keyframe_list:
+            #     each.convert_keypoint_to_array()
+
+        f = open(self.mat_path_file, 'w')
+        for frame in self.keyframe_list:
+            mat_path = self.keyframe_location + str(frame.img_index) + ".mat"
+            f.write(mat_path + "\n")
+            frame.save_to_mat(mat_path)
+
         f.close()
 
-        keyframe.save_to_mat(mat_path)
         rf_map = RFMap(self.map_file)
         rf_map.createMap(self.mat_path_file, self.tree_param_file)
+
+    def bundle_adjustment_processing(self):
+        # step 1: get common camera parameters from the first frame
+        ref_frame = self.keyframe_list[0]
+
+        camera_center = ref_frame.center
+        base_rotation = ref_frame.base_rotation
+        u, v = ref_frame.u, ref_frame.v
+
+        max_ba_frame = 10
+
+        N = len(self.keyframe_list)
+        ba_images = []
+        ba_image_indices = []
+        initial_ptzs = []
+
+        no_ba_keyframes = []
+
+        for i in range(N):
+            keyframe = self.keyframe_list[i]
+            if i >= N - max_ba_frame:
+                ba_images.append(keyframe.img)
+                ba_image_indices.append(keyframe.img_index)
+                initial_ptzs.append([keyframe.pan, keyframe.tilt, keyframe.f])
+            else:
+                no_ba_keyframes.append(keyframe)
+
+        # step 3: bundle adjustment
+        feature_method = self.feature_method
+
+        initial_ptzs = np.array(initial_ptzs)
+
+        landmarks, keyframes = bundle_adjustment(ba_images, ba_image_indices, feature_method,
+                                                 initial_ptzs, camera_center, base_rotation, u, v, "./bundle_result")
+
+        self.keyframe_list = no_ba_keyframes
+
+        for i in range(len(keyframes)):
+            keyframe = keyframes[i]
+            if keyframe.get_feature_num() > 0:
+                keyframe.convert_keypoint_to_array()
+                self.keyframe_list.append(keyframe)
+            else:
+                print('warning: key frame, %d, image index %d is not included in the map' % (i, ba_image_indices[i]))
 
     def add_keyframes(self, keyframe_list):
-        for keyframe in keyframe_list:
-            mat_path = self.keyframe_location + str(keyframe.img_index) + ".mat"
-            f = open(self.mat_path_file, 'a')
-            f.write(mat_path + "\n")
-            f.close()
-            keyframe.save_to_mat(mat_path)
+        pass
+        # for keyframe in keyframe_list:
+        #     mat_path = self.keyframe_location + str(keyframe.img_index) + ".mat"
+        #     f = open(self.mat_path_file, 'a')
+        #     f.write(mat_path + "\n")
+        #     f.close()
+        #     keyframe.save_to_mat(mat_path)
+        #     self.keyframe_list.append(keyframe)
+        #
+        # rf_map = RFMap(self.map_file)
+        # rf_map.createMap(self.mat_path_file, self.tree_param_file)
 
-        rf_map = RFMap(self.map_file)
-        rf_map.createMap(self.mat_path_file, self.tree_param_file)
-
-    def relocalize(self, relocalize_frame):
+    def relocalize(self, relocalize_frame, init_ptz):
         rf_map = RFMap(self.map_file)
 
         relocalize_frame.save_to_mat(self.relocalize_file)
 
-        estimated_ptz = rf_map.relocalization(self.relocalize_file)
+        estimated_ptz = rf_map.relocalization(self.relocalize_file, init_ptz)
 
         estimated_ptz = estimated_ptz.ravel()
 

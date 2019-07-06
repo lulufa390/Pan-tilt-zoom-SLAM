@@ -19,7 +19,7 @@ def ut_soccer3():
     first_camera = sequence.get_camera(0)
     first_bounding_box = sequence.get_bounding_box_mask(0)
 
-    slam.init_system(first_img, first_camera, first_bounding_box)
+    slam.init_system(first_img, first_camera, bounding_box=first_bounding_box)
     slam.add_keyframe(first_img, first_camera, 0, enable_rf=False)
     # slam.add_keyframe_random_forest(first_img, first_camera, 0)
 
@@ -34,13 +34,11 @@ def ut_soccer3():
 
         if slam.tracking_lost:
             relocalized_camera = slam.relocalize(img, slam.current_camera, enable_rf=False)
-            # relocalized_camera = slam.relocalize_random_forest(img, slam.current_camera)
-            slam.init_system(img, relocalized_camera, bounding_box)
+            slam.init_system(img, relocalized_camera,bounding_box=bounding_box)
 
             print("do relocalization!")
         elif slam.new_keyframe:
             slam.add_keyframe(img, slam.current_camera, i, enable_rf=False)
-            # slam.add_keyframe_random_forest(img, slam.current_camera, i)
             print("add keyframe!")
 
         print("=====The ", i, " iteration=====")
@@ -52,6 +50,10 @@ def ut_soccer3():
         pan_list.append(slam.cameras[i].pan)
         tilt_list.append(slam.cameras[i].tilt)
         zoom_list.append(slam.cameras[i].focal_length)
+
+    for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
+        keyframe.save_to_mat(str(i) + ".mat")
+
 
     save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
 
@@ -75,7 +77,11 @@ def ut_basketball():
     first_bounding_box = sequence.get_bounding_box_mask(0)
 
     slam.init_system(first_img, first_camera, first_bounding_box)
-    slam.add_keyframe(first_img, first_camera, 0)
+    slam.add_keyframe(first_img, first_camera, 0, enable_rf=False)
+
+    pan_list = [first_camera.get_ptz()[0]]
+    tilt_list = [first_camera.get_ptz()[1]]
+    zoom_list = [first_camera.get_ptz()[2]]
 
     for i in range(1, sequence.length):
         img = sequence.get_image_gray(index=i, dataset_type=0)
@@ -83,12 +89,12 @@ def ut_basketball():
         slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
 
         if slam.tracking_lost:
-            relocalized_camera = slam.relocalize(img, slam.current_camera)
+            relocalized_camera = slam.relocalize(img, slam.current_camera, enable_rf=False)
             slam.init_system(img, relocalized_camera, bounding_box)
 
             print("do relocalization!")
         elif slam.new_keyframe:
-            slam.add_keyframe(img, slam.current_camera, i)
+            slam.add_keyframe(img, slam.current_camera, i, enable_rf=False)
             print("add keyframe!")
 
         print("=====The ", i, " iteration=====")
@@ -97,12 +103,17 @@ def ut_basketball():
         print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
         print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
 
-        slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
+        pan_list.append(slam.cameras[i].pan)
+        tilt_list.append(slam.cameras[i].tilt)
+        zoom_list.append(slam.cameras[i].focal_length)
+
+        # slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
 
         # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
         #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
 
-    slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
+    # slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
+    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
 
     # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
     #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
@@ -114,19 +125,25 @@ def ut_synthesized():
 
     gt_pan, gt_tilt, gt_f = load_camera_pose("../../dataset/synthesized/synthesize_ground_truth.mat", separate=True)
 
+    begin_frame = 3000
+
     slam = PtzSlam()
 
-    first_img = sequence.get_image_gray(index=0, dataset_type=2)
+    first_img = sequence.get_image_gray(index=begin_frame, dataset_type=2)
     first_camera = sequence.camera
-    first_frame_ptz = (gt_pan[0],
-                       gt_tilt[0],
-                       gt_f[0])
+    first_frame_ptz = (gt_pan[begin_frame],
+                       gt_tilt[begin_frame],
+                       gt_f[begin_frame])
     first_camera.set_ptz(first_frame_ptz)
+
+    pan = [first_frame_ptz[0]]
+    tilt = [first_frame_ptz[1]]
+    f = [first_frame_ptz[2]]
 
     slam.init_system(first_img, first_camera)
     # slam.add_keyframe(first_img, first_camera, 0)
 
-    for i in range(1, len(gt_pan)):
+    for i in range(3001, 3600):
         img = sequence.get_image_gray(index=i, dataset_type=2)
         # bounding_box = sequence.get_bounding_box_mask(i)
         slam.tracking(next_img=img, bad_tracking_percentage=0)
@@ -142,14 +159,21 @@ def ut_synthesized():
 
         print("=====The ", i, " iteration=====")
 
-        print("%f" % (slam.cameras[i].pan - gt_pan[i]))
-        print("%f" % (slam.cameras[i].tilt - gt_tilt[i]))
-        print("%f" % (slam.cameras[i].focal_length - gt_f[i]))
+        print("%f" % (slam.cameras[-1].pan - gt_pan[i]))
+        print("%f" % (slam.cameras[-1].tilt - gt_tilt[i]))
+        print("%f" % (slam.cameras[-1].focal_length - gt_f[i]))
+
+        pan.append(slam.cameras[-1].pan)
+        tilt.append(slam.cameras[-1].tilt)
+        f.append(slam.cameras[-1].focal_length)
 
         # slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
 
         # for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
         #     keyframe.save_to_mat("../../map/" + str(i) + ".mat")
+
+    save_camera_pose(np.array(pan), np.array(tilt), np.array(f),
+                     "C:/graduate_design/experiment_result/baseline2/synthesized/ptz-3000.mat")
 
     # slam.keyframe_map.save_keyframes_to_mat("../../map/map_data.mat")
 
@@ -237,19 +261,21 @@ def ut_UBC_hockey():
     first_camera.set_ptz(ptz_extend_list[0])
 
     slam.init_system(first_img, first_camera, bounding_box_manager.get_bounding_box_mask(30, 0.5))
+
+
     slam.add_keyframe(first_img, first_camera, 0)
 
-    with open("result.txt", 'w+') as f:
+    with open("result2.txt", 'w+') as f:
         for i in range(1, sequence_length):
             next_img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[i],
                                  cv.IMREAD_GRAYSCALE)
 
             slam.tracking(next_img=next_img, bad_tracking_percentage=40,
-                          bounding_box=bounding_box_manager.get_bounding_box_mask(i + 30, 0.5))
+                          bounding_box=bounding_box_manager.get_bounding_box_mask(30, 0.5))
 
             if slam.tracking_lost:
                 relocalized_camera = slam.relocalize(next_img, slam.current_camera)
-                slam.init_system(next_img, relocalized_camera, bounding_box_manager.get_bounding_box_mask(30 + i, 0.5))
+                slam.init_system(next_img, relocalized_camera, bounding_box_manager.get_bounding_box_mask(30, 0.5))
                 print("do relocalization!")
 
             elif slam.new_keyframe:
@@ -324,7 +350,8 @@ def baseline_keyframe_based_homography_matching_synthesized():
         gt_tilt_list.append(gt_tilt[i])
         gt_f_list.append(gt_f[i])
 
-    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
+    save_camera_pose(pan_list, tilt_list, zoom_list,
+    "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers-100/keyframe-40.mat")
     # save_camera_pose(gt_p_list, gt_tilt_list, gt_f_list, "./gt.mat")
 
 
@@ -355,7 +382,7 @@ def baseline_keyframe_based_homography_matching_basketball():
 
         keyframes.add_keyframe_without_ba(new_keyframe)
 
-    for i in range(0, sequence.length):
+    for i in range(0, 1200):
         img = sequence.get_image_gray(index=i, dataset_type=0)
         lost_pose = 0, 0, 3000
 
@@ -371,7 +398,7 @@ def baseline_keyframe_based_homography_matching_basketball():
         tilt_list.append(relocalize_pose[1])
         zoom_list.append(relocalize_pose[2])
 
-    save_camera_pose(pan_list, tilt_list, zoom_list, "./", "result.mat")
+    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
 
 
 def baseline_keyframe_based_homography_matching_soccer3():
@@ -412,7 +439,79 @@ def baseline_keyframe_based_homography_matching_soccer3():
         tilt_list.append(relocalize_pose[1])
         zoom_list.append(relocalize_pose[2])
 
-    save_camera_pose(pan_list, tilt_list, zoom_list, "./", "result.mat")
+    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
+
+
+def baseline_keyframe_based_homography_matching_UBC_hockey():
+
+    sequence_length = 900
+    annotation_mat = sio.loadmat("../../UBC_2017/UBC_2017/UBC_hockey_ground_truth.mat")
+    bounding_box_mat_path = "../../UBC_2017/UBC_2017/bounding_box.mat"
+
+    filename_list = ["000" + str(i + 48630) + ".jpg" for i in range(sequence_length)]
+    camera_list = annotation_mat["camera"]
+
+    ptz_list = annotation_mat["ptz"]
+    image_name_list = annotation_mat["image_name"].squeeze()
+
+    ptz_extend_list = -1 * np.ones([sequence_length, 3])
+
+    bounding_box_manager = SequenceManager(bounding_box_path=bounding_box_mat_path)
+
+    for i, image_name in enumerate(image_name_list, 0):
+        index = int(image_name[0][0:-4]) - 48630
+        ptz_extend_list[index, 0:3] = ptz_list[i, 0:3]
+
+    camera_center = annotation_mat["cc"].squeeze()
+    base_rotation = annotation_mat["base_rotation"].squeeze()
+
+    first_img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[0],
+                          cv.IMREAD_GRAYSCALE)
+
+    first_camera = PTZCamera(camera_list[0, 0:2], camera_center, base_rotation)
+
+    first_camera.set_ptz(ptz_extend_list[0])
+
+    keyframes = Map('sift')
+    keyframes_list = [30, 150, 330, 510, 820]
+    for i in keyframes_list:
+        img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[i],
+                  cv.IMREAD_GRAYSCALE)
+
+        p, t, z = ptz_extend_list[i][0:3]
+        u, v = 640, 360
+        c = camera_center
+
+        rotation = np.zeros([3, 3])
+        cv.Rodrigues(base_rotation, rotation)
+        r = rotation
+        new_keyframe = KeyFrame(img, i, c, r, u, v, p, t, z)
+        keyframes.add_keyframe_without_ba(new_keyframe)
+
+    with open("result.txt", 'w+') as f:
+        for i in range(0, sequence_length):
+            next_img = cv.imread("../../UBC_2017/UBC_2017/images/" + filename_list[i],
+                                 cv.IMREAD_GRAYSCALE)
+
+            lost_pose = 0, -20, 2400
+
+            relocalize_pose = relocalization_camera(keyframes, next_img, lost_pose)
+
+            print("=====The ", i, " iteration=====")
+
+            print("Pan: %f" % relocalize_pose[0])
+            print("Tilt: %f" % relocalize_pose[1])
+            print("Zoom: %f" % relocalize_pose[2])
+
+            if not np.all(ptz_extend_list[i] == np.array([-1, -1, -1])):
+                print("Pan Error: %f" % (relocalize_pose[0] - ptz_extend_list[i, 0]))
+                print("Tilt Error: %f" % (relocalize_pose[1] - ptz_extend_list[i, 1]))
+                print("zoom Error: %f" % (relocalize_pose[2] - ptz_extend_list[i, 2]))
+
+                f.write(str(i) + "th frame\n")
+                f.write("Pan Error: %f\n" % (relocalize_pose[0] - ptz_extend_list[i, 0]))
+                f.write("Tilt Error: %f\n" % (relocalize_pose[1] - ptz_extend_list[i, 1]))
+                f.write("zoom Error: %f\n" % (relocalize_pose[2] - ptz_extend_list[i, 2]))
 
 
 def rf_relocalize_soccer3():
@@ -531,6 +630,7 @@ def rf_relocalize_synthesized():
         print("%f" % (ptz[1] - gt_tilt[i]))
         print("%f" % (ptz[2] - gt_f[i]))
 
+
         pan_list.append(ptz[0])
         tilt_list.append(ptz[1])
         zoom_list.append(ptz[2])
@@ -540,17 +640,19 @@ def rf_relocalize_synthesized():
         gt_f_list.append(gt_f[i])
 
     # save_camera_pose(gt_p_list, gt_tilt_list, gt_f_list, "./gt.mat")
-    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
+    save_camera_pose(pan_list, tilt_list, zoom_list,
+    "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers-100/rf-40.mat")
 
 
 
 if __name__ == "__main__":
     # ut_basketball()
     # ut_soccer3()
-    # baseline_keyframe_based_homography_matching_basketball()
+    baseline_keyframe_based_homography_matching_basketball()
     # baseline_keyframe_based_homography_matching_soccer3()
     # ut_UBC_hockey()
+    # baseline_keyframe_based_homography_matching_UBC_hockey()
     # rf_relocalize_soccer3()
     # baseline_keyframe_based_homography_matching_synthesized()
     # rf_relocalize_synthesized()
-    ut_synthesized()
+    # ut_synthesized()

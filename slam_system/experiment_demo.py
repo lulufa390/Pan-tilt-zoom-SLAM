@@ -10,13 +10,13 @@ import copy
 import random
 
 def ut_single_image():
-    sequence = SequenceManager(annotation_path="../../dataset/basketball/synthetic/ground_truth.mat",
+    sequence = SequenceManager(annotation_path="../../dataset/basketball/ground_truth.mat",
                                image_path="../../dataset/synthesized/images")
 
     gt_pan, gt_tilt, gt_f = load_camera_pose("../../dataset/synthesized/synthesize_ground_truth.mat", separate=True)
 
     # read image and ground truth pose
-    im = cv.imread('/Users/jimmy/Code/ptz_slam/dataset/basketball/synthetic/images/00000000.jpg', 0)
+    im = cv.imread('../../dataset/synthesized/images/0.jpg', 0)
     pan, tilt, fl = gt_pan[0], gt_tilt[0], gt_f[0]
     gt_pose = [pan, tilt, fl]
     camera = sequence.camera
@@ -84,17 +84,6 @@ def ut_single_image():
             error_mean[i] = m
         m, std = np.mean(error_mean), np.std(error_mean)
         print('noise, mean, std: {} {} {}'.format(v, m, std))
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

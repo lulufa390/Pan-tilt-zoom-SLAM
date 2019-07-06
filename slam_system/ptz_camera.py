@@ -255,12 +255,12 @@ class PTZCamera:
                       [0, 0, 1]])
 
         rotation = np.dot(np.array([[1, 0, 0],
-                                    [0, cos(tilt), sin(tilt)],
-                                    [0, -sin(tilt), cos(tilt)]]),
+                                    [0, math.cos(tilt), math.sin(tilt)],
+                                    [0, -math.sin(tilt), math.cos(tilt)]]),
 
-                          np.array([[cos(pan), 0, -sin(pan)],
+                          np.array([[math.cos(pan), 0, -math.sin(pan)],
                                     [0, 1, 0],
-                                    [sin(pan), 0, cos(pan)]]))
+                                    [math.sin(pan), 0, math.cos(pan)]]))
 
         rotation = np.dot(rotation, self.base_rotation)
 

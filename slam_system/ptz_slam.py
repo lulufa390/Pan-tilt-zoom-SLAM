@@ -17,7 +17,6 @@ from image_process import *
 from util import *
 
 
-
 class PtzSlam:
     def __init__(self):
         """
@@ -34,6 +33,9 @@ class PtzSlam:
         self.previous_img = None
         self.previous_keypoints = None
         self.previous_keypoints_index = None
+
+        # descriptor for rays
+        self.des = np.ndarray([0, 128])
 
         # camera object for current frame
         self.current_camera = None
@@ -57,6 +59,15 @@ class PtzSlam:
 
         # count for bad tracking frame number. If larger than a threshold, we say this frame is lost.
         self.bad_tracking_cnt = 0
+
+        # hyper params soccer:300 basketball: 500
+        self.keypoint_num = 500
+
+        # previous set to 2
+        self.observe_var = 0.1
+
+        self.angle_var = 0.001
+        self.f_var = 1
 
     def compute_h_jacobian(self, pan, tilt, focal_length, rays):
         """
@@ -135,14 +146,41 @@ class PtzSlam:
         """
 
         # step 1: detect keypoints from image
-        first_img_kp = detect_sift(img, 300)
+        # first_img_kp = detect_sift(img, self.keypoint_num)
+        first_img_kp, first_des = detect_compute_sift_array(img, self.keypoint_num)
         # first_img_kp = detect_orb(img, 300)
         # first_img_kp = add_gauss(first_img_kp, 50, 1280, 720)
+
+        # x1 = copy.copy(img)
+        # x2 = copy.copy(img)
+        #
+        # visualize_points(img, first_img_kp, (255,0,0), 5)
+        # cv.imshow("test", img)
+        # cv.waitKey(0)
+
+        # # for baseline2
+        # delete_index = []
+        # for i in range(first_img_kp.shape[0]):
+        #     world_x, world_y, _ = camera.back_project_to_3d_point(first_img_kp[i, 0], first_img_kp[i, 1])
+        #     # if world_x < 0 or world_x > 118 or world_y < 0 or world_y > 70:
+        #     if world_x < 0 or world_x > 25 or world_y < 0 or world_y > 18:
+        #         delete_index.append(i)
+        # first_img_kp = np.delete(first_img_kp, delete_index, axis=0)
+        # first_des = np.delete(first_des, delete_index, axis=0)
+
+        # visualize_points(x1, first_img_kp, (255,0,0), 5)
+        # cv.imshow("test2", x1)
+        # cv.waitKey(0)
 
         # remove keypoints on players if bounding box mask is provided
         if bounding_box is not None:
             masked_index = keypoints_masking(first_img_kp, bounding_box)
             first_img_kp = first_img_kp[masked_index]
+            first_des = first_des[masked_index]
+
+        # visualize_points(x2, first_img_kp, (255,0,0), 5)
+        # cv.imshow("test3", x2)
+        # cv.waitKey(0)
 
         # step 2: back-project keypoint locations to rays by a known camera pose
         # use key points in first frame to get init rays
@@ -152,11 +190,13 @@ class PtzSlam:
         self.rays = np.ndarray([0, 2])
         self.rays = np.row_stack([self.rays, init_rays])
 
+        self.des = first_des
+
         # step 3: initialize convariance matrix of states
         # some parameters are manually selected
         # Note 0.001 and 1 are two parameters
-        self.state_cov = 0.001 * np.eye(3 + 2 * len(self.rays))
-        self.state_cov[2][2] = 1  # covariance for focal length
+        self.state_cov = self.angle_var * np.eye(3 + 2 * len(self.rays))
+        self.state_cov[2][2] = self.f_var  # covariance for focal length
 
         # the previous frame information
         self.previous_img = img
@@ -212,7 +252,7 @@ class PtzSlam:
                                          focal_length=predicted_camera.focal_length,
                                          rays=updated_ray)
         # get Kalman gain
-        r_k = 2 * np.eye(2 * num_ray)  # todo 2 is a constant value
+        r_k = self.observe_var * np.eye(2 * num_ray)  # todo 2 is a constant value
         s_k = np.dot(np.dot(jacobi, predicted_cov), jacobi.T) + r_k
 
         k_k = np.dot(np.dot(predicted_cov, jacobi.T), np.linalg.inv(s_k))
@@ -262,6 +302,7 @@ class PtzSlam:
         # delete ray_global
         delete_index = np.array(index)
         self.rays = np.delete(self.rays, delete_index, axis=0)
+        self.des = np.delete(self.des, delete_index, axis=0)
 
         # delete p_global
         p_delete_index = np.ndarray([0])
@@ -291,14 +332,26 @@ class PtzSlam:
         keypoints, keypoints_index = self.current_camera.project_rays(
             self.rays, height, width)
 
-        new_keypoints = detect_sift(img, 300)
+        # new_keypoints = detect_sift(img, self.keypoint_num)
+        new_keypoints, new_des = detect_compute_sift_array(img, self.keypoint_num)
         # new_keypoints = detect_orb(img, 300)
         # new_keypoints = add_gauss(new_keypoints, 50, 1280, 720)
+
+        # # for baseline2
+        # delete_index = []
+        # for i in range(new_keypoints.shape[0]):
+        #     world_x, world_y, _ = self.current_camera.back_project_to_3d_point(new_keypoints[i, 0], new_keypoints[i, 1])
+        #     # if world_x < 0 or world_x > 118 or world_y < 0 or world_y > 70:
+        #     if world_x < 0 or world_x > 25 or world_y < 0 or world_y > 18:
+        #         delete_index.append(i)
+        # new_keypoints = np.delete(new_keypoints, delete_index, axis=0)
+        # new_des = np.delete(new_des, delete_index, axis=0)
 
         # remove keypoints in player bounding boxes
         if bounding_box is not None:
             bounding_box_mask_index = keypoints_masking(new_keypoints, bounding_box)
             new_keypoints = new_keypoints[bounding_box_mask_index]
+            new_des = new_des[bounding_box_mask_index]
 
         # remove keypoints near existing keypoints
         mask = np.ones(img.shape[0:2], np.uint8)
@@ -313,6 +366,7 @@ class PtzSlam:
 
         existing_keypoints_mask_index = keypoints_masking(new_keypoints, mask)
         new_keypoints = new_keypoints[existing_keypoints_mask_index]
+        new_des = new_des[existing_keypoints_mask_index]
 
         # check if exist new keypoints after masking.
         if new_keypoints is not None:
@@ -321,10 +375,11 @@ class PtzSlam:
             # add new ray to ray_global, and add new rows and cols to p_global
             for j in range(len(new_rays)):
                 self.rays = np.row_stack([self.rays, new_rays[j]])
+                self.des = np.row_stack([self.des, new_des[j]])
                 self.state_cov = np.row_stack([self.state_cov, np.zeros([2, self.state_cov.shape[1]])])
                 self.state_cov = np.column_stack([self.state_cov, np.zeros([self.state_cov.shape[0], 2])])
-                self.state_cov[self.state_cov.shape[0] - 2, self.state_cov.shape[1] - 2] = 0.01
-                self.state_cov[self.state_cov.shape[0] - 1, self.state_cov.shape[1] - 1] = 0.01
+                self.state_cov[self.state_cov.shape[0] - 2, self.state_cov.shape[1] - 2] = self.angle_var
+                self.state_cov[self.state_cov.shape[0] - 1, self.state_cov.shape[1] - 1] = self.angle_var
                 keypoints_index = np.append(keypoints_index, len(self.rays) - 1)
 
             keypoints = np.concatenate([keypoints, new_keypoints], axis=0)
@@ -348,8 +403,10 @@ class PtzSlam:
         if tracking_percentage < bad_tracking_percentage:
             self.bad_tracking_cnt += 1
 
-        if self.bad_tracking_cnt > 2:
+        if self.bad_tracking_cnt > 3:
+            # if len(self.rf_map.keyframe_list) > 8:
             self.tracking_lost = True
+            self.bad_tracking_cnt = 0
         """
         ===============================
         1. predict step
@@ -357,12 +414,14 @@ class PtzSlam:
         """
 
         # update camera pose with constant speed model
-        self.current_camera = self.cameras[-1]
+        self.current_camera = copy.deepcopy(self.cameras[-1])
+        self.current_camera.set_ptz(self.current_camera.get_ptz() + self.velocity)
+
         if not self.tracking_lost:
             self.cameras.append(self.current_camera)
 
         # update p_global
-        q_k = 5 * np.diag([0.001, 0.001, 1])
+        q_k = 5 * np.diag([self.angle_var, self.angle_var, self.f_var])
         self.state_cov[0:3, 0:3] = self.state_cov[0:3, 0:3] + q_k
 
         """
@@ -393,15 +452,15 @@ class PtzSlam:
 
         print("tracking", tracking_percentage)
 
-        if tracking_percentage > bad_tracking_percentage:
+        # if tracking_percentage > bad_tracking_percentage:
             # basketball set to (10, 25), soccer maybe (10, 15)
-            if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
-                self.new_keyframe = True
+        if self.keyframe_map.good_new_keyframe(self.current_camera.get_ptz(), 10, 15):
+            self.new_keyframe = True
 
-            # if self.rf_map.good_keyframe(self.current_camera.get_ptz(), 10, 15):
-            #     self.new_keyframe = True
+        # if self.rf_map.good_keyframe(self.current_camera.get_ptz(), 10, 15):
+        #     self.new_keyframe = True
 
-    def relocalize(self, img, camera, enable_rf=False):
+    def relocalize(self, img, camera, enable_rf=False, bounding_box=None):
         """
         :param img: image to relocalize
         :param camera: lost camera to relocaize
@@ -417,7 +476,18 @@ class PtzSlam:
             tilt = camera.tilt
             focal_length = camera.focal_length
             relocalize_frame = KeyFrame(img, -1, c, r, u, v, pan, tilt, focal_length)
-            ptz = self.rf_map.relocalize(relocalize_frame)
+
+            kp, des = detect_compute_sift_array(img, 500)
+
+            if bounding_box is not None:
+                masked_index = keypoints_masking(kp, bounding_box)
+                kp = kp[masked_index]
+                des = des[masked_index]
+
+            relocalize_frame.feature_pts = kp
+            relocalize_frame.feature_des = des
+
+            ptz = self.rf_map.relocalize(relocalize_frame, [pan, tilt, focal_length])
             camera.set_ptz(ptz)
 
         else:
@@ -428,7 +498,6 @@ class PtzSlam:
             else:
                 print("Warning: Not enough keyframes for relocalization.")
 
-        self.bad_tracking_cnt = 0
         self.tracking_lost = False
 
         return camera
@@ -453,6 +522,10 @@ class PtzSlam:
         new_keyframe = KeyFrame(img, frame_index, c, r, u, v, pan, tilt, focal_length)
 
         if enable_rf:
+            # new_keyframe.feature_pts, new_keyframe.feature_des = detect_compute_sift_array(img, 1500)
+            new_keyframe.feature_pts = self.previous_keypoints
+            new_keyframe.feature_des = self.des[self.previous_keypoints_index.astype(np.int)]
+
             self.rf_map.add_keyframe(new_keyframe)
             self.new_keyframe = False
 

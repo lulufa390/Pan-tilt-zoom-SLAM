@@ -182,6 +182,7 @@ def add_outliers_cv_keypoints(points, var, max_width, max_height, percentage):
 
     return output
 
+
 def uniform_point_sample_on_field(x_max, y_max, x_num, y_num):
     """
     Uniformly get point samples on play field.
@@ -311,7 +312,11 @@ def compute_error_data(ptz, ground_truth):
     error_t = np.mean(np.fabs(test_t - gt_t))
     error_f = np.mean(np.fabs(test_f - gt_f))
 
-    return error_p, error_t, error_f
+    std_p = np.std(np.fabs(test_p - gt_p))
+    std_t = np.std(np.fabs(test_t - gt_t))
+    std_f = np.std(np.fabs(test_f - gt_f))
+
+    return [error_p, error_t, error_f], [std_p, std_t, std_f]
 
 
 def video_capture(file_path, save_path, begin_time, rate, length):
@@ -360,6 +365,20 @@ def compute_reprojection_error(img, camera, estimated_camera):
     m, std = np.mean(reprojection_error), np.std(reprojection_error)
     return m
 
+
+def merge_ptz(path_list):
+    pan = np.ndarray([0])
+    tilt = np.ndarray([0])
+    f = np.ndarray([0])
+    for path in path_list:
+        p, t, z = load_camera_pose(path, separate=True)
+        pan = np.append(pan, p)
+        tilt = np.append(tilt, t)
+        f = np.append(f, z)
+
+    save_camera_pose(pan, tilt, f, "./merge.mat")
+
+
 def ut_add_gaussian():
     import numpy as np
     import matplotlib
@@ -399,21 +418,34 @@ if __name__ == '__main__':
     #     "/hdd/luke/hockey_data/Olympic_2014/images/", 326000, 25, 800)
 
     # gt = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
-    # test = load_camera_pose("C:/graduate_design/experiment_result/new/soccer/all_rf.mat", True)
-    #
+    # gt = load_camera_pose("../../dataset/basketball/ground_truth.mat")
     # gt = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/gt2.mat",
     #                       True)
-    #
-    # test = load_camera_pose(
-    # "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers/50-keyframe.mat", True)
+    # gt = load_camera_pose("C:/graduate_design/dataset/synthesized/synthesize_ground_truth.mat",
+    #                       True)
 
-    gt = load_camera_pose("C:/graduate_design/dataset/synthesized/synthesize_ground_truth.mat",
-                          True)
+    # gt = load_camera_pose("C:/graduate_design/dataset/synthesized/600-1200.mat", True)
+
+    # test = load_camera_pose("C:/graduate_design/experiment_result/final result/basketball/basketball_baseline1_keyframe", True)
+    # test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/new/homography-2400.mat", True)
+    # test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/homography-600.mat", True)
+    # test = load_camera_pose("C:/graduate_design/experiment_result/new/synthesized/
+    # homography_keyframe_based/relocalization/keyframe-40.mat", True)
     # test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/0-rk.mat", True)
+    # test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/0-rk-50.mat", True)
 
-    test = load_camera_pose("C:/graduate_design/experiment_result/baseline2/synthesized/ptz_ekf_tracking(2).mat", True)
-    error = compute_error_data(test, gt)
+    # error = compute_error_data(test, gt)
+    #
+    # print(error)
 
-    print(error)
+    gt_p, gt_t, gt_f = load_camera_pose("../../dataset/basketball/ground_truth.mat")
+    # gt_p, gt_t, gt_f = load_camera_pose("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat")
+    p, t, f = load_camera_pose("C:/graduate_design/experiment_result/previous_basketball/camera_pose.mat", True)
+
+    draw_camera_plot(gt_p, gt_t, gt_f, p, t, f)
+
+    # merge_ptz(['C:/graduate_design/experiment_result/new/result.mat',
+    #            'C:/graduate_design/experiment_result/new/result2.mat',
+    #            ])
 
     # ut_add_gaussian()
