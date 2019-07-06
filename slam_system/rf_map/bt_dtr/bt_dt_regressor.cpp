@@ -22,6 +22,8 @@ BTDTRegressor::~BTDTRegressor()
             trees_[i] = NULL;
         }
     }
+    trees_.clear();
+    printf("Call BTDTRegressor destructor\n");
 }
 bool BTDTRegressor::predict(const Eigen::VectorXf & feature,
                             const int maxCheck,
@@ -183,7 +185,7 @@ bool BTDTRegressor::saveModel(const char *file_name) const
         }
     }
     fclose(pf);
-    printf("save to %s\n", file_name);
+    //printf("save to %s\n", file_name);
     return true;
 }
 

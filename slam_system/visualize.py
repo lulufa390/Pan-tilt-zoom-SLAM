@@ -78,7 +78,7 @@ def project_with_PTZCamera(camera, model_points, model_line_segment, rgb_image):
         begin = int(model_line_segment[i][0])
         end = int(model_line_segment[i][1])
         cv.line(vis_image, (int(image_points[begin][0]), int(image_points[begin][1])),
-                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 2)
+                (int(image_points[end][0]), int(image_points[end][1])), (0, 0, 255), 4)
     return vis_image
 
 

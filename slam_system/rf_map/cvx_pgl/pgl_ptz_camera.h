@@ -20,6 +20,8 @@ namespace cvx_pgl {
     using Eigen::Vector3d;
     using std::vector;
     using Eigen::MatrixXd;
+    using Eigen::Matrix3d;
+    
     class ptz_camera :public perspective_camera {
         Vector2d     pp_;     // principle point
         Vector3d     cc_;     // camera center
@@ -52,10 +54,10 @@ namespace cvx_pgl {
                         const MatrixXd & img_pts);
         
         
-        double pan(void) { return ptz_[0];}
-        double tilt(void) { return ptz_[1]; }
-        double focal_length(void) { return ptz_[2];}
-        Vector3d ptz(void) { return ptz_; }
+        double pan(void) const { return ptz_[0];}
+        double tilt(void) const { return ptz_[1]; }
+        double focal_length(void) const{ return ptz_[2];}
+        Vector3d ptz(void) const { return ptz_; }
         
         
         // project pan tilt ray to (x, y)
@@ -75,6 +77,11 @@ namespace cvx_pgl {
                                                               const Vector3d & rod,
                                                               Vector3d & ptz,
                                                               perspective_camera & estimated_camera);
+        
+    private:
+        void recompute_KQR();
+        Matrix3d KR_tilt_R_pan_;    // for speed up
+        
     };
     
     // pan, tilt: degree
@@ -100,6 +107,17 @@ namespace cvx_pgl {
                        const vector<Eigen::Vector2d> & image_point,
                        const Vector3d& init_ptz,
                        Vector3d & opt_ptz);
+    
+    // init_ptzs: include camera base information
+    bool bundleAdjustment(const vector<Eigen::Vector2d> & keypoints,
+                          const vector<int>& camera_index,
+                          const vector<int>& keypoint_index,  
+                          const vector<int>& landmark_index,
+                          const vector<ptz_camera> & init_ptzs,
+                          const vector<Eigen::Vector2d> & init_landmarks,
+                          const vector<Eigen::Vector2d>& reference_landmarks,
+                          vector<ptz_camera>& refined_ptzs,
+                          vector<Eigen::Vector2d>& refined_landmmarks);
     
 }
 

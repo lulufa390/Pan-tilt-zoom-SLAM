@@ -511,7 +511,7 @@ void BTDTRTree::hashLeafNode()
     
     int index = 0;
     this->recordLeafNodes(root_, leaf_nodes_, index);    
-    printf("tree leaf node number is %d\n", leaf_node_num_);
+    //printf("tree leaf node number is %d\n", leaf_node_num_);
 }
 
 void BTDTRTree::getLeafNodeDescriptor(Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> & data)
