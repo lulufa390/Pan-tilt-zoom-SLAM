@@ -35,15 +35,7 @@ public:
     void setTreeParameter(const TreeParameter& param);   
    
     
-    // Add one tree to the init model
-    // using files from all feature_label_files and part of init_feature_label_files
-    // model: input and output
-    // feature_label_files: new added files
-    // model_file_name: output, new model
-    bool addTree(BTDTRegressor& model,
-                 const vector<string> & feature_label_files,
-                 const char *model_file_name,
-                 bool verbose = true);
+    
     
     bool addTree(BTDTRegressor& model,
                  const string & feature_label_file,
@@ -65,7 +57,17 @@ public:
 
     
     
-private:    
+private:
+    // Add one tree to the init model
+    // using files from all feature_label_files and part of init_feature_label_files
+    // model: input and output
+    // feature_label_files: new added files
+    // model_file_name: output, new model
+    bool addTree(BTDTRegressor& model,
+                 const vector<string> & feature_label_files,
+                 const char *model_file_name,
+                 bool verbose = true);
+    
     bool validationError(const BTDTRegressor & model,
                          const vector<string> & ptz_keypoint_descriptor_files,
                          const int sample_frame_num = 10) const;
