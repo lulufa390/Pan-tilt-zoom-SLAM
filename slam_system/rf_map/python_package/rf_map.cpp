@@ -41,7 +41,7 @@ void RFMap::createMap(const char * feature_label_file,
     
     btdtr_ptz_util::PTZTreeParameter tree_param;
     tree_param.readFromFile(model_parameter_file);
-    tree_param.printSelf();
+    //tree_param.printSelf();
     
     RFMapBuilder builder;
     builder.setTreeParameter(tree_param);
@@ -120,7 +120,7 @@ void RFMap::relocalizeCamera(const char* feature_location_file_name,
 EXPORTIT RFMap* RFMap_new()
 {
     RFMap* p_map = new RFMap();
-    printf("Before: address %p\n", (void*)p_map);
+    //printf("Debug: before address %p\n", (void*)p_map);
     //printf("Before: value %lld\n", (long long)p_map);
     return p_map;
 }
@@ -136,7 +136,7 @@ EXPORTIT void relocalizeCamera(RFMap* rf_map,
                               const char* test_parameter_file,
                               double* pan_tilt_zoom)
 {
-    printf("after 2: address %p\n", (void*)rf_map);
+    //printf("Debug: after 2 address %p\n", (void*)rf_map);
     rf_map->relocalizeCamera(feature_location_file_name, test_parameter_file, pan_tilt_zoom);
 }
 
@@ -145,8 +145,8 @@ EXPORTIT void createMap(RFMap* rf_map,
                         const char * model_parameter_file,
                         const char * model_name)
 {
-    printf("after 1: address %p\n", (void*)rf_map);
+    //printf("after 1: address %p\n", (void*)rf_map);
     //printf("after: address %p\n", (void*)(&(rf_map->model_)));
     rf_map->createMap(feature_label_file, model_parameter_file, model_name);
-    printf("after 1 1: address %p\n", (void*)rf_map);
+    //printf("after 1 1: address %p\n", (void*)rf_map);
 }
