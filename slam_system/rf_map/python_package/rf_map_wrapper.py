@@ -62,7 +62,7 @@ class RFMap:
         return pan_tilt_zoom
 
 
-def ut_create_map():
+def ut_create_map_relocalization():
     rf_map = RFMap('debug.txt')
 
     if system == "Windows":
@@ -84,4 +84,4 @@ def ut_create_map():
 
 
 if __name__ == '__main__':
-    ut_create_map()
+    ut_create_map_relocalization()

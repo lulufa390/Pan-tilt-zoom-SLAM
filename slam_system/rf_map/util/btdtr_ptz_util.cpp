@@ -14,7 +14,7 @@
 namespace btdtr_ptz_util {
 PTZTreeParameter::PTZTreeParameter()
 {
-    sampled_frame_num_ = 50;
+    sampled_frame_num_ = 5;
     pp_x_ = 1280.0/2;
     pp_y_ = 720.0/2;
 }

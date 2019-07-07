@@ -41,7 +41,10 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
     model.trees_.clear();
     //printf("3 \n");
     
-    tree_param_.printSelf();
+    if (verbose) {
+        tree_param_.printSelf();
+    }
+    
     model.reg_tree_param_ = tree_param_.base_tree_param_;
     
     const int frame_num = (int)feature_label_files.size();
@@ -113,121 +116,10 @@ bool  RFMapBuilder::buildModel(BTDTRegressor& model,
                 
         model.trees_.push_back(pTree);
         if (model_file_name != NULL) {
-            model.saveModel(model_file_name);            
+            model.saveModel(model_file_name);
         }
         //this->validationError(model, feature_label_files, std::min(4, frame_num));
     }
-    return true;
-}
-
-bool RFMapBuilder::addTree(BTDTRegressor& model,
-                           const vector<string> & feature_label_files,
-                           const char *model_file_name)
-{
-    assert(feature_label_files.size() > 0);
-    
-    tree_param_.base_tree_param_.tree_num_ += 1;
-    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
-    float feature_dist_threshold = 0.05;
-    float out_of_bag_error_threshold = 0.05;
-    
-    // sample from selected frames
-    vector<VectorXf> features;
-    vector<VectorXf> labels;
-    for (int j = 0; j<feature_label_files.size(); j++) {
-        vector<btdtr_ptz_util::PTZTrainingSample> samples;
-        Eigen::Vector3f dummy_ptz;  // not used
-        btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_files[j].c_str(), pp, dummy_ptz, samples);
-        for (int k = 0; k< samples.size(); k++) {
-            features.push_back(samples[k].descriptor_);
-            labels.push_back(samples[k].pan_tilt_);
-        }
-    }
-    
-    assert(features.size() == labels.size());
-    
-    vector<unsigned int> indices;
-    this->outOfBagSampling(model, features, labels, indices,
-                           feature_dist_threshold, out_of_bag_error_threshold);
-    printf("training sample number is %lu\n", features.size());
-        
-    model.feature_dim_ = (int)features[0].size();
-    model.label_dim_   = (int)labels[0].size();
-    
-    TreePtr pTree = new TreeType();
-    assert(pTree);
-    double tt = clock();
-    pTree->buildTree(features, labels, indices, tree_param_.base_tree_param_);
-    printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
-        
-    // training error
-    vector<Eigen::VectorXf> errors;
-    for (int k = 0; k< features.size(); k++) {
-        Eigen::VectorXf feat = features[k];
-        Eigen::VectorXf label = labels[k];
-        Eigen::VectorXf pred;
-        float dist = 0.0f;
-        pTree->predict(feat, 1, pred, dist);
-        errors.push_back(pred - label);
-    }
-    Eigen::VectorXf q1_error, q2_error, q3_error;
-    DTUtil::quartileError(errors, q1_error, q2_error, q3_error);
-    cout<<"Training first quartile error: \n"<<q1_error.transpose()<<endl;
-    cout<<"Training second quartile (median) error: \n"<<q2_error.transpose()<<endl;
-    cout<<"Training third quartile error: \n"<<q3_error.transpose()<<endl<<endl;
-    
-    model.trees_.push_back(pTree);
-    model.reg_tree_param_.tree_num_ += 1;
-    assert(model.trees_.size() == model.reg_tree_param_.tree_num_);
-    
-    if (model_file_name != NULL) {
-        model.saveModel(model_file_name);
-        printf("saved %s\n", model_file_name);
-    }
-    
-    this->validationError(model, feature_label_files, 1);
-    return true;
-}
-
-bool RFMapBuilder::updateTree(BTDTRegressor& model,
-                              const vector<string> & feature_label_files,
-                              const char *model_file_name)
-{
-    assert(feature_label_files.size() > 0);
-    assert(model.trees_.size() > 0);
-    
-    tree_param_.base_tree_param_.tree_num_ += 1;
-    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
-    float feature_dist_threshold = 0.05;
-    float out_of_bag_error_threshold = 0.05;
-    
-    // sample from selected frames
-    vector<VectorXf> features;
-    vector<VectorXf> labels;
-    for (int j = 0; j<feature_label_files.size(); j++) {
-        vector<btdtr_ptz_util::PTZTrainingSample> samples;
-        Eigen::Vector3f dummy_ptz;  // not used
-        btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_files[j].c_str(), pp, dummy_ptz, samples);
-        for (int k = 0; k< samples.size(); k++) {
-            features.push_back(samples[k].descriptor_);
-            labels.push_back(samples[k].pan_tilt_);
-        }
-    }
-    
-    assert(features.size() == labels.size());
-    
-    vector<unsigned int> indices = DTUtil::range<unsigned int>(0, (int)features.size(), 1);
-    assert(indices.size() == features.size());   
-    
-    model.feature_dim_ = (int)features[0].size();
-    model.label_dim_   = (int)labels[0].size();
-    
-    TreePtr pTree = model.trees_.back();
-    assert(pTree);
-    double tt = clock();
-    pTree->updateTree(features, labels, indices, tree_param_.base_tree_param_);
-    printf("update a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
-    
     return true;
 }
 

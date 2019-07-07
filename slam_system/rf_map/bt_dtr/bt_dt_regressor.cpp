@@ -23,7 +23,7 @@ BTDTRegressor::~BTDTRegressor()
         }
     }
     trees_.clear();
-    printf("Call BTDTRegressor destructor\n");
+    //printf("Call BTDTRegressor destructor\n");
 }
 bool BTDTRegressor::predict(const Eigen::VectorXf & feature,
                             const int maxCheck,

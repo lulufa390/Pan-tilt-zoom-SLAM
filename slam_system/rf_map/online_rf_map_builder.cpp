@@ -9,6 +9,7 @@
 #include "online_rf_map_builder.hpp"
 #include "dt_util.hpp"
 #include <iostream>
+#include <unordered_set>
 #include "mat_io.hpp"
 
 using namespace::std;
@@ -29,17 +30,51 @@ void OnlineRFMapBuilder::setTreeParameter(const TreeParameter& param)
     tree_param_.base_tree_param_.tree_num_ = 0; // initialization
 }
 
+bool OnlineRFMapBuilder::addTree(BTDTRegressor& model,
+                              const string & feature_label_file,
+                              const char *model_file_name,
+                              bool verbose)
+{
+    // 1. get unique files
+    unordered_set<string> all_files;
+    for (const auto& files: tree_feature_label_files_) {
+        for (const string& f:files) {
+            all_files.insert(f);
+        }
+    }
+    vector<string> unique_files;
+    for (const auto&f: all_files) {
+        unique_files.push_back(f);
+    }
+    
+    // 2. sample training files
+    const int frame_num = (int)unique_files.size();
+    const int sampled_frame_num = std::min(frame_num, tree_param_.sampled_frame_num_) - 1;
+    vector<string> sampled_files;
+    for (int j = 0; j<sampled_frame_num; j++) {
+        int index = rand()%frame_num;
+        sampled_files.push_back(unique_files[index]);
+    }
+    sampled_files.push_back(feature_label_file);
+    
+    return this->addTree(model, sampled_files, model_file_name, verbose);
+}
 
 bool OnlineRFMapBuilder::addTree(BTDTRegressor& model,
-                           const vector<string> & feature_label_files,
-                           const char *model_file_name)
+                              const vector<string> & feature_label_files,
+                              const char *model_file_name,
+                              bool verbose)
 {
     assert(feature_label_files.size() > 0);
+    assert(model.trees_.size() == tree_feature_label_files_.size());
     
+    // book keep feature label files
     tree_param_.base_tree_param_.tree_num_ += 1;
-    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);    
+    tree_feature_label_files_.push_back(feature_label_files);
+    model.reg_tree_param_ = tree_param_.base_tree_param_;
     
-    // sample from selected frames
+    // 1. read training examples
+    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
     vector<VectorXf> features;
     vector<VectorXf> labels;
     for (int j = 0; j<feature_label_files.size(); j++) {
@@ -54,6 +89,7 @@ bool OnlineRFMapBuilder::addTree(BTDTRegressor& model,
     
     assert(features.size() == labels.size());
     
+    // 2. train tree
     vector<unsigned int> indices = DTUtil::range<unsigned int>(0, (int)features.size(), 1);
     model.feature_dim_ = (int)features[0].size();
     model.label_dim_   = (int)labels[0].size();
@@ -62,70 +98,81 @@ bool OnlineRFMapBuilder::addTree(BTDTRegressor& model,
     assert(pTree);
     double tt = clock();
     pTree->buildTree(features, labels, indices, tree_param_.base_tree_param_);
-    printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
     
-    // training error
-    vector<Eigen::VectorXf> errors;
-    for (int k = 0; k< features.size(); k++) {
-        Eigen::VectorXf feat = features[k];
-        Eigen::VectorXf label = labels[k];
-        Eigen::VectorXf pred;
-        float dist = 0.0f;
-        pTree->predict(feat, 1, pred, dist);
-        errors.push_back(pred - label);
+    
+    if (verbose) {
+        printf("build a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
     }
-    Eigen::VectorXf q1_error, q2_error, q3_error;
-    DTUtil::quartileError(errors, q1_error, q2_error, q3_error);
-    cout<<"Training first quartile error: \n"<<q1_error.transpose()<<endl;
-    cout<<"Training second quartile (median) error: \n"<<q2_error.transpose()<<endl;
-    cout<<"Training third quartile error: \n"<<q3_error.transpose()<<endl<<endl;
     
+    // 3. update model
     model.trees_.push_back(pTree);
-    model.reg_tree_param_.tree_num_ += 1;
     assert(model.trees_.size() == model.reg_tree_param_.tree_num_);
     
     if (model_file_name != NULL) {
         model.saveModel(model_file_name);
-        printf("saved %s\n", model_file_name);
+        if (verbose) {
+            printf("saved %s\n", model_file_name);
+        }
     }
     
-    this->validationError(model, feature_label_files, 1);
+    // 4. training error
+    if (verbose) {
+        vector<Eigen::VectorXf> errors;
+        for (int k = 0; k< features.size(); k++) {
+            Eigen::VectorXf feat = features[k];
+            Eigen::VectorXf label = labels[k];
+            Eigen::VectorXf pred;
+            float dist = 0.0f;
+            pTree->predict(feat, 1, pred, dist);
+            errors.push_back(pred - label);
+        }
+        
+        Eigen::VectorXf q1_error, q2_error, q3_error;
+        DTUtil::quartileError(errors, q1_error, q2_error, q3_error);
+        cout<<"Training first quartile error: \n"<<q1_error.transpose()<<endl;
+        cout<<"Training second quartile (median) error: \n"<<q2_error.transpose()<<endl;
+        cout<<"Training third quartile error: \n"<<q3_error.transpose()<<endl<<endl;
+    }
+    
+    
+    //this->validationError(model, feature_label_files, 1);
     return true;
 }
 
 bool OnlineRFMapBuilder::updateTree(BTDTRegressor& model,
-                                    const int tree_index,
-                                    const vector<string> & feature_label_files,
-                                    const char *model_file_name)
+                                    
+                                    const string & feature_label_file,
+                                    const char *model_file_name,
+                                    bool verbose)
 {
-    assert(tree_index >= 0);
+    assert(model.trees_.size() > 0);
+    
+    const int tree_index = rand()%model.trees_.size();
+    
+    // add new file to book-keeper
+    tree_feature_label_files_[tree_index].push_back(feature_label_file);
     const int tree_num = model.treeNum();
     assert(tree_index < tree_num);
     
-    assert(feature_label_files.size() > 0);
-    assert(model.trees_.size() > 0);
-    
+    // 1. read training examples
     const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
-    
-    
-    // sample from selected frames
     vector<VectorXf> features;
     vector<VectorXf> labels;
-    for (int j = 0; j<feature_label_files.size(); j++) {
+    for (int j = 0; j<tree_feature_label_files_[tree_index].size(); j++) {
         vector<btdtr_ptz_util::PTZTrainingSample> samples;
         Eigen::Vector3f dummy_ptz;  // not used
-        btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_files[j].c_str(), pp, dummy_ptz, samples);
+        btdtr_ptz_util::generatePTZSampleWithFeature(tree_feature_label_files_[tree_index][j].c_str(),
+                                                     pp, dummy_ptz, samples);
         for (int k = 0; k< samples.size(); k++) {
             features.push_back(samples[k].descriptor_);
             labels.push_back(samples[k].pan_tilt_);
         }
     }
-    
     assert(features.size() == labels.size());
     
+    // 1. update the tree
     vector<unsigned int> indices = DTUtil::range<unsigned int>(0, (int)features.size(), 1);
     assert(indices.size() == features.size());
-    
     model.feature_dim_ = (int)features[0].size();
     model.label_dim_   = (int)labels[0].size();
     
@@ -135,6 +182,12 @@ bool OnlineRFMapBuilder::updateTree(BTDTRegressor& model,
     pTree->updateTree(features, labels, indices, tree_param_.base_tree_param_);
     printf("update a tree cost %lf seconds\n", (clock()-tt)/CLOCKS_PER_SEC );
     
+    if (model_file_name != NULL) {
+        model.saveModel(model_file_name);
+        if (verbose) {
+            printf("saved %s\n", model_file_name);
+        }
+    }    
     return true;
 }
 
@@ -183,31 +236,60 @@ bool OnlineRFMapBuilder::validationError(const BTDTRegressor & model,
     return true;
 }
 
-void OnlineRFMapBuilder::outOfBagSampling(const BTDTRegressor & model,
-                                    vector<VectorXf>& features,
-                                    vector<VectorXf>& labels,
-                                    vector<unsigned int> & selected_indices,
-                                    float error_threshold)
+bool OnlineRFMapBuilder::isAddTree(const BTDTRegressor & model,
+                                         const string & feature_label_file,
+                                         const double error_threshold,
+                                         const double percentage_threshold)
 {
+    vector<float> errors;
+    this->computePredictionError(model, feature_label_file, errors);
+    
+    double ratio = 0;
+    for (const auto& e:errors) {
+        if (e < error_threshold) {
+            ratio += 1;
+        }
+    }
+    ratio /= errors.size();
+    printf("error threahold: %.03f percentage %.03f\n", error_threshold, ratio);
+    if (ratio < percentage_threshold) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+void OnlineRFMapBuilder::computePredictionError(const BTDTRegressor & model,
+                                               const string & feature_label_file,
+                                               vector<float> & prediction_error)
+{
+    // 1. read training examples
+    const Eigen::Vector2f pp(tree_param_.pp_x_, tree_param_.pp_y_);
+    vector<VectorXf> features;
+    vector<VectorXf> labels;
+    vector<btdtr_ptz_util::PTZTrainingSample> samples;
+    
+    Eigen::Vector3f dummy_ptz;  // not used
+    btdtr_ptz_util::generatePTZSampleWithFeature(feature_label_file.c_str(), pp, dummy_ptz, samples);
+    for (const auto &s:samples) {
+        features.push_back(s.descriptor_);
+        labels.push_back(s.pan_tilt_);
+    }    
     assert(features.size() == labels.size());
-    assert(selected_indices.size() == 0);
     
     // use a pre-trained the model to select new examples
-    // if the prediction error is smaller than a threshold, then the new example is discarded    
+    // if the prediction error is smaller than a threshold, then the new example is discarded
     const int max_check = 4;
     for (int i = 0; i<features.size(); i++) {
         vector<VectorXf> preds;
         vector<float> dists;
-        
         bool is_pred = model.predict(features[i], max_check, preds, dists);
         assert(is_pred);
-        
         VectorXf dif = labels[i] - preds[0];
         float pred_error = dif.norm();
-        
-        if (pred_error < error_threshold) {
-            continue;
-        }
-        selected_indices.push_back(i);
+        prediction_error.push_back(pred_error);
     }
 }
+
+
