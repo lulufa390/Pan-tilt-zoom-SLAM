@@ -20,7 +20,7 @@ class Map:
         assert feature_method == 'sift' or 'orb' or 'latch'
 
         # [N, 2] float64 array
-        self.global_ray = []
+        self.global_ray = np.ndarray([0, 2])
 
         # list of KeyFrame object
         self.keyframe_list = []

@@ -10,6 +10,7 @@ import copy
 
 from sequence_manager import SequenceManager
 from scene_map import Map, RandomForestMap
+from nearest_neighbor import NNBasedMap
 from key_frame import KeyFrame
 from relocalization import relocalization_camera
 from ptz_camera import PTZCamera
