@@ -28,7 +28,7 @@ void OnlineRFMap::createMap(const char * feature_label_file,
     tree_param.readFromFile(model_parameter_file);
     
     builder_.setTreeParameter(tree_param);
-    builder_.addTree(model_, feature_label_file, model_name);
+    builder_.addTree(model_, feature_label_file, model_name, false);
 }
 
 // update a map: may add or update a tree
@@ -40,10 +40,10 @@ void OnlineRFMap::updateMap(const char * feature_label_file,
     bool is_add = builder_.isAddTree(model_, string(feature_label_file),
                                      error_threshold, percentage_threshold);
     if (is_add) {
-        builder_.addTree(model_, feature_label_file, model_name);
+        builder_.addTree(model_, feature_label_file, model_name, false);
     }
     else {
-        builder_.updateTree(model_, feature_label_file, model_name);
+        builder_.updateTree(model_, feature_label_file, model_name, false);
     }
 }
 
