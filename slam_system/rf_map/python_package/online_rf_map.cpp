@@ -1,65 +1,59 @@
 //
-//  rf_map.cpp
+//  online_rf_map.cpp
 //  ptz_slam_dev
 //
-//  Created by jimmy on 2019-07-03.
+//  Created by jimmy on 2019-07-06.
 //  Copyright © 2019 Nowhere Planet. All rights reserved.
 //
 
-#include <string>
-#include <vector>
-#include <fstream>
-#include "rf_map.hpp"
-#include "rf_map_builder.hpp"
-#include "btdtr_ptz_util.h"
+#include "online_rf_map.hpp"
 #include "ptz_pose_estimation.h"
 
-using namespace std;
-
-RFMap::RFMap()
+OnlineRFMap::OnlineRFMap()
 {
     
 }
 
-RFMap::~RFMap()
+OnlineRFMap::~OnlineRFMap()
 {
     
 }
-// Create a model from a list of feature_label files
-void RFMap::createMap(const char * feature_label_file,
-                        const char * model_parameter_file,
-                        const char * model_name)
+
+// create a map from a single feature label file
+void OnlineRFMap::createMap(const char * feature_label_file,
+                          const char * model_parameter_file,
+                          const char * model_name)
 {
-    // 1. read feature label file
-    vector<string> feature_files;
-    ifstream file(feature_label_file);
-    string str;
-    while(std::getline(file, str)) {
-        feature_files.push_back(str);
-    }
-    printf("read %lu feature label files\n", feature_files.size());
-    
     btdtr_ptz_util::PTZTreeParameter tree_param;
     tree_param.readFromFile(model_parameter_file);
-    //tree_param.printSelf();
     
-    RFMapBuilder builder;
-    builder.setTreeParameter(tree_param);
-    
-    //printf("start build model\n");
-    
-    builder.buildModel(model_, feature_files, model_name, false);
-    model_.saveModel(model_name);
-    printf("save model to file %s\n", model_name);
+    builder_.setTreeParameter(tree_param);
+    builder_.addTree(model_, feature_label_file, model_name);
 }
 
-// relocalize a camera using the model
-// parameter_file: testing parameter
-// pan_tilt_zoom: output
-void RFMap::relocalizeCamera(const char* feature_location_file_name,
-                            const char* test_parameter_file,
-                            double* pan_tilt_zoom)
+// update a map: may add or update a tree
+void OnlineRFMap::updateMap(const char * feature_label_file,
+                          const char * model_name)
 {
+    const double error_threshold = 0.1;
+    const double percentage_threshold = 0.5;
+    bool is_add = builder_.isAddTree(model_, string(feature_label_file),
+                                     error_threshold, percentage_threshold);
+    if (is_add) {
+        builder_.addTree(model_, feature_label_file, model_name);
+    }
+    else {
+        builder_.updateTree(model_, feature_label_file, model_name);
+    }
+}
+
+
+
+void OnlineRFMap::relocalizeCamera(const char* feature_location_file_name,
+                                 const char* test_parameter_file,
+                                 double* pan_tilt_zoom)
+{
+    //@todo the same code as in RFMap
     int max_check = 4;
     double distance_threshold = 0.2;
     Eigen::Vector2f pp(1280/2.0, 720/2.0);
@@ -116,37 +110,43 @@ void RFMap::relocalizeCamera(const char* feature_location_file_name,
     }
 }
 
+
 /******************-----------C inter face--------------******************/
-EXPORTIT RFMap* RFMap_new()
+EXPORTIT OnlineRFMap* OnlineRFMap_new()
 {
-    RFMap* p_map = new RFMap();
-    //printf("Debug: before address %p\n", (void*)p_map);
-    //printf("Before: value %lld\n", (long long)p_map);
-    return p_map;
+    OnlineRFMap* ol_rf_map = new OnlineRFMap();
+    return ol_rf_map;
 }
 
-EXPORTIT void RFMap_delete(RFMap* rf_map)
+EXPORTIT void OnlineRFMap_delete(OnlineRFMap* ol_rf_map)
 {
-    delete rf_map;
-    rf_map = nullptr;
+    assert(ol_rf_map != nullptr);
+    delete ol_rf_map;
+    ol_rf_map = nullptr;
 }
 
-EXPORTIT void relocalizeCamera(RFMap* rf_map,
-                              const char* feature_location_file_name,
-                              const char* test_parameter_file,
-                              double* pan_tilt_zoom)
+EXPORTIT void createOnlineMap(OnlineRFMap* ol_rf_map,
+                              const char * feature_label_file,
+                              const char * model_parameter_file,
+                              const char * model_name)
 {
-    //printf("Debug: after 2 address %p\n", (void*)rf_map);
-    rf_map->relocalizeCamera(feature_location_file_name, test_parameter_file, pan_tilt_zoom);
+    assert(ol_rf_map != nullptr);
+    ol_rf_map->createMap(feature_label_file, model_parameter_file, model_name);
 }
 
-EXPORTIT void createMap(RFMap* rf_map,
-                        const char * feature_label_file,
-                        const char * model_parameter_file,
-                        const char * model_name)
+EXPORTIT void updateOnlineMap(OnlineRFMap* ol_rf_map,
+                              const char * feature_label_file,
+                              const char * model_name)
 {
-    //printf("after 1: address %p\n", (void*)rf_map);
-    //printf("after: address %p\n", (void*)(&(rf_map->model_)));
-    rf_map->createMap(feature_label_file, model_parameter_file, model_name);
-    //printf("after 1 1: address %p\n", (void*)rf_map);
+    assert(ol_rf_map != nullptr);
+    ol_rf_map->updateMap(feature_label_file, model_name);
+}
+
+EXPORTIT void relocalizeCameraOnline(OnlineRFMap* ol_rf_map,
+                               const char* feature_location_file_name,
+                               const char* test_parameter_file,
+                               double* pan_tilt_zoom)
+{
+    assert(ol_rf_map != nullptr);
+    ol_rf_map->relocalizeCamera(feature_location_file_name, test_parameter_file, pan_tilt_zoom);
 }
