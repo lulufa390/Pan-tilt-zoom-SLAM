@@ -12,7 +12,7 @@ from key_frame import KeyFrame
 from util import overlap_pan_angle
 from bundle_adjustment import bundle_adjustment
 from sequence_manager import SequenceManager
-from rf_map.python_package.rf_map import RFMap
+from rf_map.python_package.backup.rf_map import RFMap
 
 
 class Map:

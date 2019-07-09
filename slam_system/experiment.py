@@ -678,6 +678,8 @@ def nn_relocalized_synthesized():
 
         kp, des = detect_compute_sift_array(img, 300, norm=False)
 
+        kp = add_outliers(kp, 1, 1280, 720, 2)
+
         new_keyframe.feature_pts = kp
         new_keyframe.feature_des = des
 
@@ -699,7 +701,9 @@ def nn_relocalized_synthesized():
 
         kp, des = detect_compute_sift_array(img, 300, norm=False)
 
+        kp = add_outliers(kp, 1, 1280, 720, 2)
         relocalize_frame.feature_pts = kp
+
         relocalize_frame.feature_des = des
 
         ptz = nn_map.relocalize(relocalize_frame)
@@ -718,9 +722,9 @@ def nn_relocalized_synthesized():
         gt_tilt_list.append(gt_tilt[i])
         gt_f_list.append(gt_f[i])
 
-    # save_camera_pose(gt_p_list, gt_tilt_list, gt_f_list, "./gt.mat")
+    # save_camera_pose(gt_p_list, gt_tilt_list, gt_f_list, "../../result/nearest_neighbor/gt.mat")
     save_camera_pose(pan_list, tilt_list, zoom_list,
-                     "C:/graduate_design/experiment_result/new/synthesized/homography_keyframe_based/outliers-100/rf-40.mat")
+                     "../../result/nearest_neighbor/percentage-2")
 
 
 if __name__ == "__main__":
