@@ -29,13 +29,9 @@ private:
     
 public:
     OnlineRFMapBuilder();
-    ~OnlineRFMapBuilder();
+    ~OnlineRFMapBuilder();    
     
-    
-    void setTreeParameter(const TreeParameter& param);   
-   
-    
-    
+    void setTreeParameter(const TreeParameter& param);
     
     bool addTree(BTDTRegressor& model,
                  const string & feature_label_file,
@@ -54,8 +50,6 @@ public:
                         const string & feature_label_file,
                         const double error_threshold,
                         const double percentage_threshold);
-
-    
     
 private:
     // Add one tree to the init model

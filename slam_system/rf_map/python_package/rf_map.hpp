@@ -34,8 +34,9 @@ public:
     // parameter_file: testing parameter
     // pan_tilt_zoom: input output
     void relocalizeCamera(const char* feature_location_file_name,
-                         const char* test_parameter_file,
-                         double* pan_tilt_zoom);    
+                          const char* test_parameter_file,
+                          double* pan_tilt_zoom);
+    
 };
 
 

@@ -72,7 +72,7 @@ set(SOURCE_UTIL
 
 
 
-set(SOURCE_CODE rf_map_builder.cpp ${SOURCE_CVX_GL} ${SOURCE_CVX_PGL}
+set(SOURCE_CODE rf_map_builder.cpp online_rf_map_builder.cpp ${SOURCE_CVX_GL} ${SOURCE_CVX_PGL}
      ${SOURCE_BT_DTR} ${SOURCE_DT_UTIL} ${SOURCE_UTIL} )
 
 
@@ -83,7 +83,7 @@ target_link_libraries(rf_map matio flann)
 
 # for python interface
 include_directories (./python_package)
-set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map.cpp)
+set(SOURCE_RF_MAP_PYTHON ./python_package/rf_map.cpp ./python_package/online_rf_map.cpp)
 add_library(rf_map_python SHARED ${SOURCE_CODE} ${SOURCE_RF_MAP_PYTHON})
 target_link_libraries(rf_map_python matio flann)
 
