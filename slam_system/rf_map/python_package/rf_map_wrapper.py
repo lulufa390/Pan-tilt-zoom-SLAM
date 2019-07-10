@@ -61,6 +61,25 @@ class RFMap:
                              c_void_p(pan_tilt_zoom.ctypes.data))
         return pan_tilt_zoom
 
+    @staticmethod
+    def estimateCameraRANSAC(keypoint_ray_file_name, init_pan_tilt_zoom):
+        """
+        :param keypoint_ray_file_name: .mat file has 'keypoints' and 'rays'
+        :param init_pan_tilt_zoom: 3 x 1, initial camera parameter
+        :return:
+        """
+
+        keypoint_ray_file_name = keypoint_ray_file_name.encode('utf-8')
+        pan_tilt_zoom = np.zeros((3, 1))
+        for i in range(3):
+            pan_tilt_zoom[i] = init_pan_tilt_zoom[i]
+
+        lib.estimateCameraRANSAC.argtypes = [c_char_p, c_void_p]
+
+        lib.estimateCameraRANSAC(keypoint_ray_file_name,
+                                 c_char_p(pan_tilt_zoom.ctypes.data))
+
+        return pan_tilt_zoom
 
 def ut_create_map_relocalization():
     rf_map = RFMap('debug.txt')
@@ -82,6 +101,25 @@ def ut_create_map_relocalization():
     estimated_ptz = rf_map.relocalization(feature_location_file, init_ptz)
     print('estimated ptz is {}'.format(estimated_ptz))
 
+def ut_estimateCameraRANSAC():
+    import scipy.io as sio
+
+    for i in range(0, 3480, 120):
+        file_name = '/Users/jimmy/Desktop/nn_test_data/outliers-50/{}.mat'.format(i)
+        data = sio.loadmat(file_name)
+
+        ptz_gt = data['ptz']
+        init_ptz = np.zeros((3, 1))
+
+        estimated_ptz = RFMap.estimateCameraRANSAC(file_name, init_ptz)
+
+        print('estimated ptz is {}'.format(estimated_ptz))
+        print('ground truth ptz is {}'.format(ptz_gt))
+
+
+
+
 
 if __name__ == '__main__':
-    ut_create_map_relocalization()
+    #ut_create_map_relocalization()
+    ut_estimateCameraRANSAC()

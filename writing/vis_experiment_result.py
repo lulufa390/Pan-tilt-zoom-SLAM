@@ -386,13 +386,66 @@ def vis_rf_keyframe():
     plt.plot(points[:, 0], points[:, 1], '*')
     plt.show()
 
+def compute_nearest_neighbor_calibration_error():
+    import sys
+    sys.path.append('../')
+
+    import scipy.io as sio
+    from slam_system.rf_map.python_package.rf_map_wrapper import RFMap
+
+    def compute_angular_error(gt_ptz, pred_ptz):
+        dif = gt_ptz - pred_ptz
+        dif = dif[:, 0:2]
+        dif = np.square(dif)
+        dif = np.sum(dif, axis=1)
+        errors = np.sqrt(dif)
+        return errors
+
+
+    threshold = 2.0
+    gt_ptz = np.zeros((30, 3))
+    nn_ptz = np.zeros((30, 3))
+
+
+    for i in range(0, 30):
+        idx = 120*i
+        file_name = '/Users/jimmy/Desktop/nn_test_data/outliers-0/{}.mat'.format(idx)
+        data = sio.loadmat(file_name)
+
+        ptz = data['ptz']
+        init_ptz = np.zeros((3, 1))
+
+        for j in range(3):
+            init_ptz[j] = ptz[j] + np.random.normal(0, 1, 1)
+        estimated_ptz = RFMap.estimateCameraRANSAC(file_name, init_ptz)
+
+        for j in range(3):
+            gt_ptz[i][j] = data['ptz'][j]
+            nn_ptz[i][j] = estimated_ptz[j]
+
+    print('ground truth ptz: {}'.format(gt_ptz))
+    print('NN ptz: {}'.format(nn_ptz))
+    num_camera = gt_ptz.shape[0]
+    angular_errors = compute_angular_error(gt_ptz, nn_ptz)
+    p = np.where(angular_errors < threshold)[0].shape[0] / num_camera
+
+    print('percentage is {}'.format(p))
+    # 0: 93
+    # 10: 80
+    # 20: 73.0
+    # 30: 60.0
+    # 40: 73.3
+    # 50: 66.6
+
 
 #rmse()
 #trajectory()
 #reprojection_error()
 #vis_reprojection_error_area()
 #vis_reprojection_error_multiple_sequence()
-vis_reprojection_error_multiple_sequence_subplot()
+#vis_reprojection_error_multiple_sequence_subplot()
+
+compute_nearest_neighbor_calibration_error()
 
 #computer_ground_truth_velocity()
 

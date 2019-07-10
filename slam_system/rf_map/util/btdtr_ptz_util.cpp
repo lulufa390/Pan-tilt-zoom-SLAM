@@ -289,6 +289,33 @@ void readSequenceData(const char * sequence_file_name,
     fclose(pf);
     printf("load %lu files\n", feature_files.size());
 }
+    
+    void readKeypointRay(const char* mat_file,
+                         vector<Eigen::Vector2d> & image_points,
+                         vector<Eigen::Vector2d> & rays)
+    {
+        Eigen::MatrixXd keypoint_data;
+        Eigen::MatrixXd ray_data;
+        
+        bool is_read = matio::readMatrix(mat_file, "keypoints", keypoint_data, false);
+        assert(is_read);
+        is_read = matio::readMatrix(mat_file, "rays", ray_data, false);
+        assert(is_read);
+        assert(keypoint_data.rows() == ray_data.rows());
+        assert(keypoint_data.cols() == 2);
+        assert(ray_data.cols() == 2);
+                
+        Eigen::VectorXd pt = VectorXd::Zero(2, 1);
+        Eigen::VectorXd r = VectorXd::Zero(2, 1);
+        for (int i = 0; i<keypoint_data.rows(); i++) {
+            pt = keypoint_data.row(i);
+            r = ray_data.row(i);
+            
+            image_points.push_back(pt);
+            rays.push_back(r);
+        }
+        assert(image_points.size() == rays.size());        
+    }
 
 
 

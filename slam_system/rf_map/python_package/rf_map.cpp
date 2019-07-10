@@ -116,6 +116,45 @@ void RFMap::relocalizeCamera(const char* feature_location_file_name,
     }
 }
 
+void RFMap::estimateCameraRANSAC(const char* pixel_ray_file_name,
+                               double* pan_tilt_zoom)
+{
+    // RANSAC parameter
+    Eigen::Vector2d pp(1280/2.0, 720/2.0);
+    ptz_pose_opt::PTZPreemptiveRANSACParameter ransac_param;
+    ransac_param.reprojection_error_threshold_ = 2.0;
+    ransac_param.sample_number_ = 32;
+    
+    // read pixel-ray correspondences
+    vector<Eigen::Vector2d> image_points;
+    vector<Eigen::Vector2d> rays;
+    btdtr_ptz_util::readKeypointRay(pixel_ray_file_name, image_points, rays);
+    
+    vector<vector<Eigen::Vector2d> > candidate_pan_tilt;
+    for (int i = 0; i<image_points.size(); i++) {
+        vector<Eigen::Vector2d> pan_tilt;
+        pan_tilt.push_back(rays[i]);
+        candidate_pan_tilt.push_back(pan_tilt);
+    }
+    
+    Eigen::Vector3d estimated_ptz(pan_tilt_zoom[0], pan_tilt_zoom[1], pan_tilt_zoom[2]);
+    
+    // estimate camera pose
+    double tt = clock();
+    bool is_opt = ptz_pose_opt::preemptiveRANSACOneToMany(image_points, candidate_pan_tilt,
+                                                          pp,
+                                                          ransac_param, estimated_ptz, false);
+    printf("Prediction and camera pose estimation cost time: %f seconds.\n", (clock() - tt)/CLOCKS_PER_SEC);
+    if (!is_opt) {
+        printf("-------------------------------------------- Optimize PTZ failed.\n");
+    }
+    else {
+        pan_tilt_zoom[0] = estimated_ptz[0];
+        pan_tilt_zoom[1] = estimated_ptz[1];
+        pan_tilt_zoom[2] = estimated_ptz[2];
+    }
+}
+
 /******************-----------C inter face--------------******************/
 EXPORTIT RFMap* RFMap_new()
 {
@@ -149,4 +188,10 @@ EXPORTIT void createMap(RFMap* rf_map,
     //printf("after: address %p\n", (void*)(&(rf_map->model_)));
     rf_map->createMap(feature_label_file, model_parameter_file, model_name);
     //printf("after 1 1: address %p\n", (void*)rf_map);
+}
+
+EXPORTIT void estimateCameraRANSAC(const char* pixel_ray_file_name,
+                                   double* pan_tilt_zoom)
+{
+    RFMap::estimateCameraRANSAC(pixel_ray_file_name, pan_tilt_zoom);
 }

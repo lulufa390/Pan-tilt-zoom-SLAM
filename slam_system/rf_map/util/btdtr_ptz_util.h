@@ -81,11 +81,16 @@ void generatePTZSampleWithFeature(const char * feature_ptz_file_name,
     void generatePTZSampleWithFeature(const char * feature_location_file_name,
                                       const Eigen::Vector2f& pp,
                                       vector<PTZSample> & samples);
-
+  //?
 void readSequenceData(const char * sequence_file_name,
                       const char * sequence_base_directory,
                         vector<string> & feature_files,
                         vector<Eigen::Vector3f> & ptzs);
+    
+    // read 'keypoints' and 'rays' from a .mat file
+    void readKeypointRay(const char* mat_file,
+                             vector<Eigen::Vector2d> & image_points,
+                             vector<Eigen::Vector2d> & rays);
     
 
     

@@ -37,6 +37,10 @@ public:
                           const char* test_parameter_file,
                           double* pan_tilt_zoom);
     
+    // estimate camera pose by given pixel-ray correcpondence
+    static void estimateCameraRANSAC(const char* pixel_ray_file_name,
+                                    double* pan_tilt_zoom);
+    
 };
 
 
@@ -53,7 +57,10 @@ extern "C" {
     EXPORTIT void relocalizeCamera(RFMap* rf_map,
                                  const char* feature_location_file_name,
                                  const char* test_parameter_file,
-                                 double* pan_tilt_zoom);  
+                                 double* pan_tilt_zoom);
+    
+    EXPORTIT void estimateCameraRANSAC(const char* pixel_ray_file_name,
+                                       double* pan_tilt_zoom);
 }
 
 
