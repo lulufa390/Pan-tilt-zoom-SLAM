@@ -135,7 +135,7 @@ def ut_estimateCameraRANSAC():
         rays = data['rays']
         keypoints = data['keypoints']
 
-        optimized_pose = least_squares(NNBasedMap.compute_residual, init_ptz, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
+        optimized_pose = least_squares(NNBasedMap.compute_residual, init_ptz, verbose=0, x_scale='jac', ftol=1e-4, method='trf',
                                        args=(rays, keypoints, 640, 360))
 
 
