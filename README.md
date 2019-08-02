@@ -1,5 +1,5 @@
 # Pan-tilt-zoom SLAM
-Jikai Lu, Jianhui Chen, James J. Little, "Pan-tilt-zoom SLAM for Sports Videos",
+Jikai Lu, Jianhui Chen, James J. Little, "Pan-tilt-zoom SLAM for Sports Videos",  
 accepted at *British Machine Vision Conference* (BMVC) 2019.
 
 This repository contains Python implementation of this paper.
