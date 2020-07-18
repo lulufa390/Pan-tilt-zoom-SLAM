@@ -7,63 +7,6 @@ Experiment code for different algorithms.
 
 from ptz_slam import *
 
-
-def ut_soccer3():
-    """
-    PTZ SLAM experiment code for soccer sequence3.
-    system parameters:
-    init_system and add_rays: detect 300 orb keypoints each frame
-    good new keyframe: 10 ~ 15
-    images have been blurred. So there is no need to add mask to bounding_box
-    """
-    sequence = SequenceManager("../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
-                               "../../dataset/soccer_dataset/seq3/seq3_330",
-                               "../../dataset/soccer_dataset/seq3/seq3_ground_truth.mat",
-                               "../../dataset/soccer_dataset/seq3/seq3_player_bounding_box.mat")
-    slam = PtzSlam()
-
-    first_img = sequence.get_image_gray(index=0, dataset_type=1)
-    first_camera = sequence.get_camera(0)
-    first_bounding_box = sequence.get_bounding_box_mask(0)
-
-    slam.init_system(first_img, first_camera, bounding_box=first_bounding_box)
-    slam.add_keyframe(first_img, first_camera, 0, enable_rf=False)
-    # slam.add_keyframe_random_forest(first_img, first_camera, 0)
-
-    pan_list = [first_camera.get_ptz()[0]]
-    tilt_list = [first_camera.get_ptz()[1]]
-    zoom_list = [first_camera.get_ptz()[2]]
-
-    for i in range(1, sequence.length):
-        img = sequence.get_image_gray(index=i, dataset_type=1)
-        bounding_box = sequence.get_bounding_box_mask(i)
-        slam.tracking(next_img=img, bad_tracking_percentage=80, bounding_box=bounding_box)
-
-        if slam.tracking_lost:
-            relocalized_camera = slam.relocalize(img, slam.current_camera, enable_rf=False)
-            slam.init_system(img, relocalized_camera, bounding_box=bounding_box)
-
-            print("do relocalization!")
-        elif slam.new_keyframe:
-            slam.add_keyframe(img, slam.current_camera, i, enable_rf=False)
-            print("add keyframe!")
-
-        print("=====The ", i, " iteration=====")
-
-        print("%f" % (slam.cameras[i].pan - sequence.ground_truth_pan[i]))
-        print("%f" % (slam.cameras[i].tilt - sequence.ground_truth_tilt[i]))
-        print("%f" % (slam.cameras[i].focal_length - sequence.ground_truth_f[i]))
-
-        pan_list.append(slam.cameras[i].pan)
-        tilt_list.append(slam.cameras[i].tilt)
-        zoom_list.append(slam.cameras[i].focal_length)
-
-    for i, keyframe in enumerate(slam.keyframe_map.keyframe_list):
-        keyframe.save_to_mat(str(i) + ".mat")
-
-    save_camera_pose(pan_list, tilt_list, zoom_list, "./result.mat")
-
-
 def ut_basketball():
     """
     PTZ SLAM experiment code for basketball dataset.
@@ -729,7 +672,6 @@ def nn_relocalized_synthesized():
 
 if __name__ == "__main__":
     # ut_basketball()
-    # ut_soccer3()
     # baseline_keyframe_based_homography_matching_basketball()
     # baseline_keyframe_based_homography_matching_soccer3()
     # ut_UBC_hockey()
