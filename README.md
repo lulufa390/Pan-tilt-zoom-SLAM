@@ -43,4 +43,14 @@ of our method over previous methods for online PTZ camera pose estimation.
 - deprecated: preliminary practice code
 - writing: visualize for paper writing
 
+
+## How to run a demo with the soccer data
+1. Download images from this link: https://www.dropbox.com/s/ybdb0rfvnq9avjx/soccer_images.zip?dl=0  
+   Put the folder in dataset/soccer   
+2. Compile a library (librf_map_python) in slam_system/rf_map,  
+   and change the lib directory in slam_system/rf_map/python_package/rf_map_wrapper.py  
+3. run python soccer_demo.py 
+
+
+
   
